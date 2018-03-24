@@ -7,9 +7,9 @@ package middleware
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"net"
-	"fmt"
 )
 
 const (

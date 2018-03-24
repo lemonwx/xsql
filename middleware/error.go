@@ -5,10 +5,9 @@
 
 package middleware
 
-
 import (
-"errors"
-"fmt"
+	"errors"
+	"fmt"
 )
 
 var (

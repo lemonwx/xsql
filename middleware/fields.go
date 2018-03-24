@@ -7,7 +7,6 @@ package middleware
 
 import "encoding/binary"
 
-
 type FieldData []byte
 
 type Field struct {

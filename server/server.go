@@ -3,17 +3,17 @@
  *  data  : 18-3-24 下午3:18
  */
 
-package  server
+package server
 
 import (
-	"net"
 	"fmt"
+	"net"
 
 	"github.com/lemonwx/xsql/middleware/midconn"
 )
 
 type Server struct {
-	lis net.Listener
+	lis  net.Listener
 	addr string
 }
 
@@ -28,9 +28,9 @@ func NewServer(addr string) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) Run()  error {
+func (s *Server) Run() error {
 
-	for  {
+	for {
 		conn, err := s.lis.Accept()
 		if err != nil {
 			fmt.Println("xsql server accept failed")

@@ -6,14 +6,13 @@
 package client
 
 import (
-	"net"
 	"bytes"
 	"encoding/binary"
+	"net"
 	"sync/atomic"
 
 	"github.com/lemonwx/xsql/middleware"
 )
-
 
 var DEFAULT_CAPABILITY uint32 = middleware.CLIENT_LONG_PASSWORD | middleware.CLIENT_LONG_FLAG |
 	middleware.CLIENT_CONNECT_WITH_DB | middleware.CLIENT_PROTOCOL_41 |
@@ -22,29 +21,28 @@ var DEFAULT_CAPABILITY uint32 = middleware.CLIENT_LONG_PASSWORD | middleware.CLI
 var baseConnId int32 = 1000
 
 type CliConn struct {
-	conn net.Conn
-	pkt *middleware.PacketIO
+	conn         net.Conn
+	pkt          *middleware.PacketIO
 	connectionId int32
-	salt []byte
-	capability uint32
+	salt         []byte
+	capability   uint32
 
 	status    uint16
 	collation middleware.CollationId
-	charset string
+	charset   string
 
 	user string
-	db string
+	db   string
 
-	defaultUser string
+	defaultUser   string
 	defaultPasswd string
 }
 
-
-func NewClieConn(conn net.Conn) *CliConn{
+func NewClieConn(conn net.Conn) *CliConn {
 
 	cli := &CliConn{
 		conn: conn,
-		pkt : middleware.NewPacketIO(conn),
+		pkt:  middleware.NewPacketIO(conn),
 	}
 
 	cli.pkt.Sequence = 0
@@ -56,8 +54,6 @@ func NewClieConn(conn net.Conn) *CliConn{
 
 	return cli
 }
-
-
 
 func (c *CliConn) Handshake() error {
 	if err := c.writeInitialHandshake(); err != nil {
@@ -75,7 +71,6 @@ func (c *CliConn) Handshake() error {
 	c.pkt.Sequence = 0
 	return nil
 }
-
 
 func (c *CliConn) writeInitialHandshake() error {
 	data := make([]byte, 4, 128)
@@ -122,7 +117,6 @@ func (c *CliConn) writeInitialHandshake() error {
 	data = append(data, 0)
 	return c.writePacket(data)
 }
-
 
 func (c *CliConn) readHandshakeResponse() error {
 	data, err := c.ReadPacket()
@@ -209,7 +203,7 @@ func (c *CliConn) writePacket(data []byte) error {
 	return c.pkt.WritePacket(data)
 }
 
-func (c *CliConn) SetPktSeq (sz uint8) {
+func (c *CliConn) SetPktSeq(sz uint8) {
 	c.pkt.Sequence = sz
 }
 

@@ -6,8 +6,8 @@
 package node
 
 type Node struct {
-	addr string
-	user string
+	addr     string
+	user     string
 	password string
 }
 

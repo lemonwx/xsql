@@ -6,11 +6,11 @@
 package midconn
 
 import (
+	"fmt"
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/node"
-	"fmt"
-	"os"
 	"net"
+	"os"
 )
 
 var (
@@ -19,10 +19,9 @@ var (
 )
 
 type MidConn struct {
-	cli *client.CliConn
+	cli  *client.CliConn
 	node []*node.Node
 }
-
 
 func NewMidConn(conn net.Conn) *MidConn {
 	// handshake with mysql client
@@ -55,7 +54,6 @@ func (conn *MidConn) Serve() {
 		}
 		fmt.Println(data)
 		conn.cli.WriteOK(nil)
-
 
 		conn.cli.SetPktSeq(0)
 	}
