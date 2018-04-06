@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/log"
 )
 
 var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
@@ -180,7 +181,66 @@ func (c *CliConn) readHandshakeResponse() error {
 	return nil
 }
 
+
+func (c *CliConn) SetPktSeq(sz uint8) {
+	c.pkt.Sequence = sz
+}
+
+
+func (c *CliConn) ReadPacket() ([]byte, error) {
+	return c.pkt.ReadPacket()
+}
+
+
+func (c *CliConn) WriteResultset(status uint16, r *mysql.Resultset) error {
+	log.Debugf("send select rets [%v] to cli", r)
+
+	total := make([]byte, 0, 4096)
+	data := make([]byte, 4, 512)
+	var err error
+
+	columnLen := mysql.PutLengthEncodedInt(uint64(len(r.Fields)))
+
+	data = append(data, columnLen...)
+	total, err = c.writePacketBatch(total, data, false)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range r.Fields {
+		data = data[0:4]
+		data = append(data, v.Dump()...)
+		total, err = c.writePacketBatch(total, data, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	total, err = c.writeEOFBatch(total, status, false)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range r.RowDatas {
+		data = data[0:4]
+		data = append(data, v...)
+		total, err = c.writePacketBatch(total, data, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	total, err = c.writeEOFBatch(total, status, true)
+	total = nil
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *CliConn) WriteOK(r *mysql.Result) error {
+	log.Debugf("send exec ok to cli: %v", r)
 	if r == nil {
 		r = &mysql.Result{Status: c.status}
 	}
@@ -197,18 +257,6 @@ func (c *CliConn) WriteOK(r *mysql.Result) error {
 	}
 
 	return c.writePacket(data)
-}
-
-func (c *CliConn) ReadPacket() ([]byte, error) {
-	return c.pkt.ReadPacket()
-}
-
-func (c *CliConn) writePacket(data []byte) error {
-	return c.pkt.WritePacket(data)
-}
-
-func (c *CliConn) SetPktSeq(sz uint8) {
-	c.pkt.Sequence = sz
 }
 
 func (c *CliConn) WriteError(e error) error {
@@ -230,7 +278,17 @@ func (c *CliConn) WriteError(e error) error {
 
 	data = append(data, m.Message...)
 
+	log.Errorf("send err to cli: %v", e)
 	return c.writePacket(data)
+}
+
+
+func (c *CliConn) writePacket(data []byte) error {
+	return c.pkt.WritePacket(data)
+}
+
+func (c *CliConn) writePacketBatch(total, data []byte, direct bool) ([]byte, error) {
+	return c.pkt.WritePacketBatch(total, data, direct)
 }
 
 func (c *CliConn) writeEOF(status uint16) error {
@@ -244,6 +302,19 @@ func (c *CliConn) writeEOF(status uint16) error {
 
 	return c.writePacket(data)
 }
+
+func (c *CliConn) writeEOFBatch(total []byte, status uint16, direct bool) ([]byte, error) {
+	data := make([]byte, 4, 9)
+
+	data = append(data, mysql.EOF_HEADER)
+	if c.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, 0, 0)
+		data = append(data, byte(status), byte(status>>8))
+	}
+
+	return c.writePacketBatch(total, data, direct)
+}
+
 
 func (c  *CliConn) Close() {
 	if c.conn != nil {

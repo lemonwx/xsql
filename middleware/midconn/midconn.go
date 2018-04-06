@@ -9,12 +9,17 @@ import (
 	"sync"
 	"net"
 	"sync/atomic"
+	"strings"
+	"errors"
+	"strconv"
 
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/sqlparser"
+	"utils"
 )
 
 var baseConnId uint32 = 1000
@@ -95,8 +100,6 @@ func (conn *MidConn) Serve() {
 			conn.cli.WriteError(err)
 			conn.cli.SetPktSeq(0)
 		}
-		conn.cli.WriteOK(nil)
-		conn.cli.SetPktSeq(0)
 	}
 }
 
@@ -105,11 +108,47 @@ func (conn *MidConn) dispatch(sql []byte) error {
 	log.Debugf("recv [%s] from cli", sql)
 	switch opt {
 	case mysql.COM_QUERY:
+		return conn.handleQuery(string(sql))
 	case mysql.COM_QUIT:
 	case mysql.COM_FIELD_LIST:
 	case mysql.COM_INIT_DB:
+		return conn.handleUse(sql)
 	}
 
+	return nil
+}
+
+func (conn *MidConn) handleQuery(sql string) error {
+
+	sql = strings.TrimRight(sql, ";")
+	stmt, err := sqlparser.Parse(sql)
+	if err != nil {
+		log.Errorf("parse [%s] failed: %v", sql, err)
+		return err
+	}
+
+	if strings.ToLower(sql[:4]) == "desc" {
+		rs, err := conn.nodes[0].Execute(mysql.COM_QUERY, []byte(sql))
+		if err != nil {
+			return err
+		} else {
+			return conn.cli.WriteResultset(rs.Status, rs.Resultset)
+		}
+	}
+
+	log.Debug(stmt)
+	// switch v := stmt.(type) {
+	switch v := stmt.(type) {
+	case *sqlparser.SimpleSelect:
+		return conn.handleSimpleSelect(v, sql)
+	case *sqlparser.Select:
+		return conn.handleSelect(v, sql)
+	case *sqlparser.Show:
+
+
+	default:
+		return errors.New("not support this sql")
+	}
 	return nil
 }
 
@@ -118,10 +157,19 @@ func (conn *MidConn) handleUse(db []byte) error {
 	conn.db = tmp
 	conn.cli.Db = tmp
 	// rets, errs := conn
-	return nil
+
+	rets, err := conn.ExecuteMultiNode(mysql.COM_INIT_DB,  db, nil)
+	if err != nil {
+		return err
+	}
+	return conn.HandleExecRets(rets)
 }
 
-func (conn *MidConn) ExecuteMultiNode2(opt uint8, sql []byte, nodeIdxs []int)(
+func (conn *MidConn) writeResultset(status uint16, r *mysql.Resultset) error {
+	return conn.cli.WriteResultset(status, r)
+}
+
+func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int)(
 	[]*mysql.Result, error) {
 
 	if nodeIdxs == nil {
@@ -141,10 +189,91 @@ func (conn *MidConn) ExecuteMultiNode2(opt uint8, sql []byte, nodeIdxs []int)(
 			} else {
 				rets[tmp] = rs
 			}
+			wg.Done()
 		}(idx)
 	}
 
-	return nil, nil
+	wg.Wait()
+
+	rs := make([]*mysql.Result, 0, len(nodeIdxs))
+	for _, ret := range rets {
+		if err, ok := ret.(error); ok {
+			return nil, err
+		}
+		rs = append(rs,  ret.(*mysql.Result))
+	}
+	return rs, nil
+}
+
+func (conn *MidConn) HandleExecRets(rets []*mysql.Result) error {
+	if rs, err := conn.mergeExecResult(rets); err != nil {
+		return conn.cli.WriteError(err)
+	} else if rs != nil {
+		return conn.cli.WriteOK(rs)
+	} else {
+		return conn.cli.WriteOK(nil)
+	}
+
+}
+
+func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
+
+	if rs, err := conn.mergeSelResult(nil, rets); err != nil {
+		log.Errorf("merge select result failed: %v", err)
+		return conn.cli.WriteError(err)
+	} else if rs != nil {
+		return conn.cli.WriteResultset(conn.status, rs.Resultset)
+	} else {
+		return UNEXPECT_MIDDLE_WARE_ERR
+	}
+
+}
+
+func (conn *MidConn) mergeExecResult(rets []*mysql.Result) (*mysql.Result, error) {
+	ret := new(mysql.Result)
+
+	for _, r := range rets {
+		ret.Status |= r.Status
+		ret.AffectedRows += r.AffectedRows
+	}
+	return ret, nil
+}
+
+func (conn *MidConn) mergeSelResult(versions []uint64, rets []*mysql.Result) (*mysql.Result, error) {
+	rs := rets[0]
+	tgtRs := new(mysql.Resultset)
+
+	// hide version columns
+	startIdx := 0
+	if _, ok := rs.Resultset.FieldNames["version"]; ok && versions != nil {
+		startIdx = 1
+	}
+	tgtRs.Fields = rs.Resultset.Fields[startIdx:]
+
+	for _, r := range rets {
+		for idx, _ := range r.RowDatas {
+			rd := r.RowDatas[idx]
+			if startIdx == 1 {
+				rdStart := rd[0] + 1
+				v, err := strconv.ParseUint(string(rd[1:rdStart]), 10, 64)
+				if err != nil {
+					log.Errorf("get version from every row failed: %v", err)
+				}
+				if utils.InArray(versions, v) {
+					return nil, ROW_DATA_IN_USE_ERR
+				}
+				rd = rd[rdStart:]
+			}
+			val := r.Values[idx][startIdx:]
+			tgtRs.RowDatas = append(tgtRs.RowDatas, rd)
+			tgtRs.Values = append(tgtRs.Values, val)
+		}
+	}
+
+	return &mysql.Result{
+		Status: 0,
+		Resultset: tgtRs,
+	}, nil
 }
 
 func (conn *MidConn) Close() {

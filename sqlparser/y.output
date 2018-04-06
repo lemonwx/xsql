@@ -1,0 +1,4516 @@
+
+state 0
+	$accept: .any_command $end 
+
+	SELECT  shift 18
+	INSERT  shift 19
+	UPDATE  shift 20
+	DELETE  shift 21
+	SET  shift 22
+	BEGIN  shift 27
+	COMMIT  shift 28
+	ROLLBACK  shift 29
+	REPLACE  shift 30
+	ADMIN  shift 32
+	SHOW  shift 31
+	CREATE  shift 23
+	ALTER  shift 24
+	DROP  shift 26
+	RENAME  shift 25
+	.  error
+
+	any_command  goto 1
+	command  goto 2
+	select_statement  goto 3
+	insert_statement  goto 4
+	update_statement  goto 5
+	delete_statement  goto 6
+	set_statement  goto 7
+	create_statement  goto 8
+	alter_statement  goto 9
+	rename_statement  goto 10
+	drop_statement  goto 11
+	begin_statement  goto 12
+	commit_statement  goto 13
+	rollback_statement  goto 14
+	replace_statement  goto 15
+	show_statement  goto 16
+	admin_statement  goto 17
+
+state 1
+	$accept:  any_command.$end 
+
+	$end  accept
+	.  error
+
+
+state 2
+	any_command:  command.    (1)
+
+	.  reduce 1 (src line 168)
+
+
+state 3
+	command:  select_statement.    (2)
+	select_statement:  select_statement.union_op select_statement 
+
+	UNION  shift 34
+	MINUS  shift 35
+	EXCEPT  shift 36
+	INTERSECT  shift 37
+	.  reduce 2 (src line 174)
+
+	union_op  goto 33
+
+state 4
+	command:  insert_statement.    (3)
+
+	.  reduce 3 (src line 179)
+
+
+state 5
+	command:  update_statement.    (4)
+
+	.  reduce 4 (src line 180)
+
+
+state 6
+	command:  delete_statement.    (5)
+
+	.  reduce 5 (src line 181)
+
+
+state 7
+	command:  set_statement.    (6)
+
+	.  reduce 6 (src line 182)
+
+
+state 8
+	command:  create_statement.    (7)
+
+	.  reduce 7 (src line 183)
+
+
+state 9
+	command:  alter_statement.    (8)
+
+	.  reduce 8 (src line 184)
+
+
+state 10
+	command:  rename_statement.    (9)
+
+	.  reduce 9 (src line 185)
+
+
+state 11
+	command:  drop_statement.    (10)
+
+	.  reduce 10 (src line 186)
+
+
+state 12
+	command:  begin_statement.    (11)
+
+	.  reduce 11 (src line 187)
+
+
+state 13
+	command:  commit_statement.    (12)
+
+	.  reduce 12 (src line 188)
+
+
+state 14
+	command:  rollback_statement.    (13)
+
+	.  reduce 13 (src line 189)
+
+
+state 15
+	command:  replace_statement.    (14)
+
+	.  reduce 14 (src line 190)
+
+
+state 16
+	command:  show_statement.    (15)
+
+	.  reduce 15 (src line 191)
+
+
+state 17
+	command:  admin_statement.    (16)
+
+	.  reduce 16 (src line 192)
+
+
+state 18
+	select_statement:  SELECT.comment_opt distinct_opt select_expression_list limit_opt 
+	select_statement:  SELECT.comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt 
+	$$45: .    (45)
+
+	.  reduce 45 (src line 353)
+
+	comment_opt  goto 38
+	$$45  goto 39
+
+state 19
+	insert_statement:  INSERT.comment_opt INTO dml_table_expression column_list_opt row_list on_dup_opt 
+	insert_statement:  INSERT.comment_opt INTO dml_table_expression SET update_list on_dup_opt 
+	$$45: .    (45)
+
+	.  reduce 45 (src line 353)
+
+	comment_opt  goto 40
+	$$45  goto 39
+
+state 20
+	update_statement:  UPDATE.comment_opt dml_table_expression SET update_list where_expression_opt order_by_opt limit_opt 
+	$$45: .    (45)
+
+	.  reduce 45 (src line 353)
+
+	comment_opt  goto 41
+	$$45  goto 39
+
+state 21
+	delete_statement:  DELETE.comment_opt FROM dml_table_expression where_expression_opt order_by_opt limit_opt 
+	$$45: .    (45)
+
+	.  reduce 45 (src line 353)
+
+	comment_opt  goto 42
+	$$45  goto 39
+
+state 22
+	set_statement:  SET.comment_opt update_list 
+	set_statement:  SET.comment_opt NAMES ID 
+	$$45: .    (45)
+
+	.  reduce 45 (src line 353)
+
+	comment_opt  goto 43
+	$$45  goto 39
+
+state 23
+	create_statement:  CREATE.TABLE not_exists_opt ID force_eof 
+	create_statement:  CREATE.constraint_opt INDEX sql_id using_opt ON ID force_eof 
+	create_statement:  CREATE.VIEW sql_id force_eof 
+	constraint_opt: .    (209)
+
+	TABLE  shift 44
+	VIEW  shift 46
+	UNIQUE  shift 47
+	.  reduce 209 (src line 1087)
+
+	constraint_opt  goto 45
+
+state 24
+	alter_statement:  ALTER.ignore_opt TABLE ID non_rename_operation force_eof 
+	alter_statement:  ALTER.ignore_opt TABLE ID RENAME to_opt ID 
+	alter_statement:  ALTER.VIEW sql_id force_eof 
+	ignore_opt: .    (200)
+
+	VIEW  shift 49
+	IGNORE  shift 50
+	.  reduce 200 (src line 1065)
+
+	ignore_opt  goto 48
+
+state 25
+	rename_statement:  RENAME.TABLE ID TO ID 
+
+	TABLE  shift 51
+	.  error
+
+
+state 26
+	drop_statement:  DROP.TABLE exists_opt ID 
+	drop_statement:  DROP.INDEX sql_id ON ID 
+	drop_statement:  DROP.VIEW exists_opt sql_id force_eof 
+
+	TABLE  shift 52
+	INDEX  shift 53
+	VIEW  shift 54
+	.  error
+
+
+state 27
+	begin_statement:  BEGIN.    (28)
+
+	.  reduce 28 (src line 264)
+
+
+state 28
+	commit_statement:  COMMIT.    (29)
+
+	.  reduce 29 (src line 270)
+
+
+state 29
+	rollback_statement:  ROLLBACK.    (30)
+
+	.  reduce 30 (src line 276)
+
+
+state 30
+	replace_statement:  REPLACE.comment_opt INTO dml_table_expression column_list_opt row_list 
+	replace_statement:  REPLACE.comment_opt INTO dml_table_expression SET update_list 
+	$$45: .    (45)
+
+	.  reduce 45 (src line 353)
+
+	comment_opt  goto 55
+	$$45  goto 39
+
+state 31
+	show_statement:  SHOW.DATABASES like_or_where_opt 
+	show_statement:  SHOW.TABLES from_opt like_or_where_opt 
+	show_statement:  SHOW.PROXY sql_id from_opt like_or_where_opt 
+
+	DATABASES  shift 56
+	TABLES  shift 57
+	PROXY  shift 58
+	.  error
+
+
+state 32
+	admin_statement:  ADMIN.sql_id '(' value_expression_list ')' 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 59
+
+state 33
+	select_statement:  select_statement union_op.select_statement 
+
+	SELECT  shift 18
+	.  error
+
+	select_statement  goto 61
+
+state 34
+	union_op:  UNION.    (49)
+	union_op:  UNION.ALL 
+
+	ALL  shift 62
+	.  reduce 49 (src line 372)
+
+
+state 35
+	union_op:  MINUS.    (51)
+
+	.  reduce 51 (src line 381)
+
+
+state 36
+	union_op:  EXCEPT.    (52)
+
+	.  reduce 52 (src line 385)
+
+
+state 37
+	union_op:  INTERSECT.    (53)
+
+	.  reduce 53 (src line 389)
+
+
+state 38
+	select_statement:  SELECT comment_opt.distinct_opt select_expression_list limit_opt 
+	select_statement:  SELECT comment_opt.distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt 
+	distinct_opt: .    (54)
+
+	DISTINCT  shift 64
+	.  reduce 54 (src line 394)
+
+	distinct_opt  goto 63
+
+state 39
+	comment_opt:  $$45.comment_list 
+	comment_list: .    (47)
+
+	.  reduce 47 (src line 363)
+
+	comment_list  goto 65
+
+state 40
+	insert_statement:  INSERT comment_opt.INTO dml_table_expression column_list_opt row_list on_dup_opt 
+	insert_statement:  INSERT comment_opt.INTO dml_table_expression SET update_list on_dup_opt 
+
+	INTO  shift 66
+	.  error
+
+
+state 41
+	update_statement:  UPDATE comment_opt.dml_table_expression SET update_list where_expression_opt order_by_opt limit_opt 
+
+	ID  shift 68
+	.  error
+
+	dml_table_expression  goto 67
+
+state 42
+	delete_statement:  DELETE comment_opt.FROM dml_table_expression where_expression_opt order_by_opt limit_opt 
+
+	FROM  shift 69
+	.  error
+
+
+state 43
+	set_statement:  SET comment_opt.update_list 
+	set_statement:  SET comment_opt.NAMES ID 
+
+	ID  shift 75
+	NAMES  shift 71
+	.  error
+
+	column_name  goto 73
+	update_list  goto 70
+	update_expression  goto 72
+	sql_id  goto 74
+
+state 44
+	create_statement:  CREATE TABLE.not_exists_opt ID force_eof 
+	not_exists_opt: .    (198)
+
+	IF  shift 77
+	.  reduce 198 (src line 1060)
+
+	not_exists_opt  goto 76
+
+state 45
+	create_statement:  CREATE constraint_opt.INDEX sql_id using_opt ON ID force_eof 
+
+	INDEX  shift 78
+	.  error
+
+
+state 46
+	create_statement:  CREATE VIEW.sql_id force_eof 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 79
+
+state 47
+	constraint_opt:  UNIQUE.    (210)
+
+	.  reduce 210 (src line 1089)
+
+
+state 48
+	alter_statement:  ALTER ignore_opt.TABLE ID non_rename_operation force_eof 
+	alter_statement:  ALTER ignore_opt.TABLE ID RENAME to_opt ID 
+
+	TABLE  shift 80
+	.  error
+
+
+state 49
+	alter_statement:  ALTER VIEW.sql_id force_eof 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 81
+
+state 50
+	ignore_opt:  IGNORE.    (201)
+
+	.  reduce 201 (src line 1067)
+
+
+state 51
+	rename_statement:  RENAME TABLE.ID TO ID 
+
+	ID  shift 82
+	.  error
+
+
+state 52
+	drop_statement:  DROP TABLE.exists_opt ID 
+	exists_opt: .    (196)
+
+	IF  shift 84
+	.  reduce 196 (src line 1055)
+
+	exists_opt  goto 83
+
+state 53
+	drop_statement:  DROP INDEX.sql_id ON ID 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 85
+
+state 54
+	drop_statement:  DROP VIEW.exists_opt sql_id force_eof 
+	exists_opt: .    (196)
+
+	IF  shift 84
+	.  reduce 196 (src line 1055)
+
+	exists_opt  goto 86
+
+state 55
+	replace_statement:  REPLACE comment_opt.INTO dml_table_expression column_list_opt row_list 
+	replace_statement:  REPLACE comment_opt.INTO dml_table_expression SET update_list 
+
+	INTO  shift 87
+	.  error
+
+
+state 56
+	show_statement:  SHOW DATABASES.like_or_where_opt 
+	like_or_where_opt: .    (97)
+
+	WHERE  shift 89
+	LIKE  shift 90
+	.  reduce 97 (src line 589)
+
+	like_or_where_opt  goto 88
+
+state 57
+	show_statement:  SHOW TABLES.from_opt like_or_where_opt 
+	from_opt: .    (100)
+
+	FROM  shift 92
+	.  reduce 100 (src line 602)
+
+	from_opt  goto 91
+
+state 58
+	show_statement:  SHOW PROXY.sql_id from_opt like_or_where_opt 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 93
+
+state 59
+	admin_statement:  ADMIN sql_id.'(' value_expression_list ')' 
+
+	'('  shift 94
+	.  error
+
+
+state 60
+	sql_id:  ID.    (213)
+
+	.  reduce 213 (src line 1097)
+
+
+state 61
+	select_statement:  select_statement.union_op select_statement 
+	select_statement:  select_statement union_op select_statement.    (19)
+
+	.  reduce 19 (src line 203)
+
+	union_op  goto 33
+
+state 62
+	union_op:  UNION ALL.    (50)
+
+	.  reduce 50 (src line 377)
+
+
+state 63
+	select_statement:  SELECT comment_opt distinct_opt.select_expression_list limit_opt 
+	select_statement:  SELECT comment_opt distinct_opt.select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 99
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	'*'  shift 97
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	select_expression_list  goto 95
+	select_expression  goto 96
+	expression  goto 98
+	boolean_expression  goto 100
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 101
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 64
+	distinct_opt:  DISTINCT.    (55)
+
+	.  reduce 55 (src line 398)
+
+
+state 65
+	comment_opt:  $$45 comment_list.    (46)
+	comment_list:  comment_list.COMMENT 
+
+	COMMENT  shift 124
+	.  reduce 46 (src line 357)
+
+
+state 66
+	insert_statement:  INSERT comment_opt INTO.dml_table_expression column_list_opt row_list on_dup_opt 
+	insert_statement:  INSERT comment_opt INTO.dml_table_expression SET update_list on_dup_opt 
+
+	ID  shift 68
+	.  error
+
+	dml_table_expression  goto 125
+
+state 67
+	update_statement:  UPDATE comment_opt dml_table_expression.SET update_list where_expression_opt order_by_opt limit_opt 
+
+	SET  shift 126
+	.  error
+
+
+state 68
+	dml_table_expression:  ID.    (87)
+	dml_table_expression:  ID.'.' ID 
+
+	'.'  shift 127
+	.  reduce 87 (src line 543)
+
+
+state 69
+	delete_statement:  DELETE comment_opt FROM.dml_table_expression where_expression_opt order_by_opt limit_opt 
+
+	ID  shift 68
+	.  error
+
+	dml_table_expression  goto 128
+
+state 70
+	set_statement:  SET comment_opt update_list.    (26)
+	update_list:  update_list.',' update_expression 
+
+	','  shift 129
+	.  reduce 26 (src line 254)
+
+
+state 71
+	set_statement:  SET comment_opt NAMES.ID 
+
+	ID  shift 130
+	.  error
+
+
+state 72
+	update_list:  update_expression.    (193)
+
+	.  reduce 193 (src line 1039)
+
+
+state 73
+	update_expression:  column_name.'=' value_expression 
+
+	'='  shift 131
+	.  error
+
+
+state 74
+	column_name:  sql_id.    (163)
+
+	.  reduce 163 (src line 893)
+
+
+state 75
+	column_name:  ID.'.' sql_id 
+	sql_id:  ID.    (213)
+
+	'.'  shift 132
+	.  reduce 213 (src line 1097)
+
+
+state 76
+	create_statement:  CREATE TABLE not_exists_opt.ID force_eof 
+
+	ID  shift 133
+	.  error
+
+
+state 77
+	not_exists_opt:  IF.NOT EXISTS 
+
+	NOT  shift 134
+	.  error
+
+
+state 78
+	create_statement:  CREATE constraint_opt INDEX.sql_id using_opt ON ID force_eof 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 135
+
+state 79
+	create_statement:  CREATE VIEW sql_id.force_eof 
+	force_eof: .    (214)
+
+	.  reduce 214 (src line 1103)
+
+	force_eof  goto 136
+
+state 80
+	alter_statement:  ALTER ignore_opt TABLE.ID non_rename_operation force_eof 
+	alter_statement:  ALTER ignore_opt TABLE.ID RENAME to_opt ID 
+
+	ID  shift 137
+	.  error
+
+
+state 81
+	alter_statement:  ALTER VIEW sql_id.force_eof 
+	force_eof: .    (214)
+
+	.  reduce 214 (src line 1103)
+
+	force_eof  goto 138
+
+state 82
+	rename_statement:  RENAME TABLE ID.TO ID 
+
+	TO  shift 139
+	.  error
+
+
+state 83
+	drop_statement:  DROP TABLE exists_opt.ID 
+
+	ID  shift 140
+	.  error
+
+
+state 84
+	exists_opt:  IF.EXISTS 
+
+	EXISTS  shift 141
+	.  error
+
+
+state 85
+	drop_statement:  DROP INDEX sql_id.ON ID 
+
+	ON  shift 142
+	.  error
+
+
+state 86
+	drop_statement:  DROP VIEW exists_opt.sql_id force_eof 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 143
+
+state 87
+	replace_statement:  REPLACE comment_opt INTO.dml_table_expression column_list_opt row_list 
+	replace_statement:  REPLACE comment_opt INTO.dml_table_expression SET update_list 
+
+	ID  shift 68
+	.  error
+
+	dml_table_expression  goto 144
+
+state 88
+	show_statement:  SHOW DATABASES like_or_where_opt.    (32)
+
+	.  reduce 32 (src line 288)
+
+
+state 89
+	like_or_where_opt:  WHERE.boolean_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 145
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 90
+	like_or_where_opt:  LIKE.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 147
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 91
+	show_statement:  SHOW TABLES from_opt.like_or_where_opt 
+	like_or_where_opt: .    (97)
+
+	WHERE  shift 89
+	LIKE  shift 90
+	.  reduce 97 (src line 589)
+
+	like_or_where_opt  goto 149
+
+state 92
+	from_opt:  FROM.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 150
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 93
+	show_statement:  SHOW PROXY sql_id.from_opt like_or_where_opt 
+	from_opt: .    (100)
+
+	FROM  shift 92
+	.  reduce 100 (src line 602)
+
+	from_opt  goto 151
+
+state 94
+	admin_statement:  ADMIN sql_id '('.value_expression_list ')' 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 153
+	tuple  goto 107
+	value_expression_list  goto 152
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 95
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list.limit_opt 
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list.FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt 
+	select_expression_list:  select_expression_list.',' select_expression 
+	limit_opt: .    (181)
+
+	FROM  shift 155
+	LIMIT  shift 157
+	','  shift 156
+	.  reduce 181 (src line 977)
+
+	limit_opt  goto 154
+
+state 96
+	select_expression_list:  select_expression.    (56)
+
+	.  reduce 56 (src line 403)
+
+
+state 97
+	select_expression:  '*'.    (58)
+
+	.  reduce 58 (src line 413)
+
+
+state 98
+	select_expression:  expression.as_lower_opt 
+	as_lower_opt: .    (63)
+
+	AS  shift 160
+	ID  shift 60
+	.  reduce 63 (src line 437)
+
+	as_lower_opt  goto 158
+	sql_id  goto 159
+
+state 99
+	select_expression:  ID.'.' '*' 
+	column_name:  ID.'.' sql_id 
+	sql_id:  ID.    (213)
+
+	'.'  shift 161
+	.  reduce 213 (src line 1097)
+
+
+state 100
+	expression:  boolean_expression.    (61)
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+
+	AND  shift 162
+	OR  shift 163
+	.  reduce 61 (src line 427)
+
+
+state 101
+	expression:  value_expression.    (62)
+	condition:  value_expression.compare value_expression 
+	condition:  value_expression.IN tuple 
+	condition:  value_expression.NOT IN tuple 
+	condition:  value_expression.LIKE value_expression 
+	condition:  value_expression.NOT LIKE value_expression 
+	condition:  value_expression.BETWEEN value_expression AND value_expression 
+	condition:  value_expression.NOT BETWEEN value_expression AND value_expression 
+	condition:  value_expression.IS NULL 
+	condition:  value_expression.IS NOT NULL 
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	IN  shift 165
+	IS  shift 169
+	LIKE  shift 167
+	BETWEEN  shift 168
+	LE  shift 181
+	GE  shift 182
+	NE  shift 183
+	NULL_SAFE_EQUAL  shift 184
+	'='  shift 178
+	'<'  shift 179
+	'>'  shift 180
+	NOT  shift 166
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 62 (src line 432)
+
+	compare  goto 164
+
+state 102
+	boolean_expression:  condition.    (102)
+
+	.  reduce 102 (src line 611)
+
+
+state 103
+	boolean_expression:  NOT.boolean_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 185
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 104
+	boolean_expression:  '('.boolean_expression ')' 
+	tuple:  '('.value_expression_list ')' 
+	subquery:  '('.select_statement ')' 
+
+	SELECT  shift 18
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	select_statement  goto 188
+	boolean_expression  goto 186
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 189
+	tuple  goto 107
+	value_expression_list  goto 187
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 105
+	value_expression:  value.    (133)
+
+	.  reduce 133 (src line 748)
+
+
+state 106
+	value_expression:  column_name.    (134)
+
+	.  reduce 134 (src line 753)
+
+
+state 107
+	value_expression:  tuple.    (135)
+
+	.  reduce 135 (src line 757)
+
+
+state 108
+	value_expression:  unary_operator.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 190
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 109
+	value_expression:  sql_id.'(' ')' 
+	value_expression:  sql_id.'(' select_expression_list ')' 
+	value_expression:  sql_id.'(' DISTINCT select_expression_list ')' 
+	column_name:  sql_id.    (163)
+
+	'('  shift 191
+	.  reduce 163 (src line 893)
+
+
+state 110
+	value_expression:  keyword_as_func.'(' select_expression_list ')' 
+
+	'('  shift 192
+	.  error
+
+
+state 111
+	value_expression:  case_expression.    (149)
+
+	.  reduce 149 (src line 824)
+
+
+state 112
+	condition:  EXISTS.subquery 
+
+	'('  shift 194
+	.  error
+
+	subquery  goto 193
+
+state 113
+	value:  STRING.    (165)
+
+	.  reduce 165 (src line 903)
+
+
+state 114
+	value:  NUMBER.    (166)
+
+	.  reduce 166 (src line 908)
+
+
+state 115
+	value:  VALUE_ARG.    (167)
+
+	.  reduce 167 (src line 912)
+
+
+state 116
+	value:  NULL.    (168)
+
+	.  reduce 168 (src line 916)
+
+
+state 117
+	tuple:  subquery.    (129)
+
+	.  reduce 129 (src line 727)
+
+
+state 118
+	unary_operator:  '+'.    (152)
+
+	.  reduce 152 (src line 839)
+
+
+state 119
+	unary_operator:  '-'.    (153)
+
+	.  reduce 153 (src line 844)
+
+
+state 120
+	unary_operator:  '~'.    (154)
+
+	.  reduce 154 (src line 848)
+
+
+state 121
+	keyword_as_func:  IF.    (150)
+
+	.  reduce 150 (src line 829)
+
+
+state 122
+	keyword_as_func:  VALUES.    (151)
+
+	.  reduce 151 (src line 834)
+
+
+state 123
+	case_expression:  CASE.value_expression_opt when_expression_list else_expression_opt END 
+	value_expression_opt: .    (156)
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  reduce 156 (src line 859)
+
+	value  goto 105
+	value_expression  goto 196
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	value_expression_opt  goto 195
+	sql_id  goto 109
+
+state 124
+	comment_list:  comment_list COMMENT.    (48)
+
+	.  reduce 48 (src line 367)
+
+
+state 125
+	insert_statement:  INSERT comment_opt INTO dml_table_expression.column_list_opt row_list on_dup_opt 
+	insert_statement:  INSERT comment_opt INTO dml_table_expression.SET update_list on_dup_opt 
+	column_list_opt: .    (187)
+
+	SET  shift 198
+	'('  shift 199
+	.  reduce 187 (src line 1011)
+
+	column_list_opt  goto 197
+
+state 126
+	update_statement:  UPDATE comment_opt dml_table_expression SET.update_list where_expression_opt order_by_opt limit_opt 
+
+	ID  shift 75
+	.  error
+
+	column_name  goto 73
+	update_list  goto 200
+	update_expression  goto 72
+	sql_id  goto 74
+
+state 127
+	dml_table_expression:  ID '.'.ID 
+
+	ID  shift 201
+	.  error
+
+
+state 128
+	delete_statement:  DELETE comment_opt FROM dml_table_expression.where_expression_opt order_by_opt limit_opt 
+	where_expression_opt: .    (95)
+
+	WHERE  shift 203
+	.  reduce 95 (src line 580)
+
+	where_expression_opt  goto 202
+
+state 129
+	update_list:  update_list ','.update_expression 
+
+	ID  shift 75
+	.  error
+
+	column_name  goto 73
+	update_expression  goto 204
+	sql_id  goto 74
+
+state 130
+	set_statement:  SET comment_opt NAMES ID.    (27)
+
+	.  reduce 27 (src line 259)
+
+
+state 131
+	update_expression:  column_name '='.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 205
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 132
+	column_name:  ID '.'.sql_id 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 206
+
+state 133
+	create_statement:  CREATE TABLE not_exists_opt ID.force_eof 
+	force_eof: .    (214)
+
+	.  reduce 214 (src line 1103)
+
+	force_eof  goto 207
+
+state 134
+	not_exists_opt:  IF NOT.EXISTS 
+
+	EXISTS  shift 208
+	.  error
+
+
+state 135
+	create_statement:  CREATE constraint_opt INDEX sql_id.using_opt ON ID force_eof 
+	using_opt: .    (211)
+
+	USING  shift 210
+	.  reduce 211 (src line 1092)
+
+	using_opt  goto 209
+
+state 136
+	create_statement:  CREATE VIEW sql_id force_eof.    (37)
+
+	.  reduce 37 (src line 312)
+
+
+state 137
+	alter_statement:  ALTER ignore_opt TABLE ID.non_rename_operation force_eof 
+	alter_statement:  ALTER ignore_opt TABLE ID.RENAME to_opt ID 
+
+	ORDER  shift 216
+	DEFAULT  shift 214
+	ID  shift 217
+	ALTER  shift 213
+	DROP  shift 215
+	RENAME  shift 212
+	.  error
+
+	non_rename_operation  goto 211
+
+state 138
+	alter_statement:  ALTER VIEW sql_id force_eof.    (40)
+
+	.  reduce 40 (src line 327)
+
+
+state 139
+	rename_statement:  RENAME TABLE ID TO.ID 
+
+	ID  shift 218
+	.  error
+
+
+state 140
+	drop_statement:  DROP TABLE exists_opt ID.    (42)
+
+	.  reduce 42 (src line 338)
+
+
+state 141
+	exists_opt:  IF EXISTS.    (197)
+
+	.  reduce 197 (src line 1057)
+
+
+state 142
+	drop_statement:  DROP INDEX sql_id ON.ID 
+
+	ID  shift 219
+	.  error
+
+
+state 143
+	drop_statement:  DROP VIEW exists_opt sql_id.force_eof 
+	force_eof: .    (214)
+
+	.  reduce 214 (src line 1103)
+
+	force_eof  goto 220
+
+state 144
+	replace_statement:  REPLACE comment_opt INTO dml_table_expression.column_list_opt row_list 
+	replace_statement:  REPLACE comment_opt INTO dml_table_expression.SET update_list 
+	column_list_opt: .    (187)
+
+	SET  shift 222
+	'('  shift 199
+	.  reduce 187 (src line 1011)
+
+	column_list_opt  goto 221
+
+state 145
+	like_or_where_opt:  WHERE boolean_expression.    (98)
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+
+	AND  shift 162
+	OR  shift 163
+	.  reduce 98 (src line 593)
+
+
+state 146
+	condition:  value_expression.compare value_expression 
+	condition:  value_expression.IN tuple 
+	condition:  value_expression.NOT IN tuple 
+	condition:  value_expression.LIKE value_expression 
+	condition:  value_expression.NOT LIKE value_expression 
+	condition:  value_expression.BETWEEN value_expression AND value_expression 
+	condition:  value_expression.NOT BETWEEN value_expression AND value_expression 
+	condition:  value_expression.IS NULL 
+	condition:  value_expression.IS NOT NULL 
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	IN  shift 165
+	IS  shift 169
+	LIKE  shift 167
+	BETWEEN  shift 168
+	LE  shift 181
+	GE  shift 182
+	NE  shift 183
+	NULL_SAFE_EQUAL  shift 184
+	'='  shift 178
+	'<'  shift 179
+	'>'  shift 180
+	NOT  shift 166
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  error
+
+	compare  goto 164
+
+state 147
+	like_or_where_opt:  LIKE value_expression.    (99)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 99 (src line 597)
+
+
+state 148
+	tuple:  '('.value_expression_list ')' 
+	subquery:  '('.select_statement ')' 
+
+	SELECT  shift 18
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	select_statement  goto 188
+	value  goto 105
+	value_expression  goto 153
+	tuple  goto 107
+	value_expression_list  goto 187
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 149
+	show_statement:  SHOW TABLES from_opt like_or_where_opt.    (33)
+
+	.  reduce 33 (src line 293)
+
+
+state 150
+	from_opt:  FROM value_expression.    (101)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 101 (src line 606)
+
+
+state 151
+	show_statement:  SHOW PROXY sql_id from_opt.like_or_where_opt 
+	like_or_where_opt: .    (97)
+
+	WHERE  shift 89
+	LIKE  shift 90
+	.  reduce 97 (src line 589)
+
+	like_or_where_opt  goto 223
+
+state 152
+	admin_statement:  ADMIN sql_id '(' value_expression_list.')' 
+	value_expression_list:  value_expression_list.',' value_expression 
+
+	','  shift 225
+	')'  shift 224
+	.  error
+
+
+state 153
+	value_expression_list:  value_expression.    (131)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 131 (src line 738)
+
+
+state 154
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list limit_opt.    (17)
+
+	.  reduce 17 (src line 194)
+
+
+state 155
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM.table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt 
+
+	ID  shift 230
+	'('  shift 229
+	.  error
+
+	table_expression_list  goto 226
+	table_expression  goto 227
+	simple_table_expression  goto 228
+	subquery  goto 231
+
+state 156
+	select_expression_list:  select_expression_list ','.select_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 99
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	'*'  shift 97
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	select_expression  goto 232
+	expression  goto 98
+	boolean_expression  goto 100
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 101
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 157
+	limit_opt:  LIMIT.value_expression 
+	limit_opt:  LIMIT.value_expression ',' value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 233
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 158
+	select_expression:  expression as_lower_opt.    (59)
+
+	.  reduce 59 (src line 418)
+
+
+state 159
+	as_lower_opt:  sql_id.    (64)
+
+	.  reduce 64 (src line 441)
+
+
+state 160
+	as_lower_opt:  AS.sql_id 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 234
+
+state 161
+	select_expression:  ID '.'.'*' 
+	column_name:  ID '.'.sql_id 
+
+	ID  shift 60
+	'*'  shift 235
+	.  error
+
+	sql_id  goto 206
+
+state 162
+	boolean_expression:  boolean_expression AND.boolean_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 236
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 163
+	boolean_expression:  boolean_expression OR.boolean_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 237
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 164
+	condition:  value_expression compare.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 238
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 165
+	condition:  value_expression IN.tuple 
+
+	'('  shift 148
+	.  error
+
+	tuple  goto 239
+	subquery  goto 117
+
+state 166
+	condition:  value_expression NOT.IN tuple 
+	condition:  value_expression NOT.LIKE value_expression 
+	condition:  value_expression NOT.BETWEEN value_expression AND value_expression 
+
+	IN  shift 240
+	LIKE  shift 241
+	BETWEEN  shift 242
+	.  error
+
+
+state 167
+	condition:  value_expression LIKE.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 243
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 168
+	condition:  value_expression BETWEEN.value_expression AND value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 244
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 169
+	condition:  value_expression IS.NULL 
+	condition:  value_expression IS.NOT NULL 
+
+	NULL  shift 245
+	NOT  shift 246
+	.  error
+
+
+state 170
+	value_expression:  value_expression '&'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 247
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 171
+	value_expression:  value_expression '|'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 248
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 172
+	value_expression:  value_expression '^'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 249
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 173
+	value_expression:  value_expression '+'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 250
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 174
+	value_expression:  value_expression '-'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 251
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 175
+	value_expression:  value_expression '*'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 252
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 176
+	value_expression:  value_expression '/'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 253
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 177
+	value_expression:  value_expression '%'.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 254
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 178
+	compare:  '='.    (117)
+
+	.  reduce 117 (src line 672)
+
+
+state 179
+	compare:  '<'.    (118)
+
+	.  reduce 118 (src line 677)
+
+
+state 180
+	compare:  '>'.    (119)
+
+	.  reduce 119 (src line 681)
+
+
+state 181
+	compare:  LE.    (120)
+
+	.  reduce 120 (src line 685)
+
+
+state 182
+	compare:  GE.    (121)
+
+	.  reduce 121 (src line 689)
+
+
+state 183
+	compare:  NE.    (122)
+
+	.  reduce 122 (src line 693)
+
+
+state 184
+	compare:  NULL_SAFE_EQUAL.    (123)
+
+	.  reduce 123 (src line 697)
+
+
+state 185
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+	boolean_expression:  NOT boolean_expression.    (105)
+
+	.  reduce 105 (src line 621)
+
+
+state 186
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+	boolean_expression:  '(' boolean_expression.')' 
+
+	AND  shift 162
+	OR  shift 163
+	')'  shift 255
+	.  error
+
+
+state 187
+	tuple:  '(' value_expression_list.')' 
+	value_expression_list:  value_expression_list.',' value_expression 
+
+	','  shift 225
+	')'  shift 256
+	.  error
+
+
+state 188
+	select_statement:  select_statement.union_op select_statement 
+	subquery:  '(' select_statement.')' 
+
+	UNION  shift 34
+	MINUS  shift 35
+	EXCEPT  shift 36
+	INTERSECT  shift 37
+	')'  shift 257
+	.  error
+
+	union_op  goto 33
+
+state 189
+	condition:  value_expression.compare value_expression 
+	condition:  value_expression.IN tuple 
+	condition:  value_expression.NOT IN tuple 
+	condition:  value_expression.LIKE value_expression 
+	condition:  value_expression.NOT LIKE value_expression 
+	condition:  value_expression.BETWEEN value_expression AND value_expression 
+	condition:  value_expression.NOT BETWEEN value_expression AND value_expression 
+	condition:  value_expression.IS NULL 
+	condition:  value_expression.IS NOT NULL 
+	value_expression_list:  value_expression.    (131)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	IN  shift 165
+	IS  shift 169
+	LIKE  shift 167
+	BETWEEN  shift 168
+	LE  shift 181
+	GE  shift 182
+	NE  shift 183
+	NULL_SAFE_EQUAL  shift 184
+	'='  shift 178
+	'<'  shift 179
+	'>'  shift 180
+	NOT  shift 166
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 131 (src line 738)
+
+	compare  goto 164
+
+state 190
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	value_expression:  unary_operator value_expression.    (144)
+
+	.  reduce 144 (src line 793)
+
+
+state 191
+	value_expression:  sql_id '('.')' 
+	value_expression:  sql_id '('.select_expression_list ')' 
+	value_expression:  sql_id '('.DISTINCT select_expression_list ')' 
+
+	DISTINCT  shift 260
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 99
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	'*'  shift 97
+	CASE  shift 123
+	IF  shift 121
+	')'  shift 258
+	.  error
+
+	select_expression_list  goto 259
+	select_expression  goto 96
+	expression  goto 98
+	boolean_expression  goto 100
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 101
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 192
+	value_expression:  keyword_as_func '('.select_expression_list ')' 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 99
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	'*'  shift 97
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	select_expression_list  goto 261
+	select_expression  goto 96
+	expression  goto 98
+	boolean_expression  goto 100
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 101
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 193
+	condition:  EXISTS subquery.    (116)
+
+	.  reduce 116 (src line 667)
+
+
+state 194
+	subquery:  '('.select_statement ')' 
+
+	SELECT  shift 18
+	.  error
+
+	select_statement  goto 188
+
+state 195
+	case_expression:  CASE value_expression_opt.when_expression_list else_expression_opt END 
+
+	WHEN  shift 264
+	.  error
+
+	when_expression_list  goto 262
+	when_expression  goto 263
+
+state 196
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	value_expression_opt:  value_expression.    (157)
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 157 (src line 863)
+
+
+state 197
+	insert_statement:  INSERT comment_opt INTO dml_table_expression column_list_opt.row_list on_dup_opt 
+
+	SELECT  shift 18
+	VALUES  shift 266
+	.  error
+
+	select_statement  goto 267
+	row_list  goto 265
+
+state 198
+	insert_statement:  INSERT comment_opt INTO dml_table_expression SET.update_list on_dup_opt 
+
+	ID  shift 75
+	.  error
+
+	column_name  goto 73
+	update_list  goto 268
+	update_expression  goto 72
+	sql_id  goto 74
+
+state 199
+	column_list_opt:  '('.column_list ')' 
+
+	ID  shift 75
+	.  error
+
+	column_name  goto 270
+	column_list  goto 269
+	sql_id  goto 74
+
+state 200
+	update_statement:  UPDATE comment_opt dml_table_expression SET update_list.where_expression_opt order_by_opt limit_opt 
+	update_list:  update_list.',' update_expression 
+	where_expression_opt: .    (95)
+
+	WHERE  shift 203
+	','  shift 129
+	.  reduce 95 (src line 580)
+
+	where_expression_opt  goto 271
+
+state 201
+	dml_table_expression:  ID '.' ID.    (88)
+
+	.  reduce 88 (src line 548)
+
+
+state 202
+	delete_statement:  DELETE comment_opt FROM dml_table_expression where_expression_opt.order_by_opt limit_opt 
+	order_by_opt: .    (173)
+
+	ORDER  shift 273
+	.  reduce 173 (src line 939)
+
+	order_by_opt  goto 272
+
+state 203
+	where_expression_opt:  WHERE.boolean_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 274
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 204
+	update_list:  update_list ',' update_expression.    (194)
+
+	.  reduce 194 (src line 1044)
+
+
+state 205
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	update_expression:  column_name '=' value_expression.    (195)
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 195 (src line 1049)
+
+
+state 206
+	column_name:  ID '.' sql_id.    (164)
+
+	.  reduce 164 (src line 898)
+
+
+state 207
+	create_statement:  CREATE TABLE not_exists_opt ID force_eof.    (35)
+
+	.  reduce 35 (src line 302)
+
+
+state 208
+	not_exists_opt:  IF NOT EXISTS.    (199)
+
+	.  reduce 199 (src line 1062)
+
+
+state 209
+	create_statement:  CREATE constraint_opt INDEX sql_id using_opt.ON ID force_eof 
+
+	ON  shift 275
+	.  error
+
+
+state 210
+	using_opt:  USING.sql_id 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 276
+
+state 211
+	alter_statement:  ALTER ignore_opt TABLE ID non_rename_operation.force_eof 
+	force_eof: .    (214)
+
+	.  reduce 214 (src line 1103)
+
+	force_eof  goto 277
+
+state 212
+	alter_statement:  ALTER ignore_opt TABLE ID RENAME.to_opt ID 
+	to_opt: .    (207)
+
+	TO  shift 279
+	.  reduce 207 (src line 1082)
+
+	to_opt  goto 278
+
+state 213
+	non_rename_operation:  ALTER.    (202)
+
+	.  reduce 202 (src line 1070)
+
+
+state 214
+	non_rename_operation:  DEFAULT.    (203)
+
+	.  reduce 203 (src line 1073)
+
+
+state 215
+	non_rename_operation:  DROP.    (204)
+
+	.  reduce 204 (src line 1075)
+
+
+state 216
+	non_rename_operation:  ORDER.    (205)
+
+	.  reduce 205 (src line 1077)
+
+
+state 217
+	non_rename_operation:  ID.    (206)
+
+	.  reduce 206 (src line 1079)
+
+
+state 218
+	rename_statement:  RENAME TABLE ID TO ID.    (41)
+
+	.  reduce 41 (src line 332)
+
+
+state 219
+	drop_statement:  DROP INDEX sql_id ON ID.    (43)
+
+	.  reduce 43 (src line 343)
+
+
+state 220
+	drop_statement:  DROP VIEW exists_opt sql_id force_eof.    (44)
+
+	.  reduce 44 (src line 348)
+
+
+state 221
+	replace_statement:  REPLACE comment_opt INTO dml_table_expression column_list_opt.row_list 
+
+	SELECT  shift 18
+	VALUES  shift 266
+	.  error
+
+	select_statement  goto 267
+	row_list  goto 280
+
+state 222
+	replace_statement:  REPLACE comment_opt INTO dml_table_expression SET.update_list 
+
+	ID  shift 75
+	.  error
+
+	column_name  goto 73
+	update_list  goto 281
+	update_expression  goto 72
+	sql_id  goto 74
+
+state 223
+	show_statement:  SHOW PROXY sql_id from_opt like_or_where_opt.    (34)
+
+	.  reduce 34 (src line 297)
+
+
+state 224
+	admin_statement:  ADMIN sql_id '(' value_expression_list ')'.    (31)
+
+	.  reduce 31 (src line 282)
+
+
+state 225
+	value_expression_list:  value_expression_list ','.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 282
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 226
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list.where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt 
+	table_expression_list:  table_expression_list.',' table_expression 
+	where_expression_opt: .    (95)
+
+	WHERE  shift 203
+	','  shift 284
+	.  reduce 95 (src line 580)
+
+	where_expression_opt  goto 283
+
+state 227
+	table_expression_list:  table_expression.    (66)
+	table_expression:  table_expression.join_type table_expression 
+	table_expression:  table_expression.join_type table_expression ON boolean_expression 
+
+	JOIN  shift 286
+	STRAIGHT_JOIN  shift 287
+	LEFT  shift 288
+	RIGHT  shift 289
+	INNER  shift 290
+	CROSS  shift 291
+	NATURAL  shift 292
+	.  reduce 66 (src line 450)
+
+	join_type  goto 285
+
+state 228
+	table_expression:  simple_table_expression.as_opt index_hint_list 
+	as_opt: .    (72)
+
+	AS  shift 295
+	ID  shift 294
+	.  reduce 72 (src line 478)
+
+	as_opt  goto 293
+
+state 229
+	table_expression:  '('.table_expression ')' 
+	subquery:  '('.select_statement ')' 
+
+	SELECT  shift 18
+	ID  shift 230
+	'('  shift 229
+	.  error
+
+	select_statement  goto 188
+	table_expression  goto 296
+	simple_table_expression  goto 228
+	subquery  goto 231
+
+state 230
+	simple_table_expression:  ID.    (84)
+	simple_table_expression:  ID.'.' ID 
+
+	'.'  shift 297
+	.  reduce 84 (src line 529)
+
+
+state 231
+	simple_table_expression:  subquery.    (86)
+
+	.  reduce 86 (src line 538)
+
+
+state 232
+	select_expression_list:  select_expression_list ',' select_expression.    (57)
+
+	.  reduce 57 (src line 408)
+
+
+state 233
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	limit_opt:  LIMIT value_expression.    (182)
+	limit_opt:  LIMIT value_expression.',' value_expression 
+
+	','  shift 298
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 182 (src line 981)
+
+
+state 234
+	as_lower_opt:  AS sql_id.    (65)
+
+	.  reduce 65 (src line 445)
+
+
+state 235
+	select_expression:  ID '.' '*'.    (60)
+
+	.  reduce 60 (src line 422)
+
+
+state 236
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression AND boolean_expression.    (103)
+	boolean_expression:  boolean_expression.OR boolean_expression 
+
+	.  reduce 103 (src line 613)
+
+
+state 237
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+	boolean_expression:  boolean_expression OR boolean_expression.    (104)
+
+	.  reduce 104 (src line 617)
+
+
+state 238
+	condition:  value_expression compare value_expression.    (107)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 107 (src line 630)
+
+
+state 239
+	condition:  value_expression IN tuple.    (108)
+
+	.  reduce 108 (src line 635)
+
+
+state 240
+	condition:  value_expression NOT IN.tuple 
+
+	'('  shift 148
+	.  error
+
+	tuple  goto 299
+	subquery  goto 117
+
+state 241
+	condition:  value_expression NOT LIKE.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 300
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 242
+	condition:  value_expression NOT BETWEEN.value_expression AND value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 301
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 243
+	condition:  value_expression LIKE value_expression.    (110)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 110 (src line 643)
+
+
+state 244
+	condition:  value_expression BETWEEN value_expression.AND value_expression 
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	AND  shift 302
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  error
+
+
+state 245
+	condition:  value_expression IS NULL.    (114)
+
+	.  reduce 114 (src line 659)
+
+
+state 246
+	condition:  value_expression IS NOT.NULL 
+
+	NULL  shift 303
+	.  error
+
+
+state 247
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression '&' value_expression.    (136)
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 136 (src line 761)
+
+
+state 248
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression '|' value_expression.    (137)
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 137 (src line 765)
+
+
+state 249
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression '^' value_expression.    (138)
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 138 (src line 769)
+
+
+state 250
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression '+' value_expression.    (139)
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 139 (src line 773)
+
+
+state 251
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression '-' value_expression.    (140)
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 140 (src line 777)
+
+
+state 252
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression '*' value_expression.    (141)
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	.  reduce 141 (src line 781)
+
+
+state 253
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression '/' value_expression.    (142)
+	value_expression:  value_expression.'%' value_expression 
+
+	.  reduce 142 (src line 785)
+
+
+state 254
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	value_expression:  value_expression '%' value_expression.    (143)
+
+	.  reduce 143 (src line 789)
+
+
+state 255
+	boolean_expression:  '(' boolean_expression ')'.    (106)
+
+	.  reduce 106 (src line 625)
+
+
+state 256
+	tuple:  '(' value_expression_list ')'.    (128)
+
+	.  reduce 128 (src line 722)
+
+
+state 257
+	subquery:  '(' select_statement ')'.    (130)
+
+	.  reduce 130 (src line 732)
+
+
+state 258
+	value_expression:  sql_id '(' ')'.    (145)
+
+	.  reduce 145 (src line 808)
+
+
+state 259
+	select_expression_list:  select_expression_list.',' select_expression 
+	value_expression:  sql_id '(' select_expression_list.')' 
+
+	','  shift 156
+	')'  shift 304
+	.  error
+
+
+state 260
+	value_expression:  sql_id '(' DISTINCT.select_expression_list ')' 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 99
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	'*'  shift 97
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	select_expression_list  goto 305
+	select_expression  goto 96
+	expression  goto 98
+	boolean_expression  goto 100
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 101
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 261
+	select_expression_list:  select_expression_list.',' select_expression 
+	value_expression:  keyword_as_func '(' select_expression_list.')' 
+
+	','  shift 156
+	')'  shift 306
+	.  error
+
+
+state 262
+	case_expression:  CASE value_expression_opt when_expression_list.else_expression_opt END 
+	when_expression_list:  when_expression_list.when_expression 
+	else_expression_opt: .    (161)
+
+	WHEN  shift 264
+	ELSE  shift 309
+	.  reduce 161 (src line 884)
+
+	when_expression  goto 308
+	else_expression_opt  goto 307
+
+state 263
+	when_expression_list:  when_expression.    (158)
+
+	.  reduce 158 (src line 868)
+
+
+state 264
+	when_expression:  WHEN.boolean_expression THEN value_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 310
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 265
+	insert_statement:  INSERT comment_opt INTO dml_table_expression column_list_opt row_list.on_dup_opt 
+	on_dup_opt: .    (191)
+
+	ON  shift 312
+	.  reduce 191 (src line 1030)
+
+	on_dup_opt  goto 311
+
+state 266
+	row_list:  VALUES.tuple_list 
+
+	'('  shift 148
+	.  error
+
+	tuple  goto 314
+	tuple_list  goto 313
+	subquery  goto 117
+
+state 267
+	select_statement:  select_statement.union_op select_statement 
+	row_list:  select_statement.    (125)
+
+	UNION  shift 34
+	MINUS  shift 35
+	EXCEPT  shift 36
+	INTERSECT  shift 37
+	.  reduce 125 (src line 707)
+
+	union_op  goto 33
+
+state 268
+	insert_statement:  INSERT comment_opt INTO dml_table_expression SET update_list.on_dup_opt 
+	update_list:  update_list.',' update_expression 
+	on_dup_opt: .    (191)
+
+	','  shift 129
+	ON  shift 312
+	.  reduce 191 (src line 1030)
+
+	on_dup_opt  goto 315
+
+state 269
+	column_list_opt:  '(' column_list.')' 
+	column_list:  column_list.',' column_name 
+
+	','  shift 317
+	')'  shift 316
+	.  error
+
+
+state 270
+	column_list:  column_name.    (189)
+
+	.  reduce 189 (src line 1020)
+
+
+state 271
+	update_statement:  UPDATE comment_opt dml_table_expression SET update_list where_expression_opt.order_by_opt limit_opt 
+	order_by_opt: .    (173)
+
+	ORDER  shift 273
+	.  reduce 173 (src line 939)
+
+	order_by_opt  goto 318
+
+state 272
+	delete_statement:  DELETE comment_opt FROM dml_table_expression where_expression_opt order_by_opt.limit_opt 
+	limit_opt: .    (181)
+
+	LIMIT  shift 157
+	.  reduce 181 (src line 977)
+
+	limit_opt  goto 319
+
+state 273
+	order_by_opt:  ORDER.BY order_list 
+
+	BY  shift 320
+	.  error
+
+
+state 274
+	where_expression_opt:  WHERE boolean_expression.    (96)
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+
+	AND  shift 162
+	OR  shift 163
+	.  reduce 96 (src line 584)
+
+
+state 275
+	create_statement:  CREATE constraint_opt INDEX sql_id using_opt ON.ID force_eof 
+
+	ID  shift 321
+	.  error
+
+
+state 276
+	using_opt:  USING sql_id.    (212)
+
+	.  reduce 212 (src line 1094)
+
+
+state 277
+	alter_statement:  ALTER ignore_opt TABLE ID non_rename_operation force_eof.    (38)
+
+	.  reduce 38 (src line 317)
+
+
+state 278
+	alter_statement:  ALTER ignore_opt TABLE ID RENAME to_opt.ID 
+
+	ID  shift 322
+	.  error
+
+
+state 279
+	to_opt:  TO.    (208)
+
+	.  reduce 208 (src line 1084)
+
+
+state 280
+	replace_statement:  REPLACE comment_opt INTO dml_table_expression column_list_opt row_list.    (22)
+
+	.  reduce 22 (src line 225)
+
+
+state 281
+	replace_statement:  REPLACE comment_opt INTO dml_table_expression SET update_list.    (23)
+	update_list:  update_list.',' update_expression 
+
+	','  shift 129
+	.  reduce 23 (src line 230)
+
+
+state 282
+	value_expression_list:  value_expression_list ',' value_expression.    (132)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 132 (src line 743)
+
+
+state 283
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt.group_by_opt having_opt order_by_opt limit_opt lock_opt 
+	group_by_opt: .    (169)
+
+	GROUP  shift 324
+	.  reduce 169 (src line 921)
+
+	group_by_opt  goto 323
+
+state 284
+	table_expression_list:  table_expression_list ','.table_expression 
+
+	ID  shift 230
+	'('  shift 229
+	.  error
+
+	table_expression  goto 325
+	simple_table_expression  goto 228
+	subquery  goto 231
+
+state 285
+	table_expression:  table_expression join_type.table_expression 
+	table_expression:  table_expression join_type.table_expression ON boolean_expression 
+
+	ID  shift 230
+	'('  shift 229
+	.  error
+
+	table_expression  goto 326
+	simple_table_expression  goto 228
+	subquery  goto 231
+
+state 286
+	join_type:  JOIN.    (75)
+
+	.  reduce 75 (src line 491)
+
+
+state 287
+	join_type:  STRAIGHT_JOIN.    (76)
+
+	.  reduce 76 (src line 496)
+
+
+state 288
+	join_type:  LEFT.JOIN 
+	join_type:  LEFT.OUTER JOIN 
+
+	JOIN  shift 327
+	OUTER  shift 328
+	.  error
+
+
+state 289
+	join_type:  RIGHT.JOIN 
+	join_type:  RIGHT.OUTER JOIN 
+
+	JOIN  shift 329
+	OUTER  shift 330
+	.  error
+
+
+state 290
+	join_type:  INNER.JOIN 
+
+	JOIN  shift 331
+	.  error
+
+
+state 291
+	join_type:  CROSS.JOIN 
+
+	JOIN  shift 332
+	.  error
+
+
+state 292
+	join_type:  NATURAL.JOIN 
+
+	JOIN  shift 333
+	.  error
+
+
+state 293
+	table_expression:  simple_table_expression as_opt.index_hint_list 
+	index_hint_list: .    (89)
+
+	USE  shift 335
+	FORCE  shift 337
+	IGNORE  shift 336
+	.  reduce 89 (src line 553)
+
+	index_hint_list  goto 334
+
+state 294
+	as_opt:  ID.    (73)
+
+	.  reduce 73 (src line 482)
+
+
+state 295
+	as_opt:  AS.ID 
+
+	ID  shift 338
+	.  error
+
+
+state 296
+	table_expression:  '(' table_expression.')' 
+	table_expression:  table_expression.join_type table_expression 
+	table_expression:  table_expression.join_type table_expression ON boolean_expression 
+
+	JOIN  shift 286
+	STRAIGHT_JOIN  shift 287
+	LEFT  shift 288
+	RIGHT  shift 289
+	INNER  shift 290
+	CROSS  shift 291
+	NATURAL  shift 292
+	')'  shift 339
+	.  error
+
+	join_type  goto 285
+
+state 297
+	simple_table_expression:  ID '.'.ID 
+
+	ID  shift 340
+	.  error
+
+
+state 298
+	limit_opt:  LIMIT value_expression ','.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 341
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 299
+	condition:  value_expression NOT IN tuple.    (109)
+
+	.  reduce 109 (src line 639)
+
+
+state 300
+	condition:  value_expression NOT LIKE value_expression.    (111)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 111 (src line 647)
+
+
+state 301
+	condition:  value_expression NOT BETWEEN value_expression.AND value_expression 
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	AND  shift 342
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  error
+
+
+state 302
+	condition:  value_expression BETWEEN value_expression AND.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 343
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 303
+	condition:  value_expression IS NOT NULL.    (115)
+
+	.  reduce 115 (src line 663)
+
+
+state 304
+	value_expression:  sql_id '(' select_expression_list ')'.    (146)
+
+	.  reduce 146 (src line 812)
+
+
+state 305
+	select_expression_list:  select_expression_list.',' select_expression 
+	value_expression:  sql_id '(' DISTINCT select_expression_list.')' 
+
+	','  shift 156
+	')'  shift 344
+	.  error
+
+
+state 306
+	value_expression:  keyword_as_func '(' select_expression_list ')'.    (148)
+
+	.  reduce 148 (src line 820)
+
+
+state 307
+	case_expression:  CASE value_expression_opt when_expression_list else_expression_opt.END 
+
+	END  shift 345
+	.  error
+
+
+state 308
+	when_expression_list:  when_expression_list when_expression.    (159)
+
+	.  reduce 159 (src line 873)
+
+
+state 309
+	else_expression_opt:  ELSE.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 346
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 310
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+	when_expression:  WHEN boolean_expression.THEN value_expression 
+
+	AND  shift 162
+	OR  shift 163
+	THEN  shift 347
+	.  error
+
+
+state 311
+	insert_statement:  INSERT comment_opt INTO dml_table_expression column_list_opt row_list on_dup_opt.    (20)
+
+	.  reduce 20 (src line 209)
+
+
+state 312
+	on_dup_opt:  ON.DUPLICATE KEY UPDATE update_list 
+
+	DUPLICATE  shift 348
+	.  error
+
+
+state 313
+	row_list:  VALUES tuple_list.    (124)
+	tuple_list:  tuple_list.',' tuple 
+
+	','  shift 349
+	.  reduce 124 (src line 702)
+
+
+state 314
+	tuple_list:  tuple.    (126)
+
+	.  reduce 126 (src line 712)
+
+
+state 315
+	insert_statement:  INSERT comment_opt INTO dml_table_expression SET update_list on_dup_opt.    (21)
+
+	.  reduce 21 (src line 214)
+
+
+state 316
+	column_list_opt:  '(' column_list ')'.    (188)
+
+	.  reduce 188 (src line 1015)
+
+
+state 317
+	column_list:  column_list ','.column_name 
+
+	ID  shift 75
+	.  error
+
+	column_name  goto 350
+	sql_id  goto 74
+
+state 318
+	update_statement:  UPDATE comment_opt dml_table_expression SET update_list where_expression_opt order_by_opt.limit_opt 
+	limit_opt: .    (181)
+
+	LIMIT  shift 157
+	.  reduce 181 (src line 977)
+
+	limit_opt  goto 351
+
+state 319
+	delete_statement:  DELETE comment_opt FROM dml_table_expression where_expression_opt order_by_opt limit_opt.    (25)
+
+	.  reduce 25 (src line 248)
+
+
+state 320
+	order_by_opt:  ORDER BY.order_list 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 354
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	order_list  goto 352
+	order  goto 353
+	sql_id  goto 109
+
+state 321
+	create_statement:  CREATE constraint_opt INDEX sql_id using_opt ON ID.force_eof 
+	force_eof: .    (214)
+
+	.  reduce 214 (src line 1103)
+
+	force_eof  goto 355
+
+state 322
+	alter_statement:  ALTER ignore_opt TABLE ID RENAME to_opt ID.    (39)
+
+	.  reduce 39 (src line 322)
+
+
+state 323
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt.having_opt order_by_opt limit_opt lock_opt 
+	having_opt: .    (171)
+
+	HAVING  shift 357
+	.  reduce 171 (src line 930)
+
+	having_opt  goto 356
+
+state 324
+	group_by_opt:  GROUP.BY value_expression_list 
+
+	BY  shift 358
+	.  error
+
+
+state 325
+	table_expression_list:  table_expression_list ',' table_expression.    (67)
+	table_expression:  table_expression.join_type table_expression 
+	table_expression:  table_expression.join_type table_expression ON boolean_expression 
+
+	JOIN  shift 286
+	STRAIGHT_JOIN  shift 287
+	LEFT  shift 288
+	RIGHT  shift 289
+	INNER  shift 290
+	CROSS  shift 291
+	NATURAL  shift 292
+	.  reduce 67 (src line 455)
+
+	join_type  goto 285
+
+state 326
+	table_expression:  table_expression.join_type table_expression 
+	table_expression:  table_expression join_type table_expression.    (70)
+	table_expression:  table_expression.join_type table_expression ON boolean_expression 
+	table_expression:  table_expression join_type table_expression.ON boolean_expression 
+
+	ON  shift 359
+	.  reduce 70 (src line 469)
+
+	join_type  goto 285
+
+state 327
+	join_type:  LEFT JOIN.    (77)
+
+	.  reduce 77 (src line 500)
+
+
+state 328
+	join_type:  LEFT OUTER.JOIN 
+
+	JOIN  shift 360
+	.  error
+
+
+state 329
+	join_type:  RIGHT JOIN.    (79)
+
+	.  reduce 79 (src line 508)
+
+
+state 330
+	join_type:  RIGHT OUTER.JOIN 
+
+	JOIN  shift 361
+	.  error
+
+
+state 331
+	join_type:  INNER JOIN.    (81)
+
+	.  reduce 81 (src line 516)
+
+
+state 332
+	join_type:  CROSS JOIN.    (82)
+
+	.  reduce 82 (src line 520)
+
+
+state 333
+	join_type:  NATURAL JOIN.    (83)
+
+	.  reduce 83 (src line 524)
+
+
+state 334
+	table_expression:  simple_table_expression as_opt index_hint_list.    (68)
+
+	.  reduce 68 (src line 460)
+
+
+state 335
+	index_hint_list:  USE.INDEX '(' index_list ')' 
+
+	INDEX  shift 362
+	.  error
+
+
+state 336
+	index_hint_list:  IGNORE.INDEX '(' index_list ')' 
+
+	INDEX  shift 363
+	.  error
+
+
+state 337
+	index_hint_list:  FORCE.INDEX '(' index_list ')' 
+
+	INDEX  shift 364
+	.  error
+
+
+state 338
+	as_opt:  AS ID.    (74)
+
+	.  reduce 74 (src line 486)
+
+
+state 339
+	table_expression:  '(' table_expression ')'.    (69)
+
+	.  reduce 69 (src line 465)
+
+
+state 340
+	simple_table_expression:  ID '.' ID.    (85)
+
+	.  reduce 85 (src line 534)
+
+
+state 341
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	limit_opt:  LIMIT value_expression ',' value_expression.    (183)
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 183 (src line 985)
+
+
+state 342
+	condition:  value_expression NOT BETWEEN value_expression AND.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 365
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 343
+	condition:  value_expression BETWEEN value_expression AND value_expression.    (112)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 112 (src line 651)
+
+
+state 344
+	value_expression:  sql_id '(' DISTINCT select_expression_list ')'.    (147)
+
+	.  reduce 147 (src line 816)
+
+
+state 345
+	case_expression:  CASE value_expression_opt when_expression_list else_expression_opt END.    (155)
+
+	.  reduce 155 (src line 853)
+
+
+state 346
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	else_expression_opt:  ELSE value_expression.    (162)
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 162 (src line 888)
+
+
+state 347
+	when_expression:  WHEN boolean_expression THEN.value_expression 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 366
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 348
+	on_dup_opt:  ON DUPLICATE.KEY UPDATE update_list 
+
+	KEY  shift 367
+	.  error
+
+
+state 349
+	tuple_list:  tuple_list ','.tuple 
+
+	'('  shift 148
+	.  error
+
+	tuple  goto 368
+	subquery  goto 117
+
+state 350
+	column_list:  column_list ',' column_name.    (190)
+
+	.  reduce 190 (src line 1025)
+
+
+state 351
+	update_statement:  UPDATE comment_opt dml_table_expression SET update_list where_expression_opt order_by_opt limit_opt.    (24)
+
+	.  reduce 24 (src line 242)
+
+
+state 352
+	order_by_opt:  ORDER BY order_list.    (174)
+	order_list:  order_list.',' order 
+
+	','  shift 369
+	.  reduce 174 (src line 943)
+
+
+state 353
+	order_list:  order.    (175)
+
+	.  reduce 175 (src line 948)
+
+
+state 354
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	order:  value_expression.asc_desc_opt 
+	asc_desc_opt: .    (178)
+
+	ASC  shift 371
+	DESC  shift 372
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 178 (src line 964)
+
+	asc_desc_opt  goto 370
+
+state 355
+	create_statement:  CREATE constraint_opt INDEX sql_id using_opt ON ID force_eof.    (36)
+
+	.  reduce 36 (src line 307)
+
+
+state 356
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt.order_by_opt limit_opt lock_opt 
+	order_by_opt: .    (173)
+
+	ORDER  shift 273
+	.  reduce 173 (src line 939)
+
+	order_by_opt  goto 373
+
+state 357
+	having_opt:  HAVING.boolean_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 374
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 358
+	group_by_opt:  GROUP BY.value_expression_list 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 153
+	tuple  goto 107
+	value_expression_list  goto 375
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 359
+	table_expression:  table_expression join_type table_expression ON.boolean_expression 
+
+	EXISTS  shift 112
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 104
+	'~'  shift 120
+	NOT  shift 103
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	boolean_expression  goto 376
+	condition  goto 102
+	value  goto 105
+	value_expression  goto 146
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	sql_id  goto 109
+
+state 360
+	join_type:  LEFT OUTER JOIN.    (78)
+
+	.  reduce 78 (src line 504)
+
+
+state 361
+	join_type:  RIGHT OUTER JOIN.    (80)
+
+	.  reduce 80 (src line 512)
+
+
+state 362
+	index_hint_list:  USE INDEX.'(' index_list ')' 
+
+	'('  shift 377
+	.  error
+
+
+state 363
+	index_hint_list:  IGNORE INDEX.'(' index_list ')' 
+
+	'('  shift 378
+	.  error
+
+
+state 364
+	index_hint_list:  FORCE INDEX.'(' index_list ')' 
+
+	'('  shift 379
+	.  error
+
+
+state 365
+	condition:  value_expression NOT BETWEEN value_expression AND value_expression.    (113)
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 113 (src line 655)
+
+
+state 366
+	value_expression:  value_expression.'&' value_expression 
+	value_expression:  value_expression.'|' value_expression 
+	value_expression:  value_expression.'^' value_expression 
+	value_expression:  value_expression.'+' value_expression 
+	value_expression:  value_expression.'-' value_expression 
+	value_expression:  value_expression.'*' value_expression 
+	value_expression:  value_expression.'/' value_expression 
+	value_expression:  value_expression.'%' value_expression 
+	when_expression:  WHEN boolean_expression THEN value_expression.    (160)
+
+	'&'  shift 170
+	'|'  shift 171
+	'^'  shift 172
+	'+'  shift 173
+	'-'  shift 174
+	'*'  shift 175
+	'/'  shift 176
+	'%'  shift 177
+	.  reduce 160 (src line 878)
+
+
+state 367
+	on_dup_opt:  ON DUPLICATE KEY.UPDATE update_list 
+
+	UPDATE  shift 380
+	.  error
+
+
+state 368
+	tuple_list:  tuple_list ',' tuple.    (127)
+
+	.  reduce 127 (src line 717)
+
+
+state 369
+	order_list:  order_list ','.order 
+
+	NULL  shift 116
+	VALUES  shift 122
+	ID  shift 75
+	STRING  shift 113
+	NUMBER  shift 114
+	VALUE_ARG  shift 115
+	'('  shift 148
+	'~'  shift 120
+	'+'  shift 118
+	'-'  shift 119
+	CASE  shift 123
+	IF  shift 121
+	.  error
+
+	value  goto 105
+	value_expression  goto 354
+	tuple  goto 107
+	keyword_as_func  goto 110
+	subquery  goto 117
+	unary_operator  goto 108
+	column_name  goto 106
+	case_expression  goto 111
+	order  goto 381
+	sql_id  goto 109
+
+state 370
+	order:  value_expression asc_desc_opt.    (177)
+
+	.  reduce 177 (src line 958)
+
+
+state 371
+	asc_desc_opt:  ASC.    (179)
+
+	.  reduce 179 (src line 968)
+
+
+state 372
+	asc_desc_opt:  DESC.    (180)
+
+	.  reduce 180 (src line 972)
+
+
+state 373
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt.limit_opt lock_opt 
+	limit_opt: .    (181)
+
+	LIMIT  shift 157
+	.  reduce 181 (src line 977)
+
+	limit_opt  goto 382
+
+state 374
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+	having_opt:  HAVING boolean_expression.    (172)
+
+	AND  shift 162
+	OR  shift 163
+	.  reduce 172 (src line 934)
+
+
+state 375
+	value_expression_list:  value_expression_list.',' value_expression 
+	group_by_opt:  GROUP BY value_expression_list.    (170)
+
+	','  shift 225
+	.  reduce 170 (src line 925)
+
+
+state 376
+	table_expression:  table_expression join_type table_expression ON boolean_expression.    (71)
+	boolean_expression:  boolean_expression.AND boolean_expression 
+	boolean_expression:  boolean_expression.OR boolean_expression 
+
+	AND  shift 162
+	OR  shift 163
+	.  reduce 71 (src line 473)
+
+
+state 377
+	index_hint_list:  USE INDEX '('.index_list ')' 
+
+	ID  shift 60
+	.  error
+
+	index_list  goto 383
+	sql_id  goto 384
+
+state 378
+	index_hint_list:  IGNORE INDEX '('.index_list ')' 
+
+	ID  shift 60
+	.  error
+
+	index_list  goto 385
+	sql_id  goto 384
+
+state 379
+	index_hint_list:  FORCE INDEX '('.index_list ')' 
+
+	ID  shift 60
+	.  error
+
+	index_list  goto 386
+	sql_id  goto 384
+
+state 380
+	on_dup_opt:  ON DUPLICATE KEY UPDATE.update_list 
+
+	ID  shift 75
+	.  error
+
+	column_name  goto 73
+	update_list  goto 387
+	update_expression  goto 72
+	sql_id  goto 74
+
+state 381
+	order_list:  order_list ',' order.    (176)
+
+	.  reduce 176 (src line 953)
+
+
+state 382
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt.lock_opt 
+	lock_opt: .    (184)
+
+	FOR  shift 389
+	LOCK  shift 390
+	.  reduce 184 (src line 990)
+
+	lock_opt  goto 388
+
+state 383
+	index_hint_list:  USE INDEX '(' index_list.')' 
+	index_list:  index_list.',' sql_id 
+
+	','  shift 392
+	')'  shift 391
+	.  error
+
+
+state 384
+	index_list:  sql_id.    (93)
+
+	.  reduce 93 (src line 570)
+
+
+state 385
+	index_hint_list:  IGNORE INDEX '(' index_list.')' 
+	index_list:  index_list.',' sql_id 
+
+	','  shift 392
+	')'  shift 393
+	.  error
+
+
+state 386
+	index_hint_list:  FORCE INDEX '(' index_list.')' 
+	index_list:  index_list.',' sql_id 
+
+	','  shift 392
+	')'  shift 394
+	.  error
+
+
+state 387
+	on_dup_opt:  ON DUPLICATE KEY UPDATE update_list.    (192)
+	update_list:  update_list.',' update_expression 
+
+	','  shift 129
+	.  reduce 192 (src line 1034)
+
+
+state 388
+	select_statement:  SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt.    (18)
+
+	.  reduce 18 (src line 199)
+
+
+state 389
+	lock_opt:  FOR.UPDATE 
+
+	UPDATE  shift 395
+	.  error
+
+
+state 390
+	lock_opt:  LOCK.IN sql_id sql_id 
+
+	IN  shift 396
+	.  error
+
+
+state 391
+	index_hint_list:  USE INDEX '(' index_list ')'.    (90)
+
+	.  reduce 90 (src line 557)
+
+
+state 392
+	index_list:  index_list ','.sql_id 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 397
+
+state 393
+	index_hint_list:  IGNORE INDEX '(' index_list ')'.    (91)
+
+	.  reduce 91 (src line 561)
+
+
+state 394
+	index_hint_list:  FORCE INDEX '(' index_list ')'.    (92)
+
+	.  reduce 92 (src line 565)
+
+
+state 395
+	lock_opt:  FOR UPDATE.    (185)
+
+	.  reduce 185 (src line 994)
+
+
+state 396
+	lock_opt:  LOCK IN.sql_id sql_id 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 398
+
+state 397
+	index_list:  index_list ',' sql_id.    (94)
+
+	.  reduce 94 (src line 575)
+
+
+state 398
+	lock_opt:  LOCK IN sql_id.sql_id 
+
+	ID  shift 60
+	.  error
+
+	sql_id  goto 399
+
+state 399
+	lock_opt:  LOCK IN sql_id sql_id.    (186)
+
+	.  reduce 186 (src line 998)
+
+
+105 terminals, 78 nonterminals
+215 grammar rules, 400/2000 states
+0 shift/reduce, 0 reduce/reduce conflicts reported
+127 working sets used
+memory: parser 729/30000
+263 extra closures
+1067 shift entries, 1 exceptions
+214 goto entries
+403 entries saved by goto default
+Optimizer space used: output 580/30000
+580 table entries, 0 zero
+maximum spread: 105, maximum offset: 398

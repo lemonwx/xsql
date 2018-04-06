@@ -1,0 +1,15 @@
+// Copyright 2012, Google Inc. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package sqlparser
+
+import (
+)
+
+const (
+	EID_NODE = iota
+	VALUE_NODE
+	LIST_NODE
+	OTHER_NODE
+)
