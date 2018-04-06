@@ -239,6 +239,25 @@ func (c *CliConn) WriteResultset(status uint16, r *mysql.Resultset) error {
 	return nil
 }
 
+func (c *CliConn) WriteFieldList(status uint16, fs []*mysql.Field) error {
+
+	data := make([]byte, 4, 1024)
+
+	for _, v := range fs {
+		data = data[0:4]
+		data = append(data, v.Dump()...)
+		if err := c.writePacket(data); err != nil {
+			return err
+		}
+	}
+
+	if err := c.writeEOF(status); err != nil {
+		return err
+	}
+	return nil
+}
+
+
 func (c *CliConn) WriteOK(r *mysql.Result) error {
 	log.Debugf("send exec ok to cli: %v", r)
 	if r == nil {

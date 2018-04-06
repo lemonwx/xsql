@@ -236,6 +236,19 @@ func (node *Node) executeSql(opt uint8, data []byte) error{
 	return node.writePacket(send)
 }
 
+func (node *Node) writeCommandStrStr(command byte, arg1 string, arg2 string) error {
+	node.pkt.Sequence = 0
+
+	data := make([]byte, 4, 6+len(arg1)+len(arg2))
+
+	data = append(data, command)
+	data = append(data, arg1...)
+	data = append(data, 0)
+	data = append(data, arg2...)
+
+	return node.writePacket(data)
+}
+
 func (node *Node) parseResult() (*mysql.Result, error) {
 	data, err := node.readPacket()
 	if err != nil {
@@ -385,6 +398,40 @@ func (node *Node) parseErrPkt(data []byte) error {
 	return e
 }
 
+
+func (node *Node) FieldList(table string, wildcard string) ([]*mysql.Field, error) {
+	if err := node.writeCommandStrStr(mysql.COM_FIELD_LIST, table, wildcard); err != nil {
+		return nil, err
+	}
+
+	data, err := node.readPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	fs := make([]*mysql.Field, 0, 4)
+	var f *mysql.Field
+	if data[0] == mysql.ERR_HEADER {
+		return nil, node.parseErrPkt(data)
+	} else {
+		for {
+			if data, err = node.readPacket(); err != nil {
+				return nil, err
+			}
+
+			// EOF Packet
+			if node.isEOFPacket(data) {
+				return fs, nil
+			}
+
+			if f, err = mysql.FieldData(data).Parse(); err != nil {
+				return nil, err
+			}
+			fs = append(fs, f)
+		}
+	}
+	return nil, fmt.Errorf("field list error")
+}
 
 func (node *Node) writePacket(data []byte) error {
 	return node.pkt.WritePacket(data)

@@ -1,55 +1,20 @@
-2018/04/06 18:46:50 main.go:31: DEBUG: [this is xsql's log]
-2018/04/06 18:46:50 main.go:47: INFO: server run under &{0xc42000e5d0 192.168.1.2:1234}
-2018/04/06 18:46:53 midconn.go:66: DEBUG: connect to mysqld [&{0xc42000e5e0 0xc42000ccc0 172.17.0.2:5518 root root  41477 2 0  [108 76 113 109 71 110 100 31 73 117 24 107 20 108 41 44 51 18 126 97]}] success
-2018/04/06 18:46:53 midconn.go:66: DEBUG: connect to mysqld [&{0xc42000e5e8 0xc42000cce0 172.17.0.3:5518 root root  41477 2 0  [35 69 111 45 106 75 80 106 108 117 72 107 70 84 103 107 62 126 5 1]}] success
-2018/04/06 18:46:53 midconn.go:77: DEBUG: [hand shake with cli and mysqld finish]
-2018/04/06 18:46:53 cliconn.go:243: DEBUG: send exec ok to cli: <nil>
-2018/04/06 18:46:53 server.go:52: DEBUG: [192.168.1.2:60446] connected, midConn [1001] serve for it
-2018/04/06 18:46:53 midconn.go:108: DEBUG: recv [select @@version_comment limit 1] from cli
-2018/04/06 18:46:53 midconn.go:139: DEBUG: [0xc42005b8c0]
-2018/04/06 18:46:53 midconn.go:176: DEBUG: [nodeIdxs is nil. use meta.FullNodeIdxs to execute]
-2018/04/06 18:46:53 node.go:235: DEBUG: send  [select @@version_comment limit 1] to node [172.17.0.3:5518]
-2018/04/06 18:46:53 node.go:235: DEBUG: send  [select @@version_comment limit 1] to node [172.17.0.2:5518]
-2018/04/06 18:46:53 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.2:5518
-2018/04/06 18:46:53 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.3:5518
-2018/04/06 18:46:53 cliconn.go:196: DEBUG: send select rets [&{[0xc4200ea0c0] map[] [[(Ubuntu)] [(Ubuntu)]] [[8 40 85 98 117 110 116 117 41] [8 40 85 98 117 110 116 117 41]]}] to cli
-2018/04/06 18:47:03 midconn.go:108: DEBUG: recv [select 123 limit 123] from cli
-2018/04/06 18:47:03 midconn.go:139: DEBUG: [0xc420110040]
-2018/04/06 18:47:03 midconn.go:176: DEBUG: [nodeIdxs is nil. use meta.FullNodeIdxs to execute]
-2018/04/06 18:47:03 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.3:5518]
-2018/04/06 18:47:03 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.2:5518]
-2018/04/06 18:47:03 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.3:5518
-2018/04/06 18:47:03 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.2:5518
-2018/04/06 18:47:03 cliconn.go:196: DEBUG: send select rets [&{[0xc4200ea240] map[] [[123] [123]] [[3 49 50 51] [3 49 50 51]]}] to cli
-2018/04/06 18:47:05 midconn.go:108: DEBUG: recv [select 123 limit 123] from cli
-2018/04/06 18:47:05 midconn.go:139: DEBUG: [0xc42005b900]
-2018/04/06 18:47:05 midconn.go:176: DEBUG: [nodeIdxs is nil. use meta.FullNodeIdxs to execute]
-2018/04/06 18:47:05 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.3:5518]
-2018/04/06 18:47:05 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.2:5518]
-2018/04/06 18:47:05 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.3:5518
-2018/04/06 18:47:05 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.2:5518
-2018/04/06 18:47:05 cliconn.go:196: DEBUG: send select rets [&{[0xc420142180] map[] [[123] [123]] [[3 49 50 51] [3 49 50 51]]}] to cli
-2018/04/06 18:47:06 midconn.go:108: DEBUG: recv [select 123 limit 123] from cli
-2018/04/06 18:47:06 midconn.go:139: DEBUG: [0xc42005b940]
-2018/04/06 18:47:06 midconn.go:176: DEBUG: [nodeIdxs is nil. use meta.FullNodeIdxs to execute]
-2018/04/06 18:47:06 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.3:5518]
-2018/04/06 18:47:06 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.2:5518]
-2018/04/06 18:47:06 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.3:5518
-2018/04/06 18:47:06 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.2:5518
-2018/04/06 18:47:06 cliconn.go:196: DEBUG: send select rets [&{[0xc4201080c0] map[] [[123] [123]] [[3 49 50 51] [3 49 50 51]]}] to cli
-2018/04/06 18:47:07 midconn.go:108: DEBUG: recv [select 123 limit 123] from cli
-2018/04/06 18:47:07 midconn.go:139: DEBUG: [0xc420110080]
-2018/04/06 18:47:07 midconn.go:176: DEBUG: [nodeIdxs is nil. use meta.FullNodeIdxs to execute]
-2018/04/06 18:47:07 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.3:5518]
-2018/04/06 18:47:07 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.2:5518]
-2018/04/06 18:47:07 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.3:5518
-2018/04/06 18:47:07 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.2:5518
-2018/04/06 18:47:07 cliconn.go:196: DEBUG: send select rets [&{[0xc420142300] map[] [[123] [123]] [[3 49 50 51] [3 49 50 51]]}] to cli
-2018/04/06 18:47:07 midconn.go:108: DEBUG: recv [select 123 limit 123] from cli
-2018/04/06 18:47:07 midconn.go:139: DEBUG: [0xc4201100c0]
-2018/04/06 18:47:07 midconn.go:176: DEBUG: [nodeIdxs is nil. use meta.FullNodeIdxs to execute]
-2018/04/06 18:47:07 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.3:5518]
-2018/04/06 18:47:07 node.go:235: DEBUG: send  [select 123 limit 123] to node [172.17.0.2:5518]
-2018/04/06 18:47:07 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.3:5518
-2018/04/06 18:47:07 node.go:244: DEBUG: recv [1]-[] from node 172.17.0.2:5518
-2018/04/06 18:47:07 cliconn.go:196: DEBUG: send select rets [&{[0xc420142480] map[] [[123] [123]] [[3 49 50 51] [3 49 50 51]]}] to cli
+2018/04/06 19:07:50 main.go:31: DEBUG: [this is xsql's log]
+2018/04/06 19:07:50 main.go:47: INFO: server run under &{0xc42000e5d0 192.168.1.2:1234}
+2018/04/06 19:07:51 node.go:72: ERROR: hand shake with mysqld [172.17.0.3:5518], read ok failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:51 midconn.go:65: ERROR: connected to backend mysqld 1 failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:51 node.go:72: ERROR: hand shake with mysqld [172.17.0.2:5518], read ok failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:51 midconn.go:65: ERROR: connected to backend mysqld 0 failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:51 cliconn.go:300: ERROR: send err to cli: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:51 server.go:49: ERROR: new mid conn failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:52 node.go:72: ERROR: hand shake with mysqld [172.17.0.3:5518], read ok failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:52 midconn.go:65: ERROR: connected to backend mysqld 1 failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:52 node.go:72: ERROR: hand shake with mysqld [172.17.0.2:5518], read ok failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:52 midconn.go:65: ERROR: connected to backend mysqld 0 failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:52 cliconn.go:300: ERROR: send err to cli: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:52 server.go:49: ERROR: new mid conn failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:56 node.go:72: ERROR: hand shake with mysqld [172.17.0.3:5518], read ok failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:56 midconn.go:65: ERROR: connected to backend mysqld 1 failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:56 node.go:72: ERROR: hand shake with mysqld [172.17.0.2:5518], read ok failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:56 midconn.go:65: ERROR: connected to backend mysqld 0 failed: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:56 cliconn.go:300: ERROR: send err to cli: ERROR 1049 (42000): Unknown database 'dbb'
+2018/04/06 19:07:56 server.go:49: ERROR: new mid conn failed: ERROR 1049 (42000): Unknown database 'dbb'

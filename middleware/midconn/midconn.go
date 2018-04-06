@@ -20,6 +20,7 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 	"utils"
+	"bytes"
 )
 
 var baseConnId uint32 = 1000
@@ -72,6 +73,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 
 	if err != nil {
 		midConn.cli.WriteError(err)
+		return nil, err
 	} else {
 		// hand shake with cli finish
 		log.Debug("hand shake with cli and mysqld finish")
@@ -105,18 +107,38 @@ func (conn *MidConn) Serve() {
 
 func (conn *MidConn) dispatch(sql []byte) error {
 	opt, sql := sql[0], sql[1:]
-	log.Debugf("recv [%s] from cli", sql)
+	log.Debugf("recv [%d:%s] from cli", opt, sql)
 	switch opt {
 	case mysql.COM_QUERY:
 		return conn.handleQuery(string(sql))
 	case mysql.COM_QUIT:
 	case mysql.COM_FIELD_LIST:
+		return conn.handleFieldList(sql)
 	case mysql.COM_INIT_DB:
 		return conn.handleUse(sql)
 	}
 
 	return nil
 }
+
+func (conn *MidConn) handleFieldList(data []byte) error {
+	index := bytes.IndexByte(data, 0x00)
+	table := string(data[0:index])
+	wildcard := string(data[index+1:])
+
+
+	if conn.db == "" {
+		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+	}
+
+	if fs, err := conn.nodes[0].FieldList(table, wildcard); err != nil {
+		log.Errorf("node 0 execute fieldList failed: %v", err)
+		return err
+	} else {
+		return conn.cli.WriteFieldList(conn.status, fs)
+	}
+}
+
 
 func (conn *MidConn) handleQuery(sql string) error {
 
@@ -136,7 +158,6 @@ func (conn *MidConn) handleQuery(sql string) error {
 		}
 	}
 
-	log.Debug(stmt)
 	// switch v := stmt.(type) {
 	switch v := stmt.(type) {
 	case *sqlparser.SimpleSelect:
@@ -144,6 +165,7 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Select:
 		return conn.handleSelect(v, sql)
 	case *sqlparser.Show:
+		return conn.handleShow(v, sql)
 
 
 	default:
