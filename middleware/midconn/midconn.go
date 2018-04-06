@@ -6,15 +6,15 @@
 package midconn
 
 import (
-	"fmt"
+	"sync"
+	"net"
+	"sync/atomic"
+
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/node"
-	"net"
 	"github.com/lemonwx/xsql/middleware/meta"
-	"sync"
 	"github.com/lemonwx/log"
-	"sync/atomic"
-	"github.com/lemonwx/xsql/middleware"
+	"github.com/lemonwx/xsql/mysql"
 )
 
 var baseConnId uint32 = 1000
@@ -27,9 +27,6 @@ type MidConn struct {
 	COnnectionId uint32
 	RemoteAddr net.Addr
 	status uint16
-
-
-
 }
 
 func NewMidConn(conn net.Conn) (*MidConn, error) {
@@ -77,7 +74,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	baseConnId = atomic.AddUint32(&baseConnId, 1)
 	midConn.COnnectionId = baseConnId
 	midConn.RemoteAddr = conn.RemoteAddr()
-	midConn.status = middleware.SERVER_STATUS_AUTOCOMMIT
+	midConn.status = mysql.SERVER_STATUS_AUTOCOMMIT
 	return midConn, nil
 }
 
@@ -86,11 +83,61 @@ func (conn *MidConn) Serve() {
 		conn.cli.SetPktSeq(0)
 		data, err := conn.cli.ReadPacket()
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf("cli conn read packet failed: %v", err)
 			break
 		}
-		fmt.Println(data)
+		if err = conn.dispatch(data); err != nil {
+			conn.cli.WriteError(err)
+			conn.cli.SetPktSeq(0)
+		}
 		conn.cli.WriteOK(nil)
 		conn.cli.SetPktSeq(0)
 	}
+}
+
+func (conn *MidConn) dispatch(sql []byte) error {
+	opt, sql := sql[0], sql[1:]
+	log.Debugf("recv [%s] from cli", sql)
+	switch opt {
+	case mysql.COM_QUERY:
+	case mysql.COM_QUIT:
+	case mysql.COM_FIELD_LIST:
+	case mysql.COM_INIT_DB:
+	}
+
+	return nil
+}
+
+func (conn *MidConn) handleUse(db []byte) error {
+	tmp := string(db)
+	conn.db = tmp
+	conn.cli.Db = tmp
+	// rets, errs := conn
+	return nil
+}
+
+func (conn *MidConn) ExecuteMultiNode2(opt uint8, sql []byte, nodeIdxs []int)(
+	[]*mysql.Result, error) {
+
+	if nodeIdxs == nil {
+		log.Debug("nodeIdxs is nil. use meta.FullNodeIdxs to execute")
+		nodeIdxs = meta.FullNodeIdxs
+	}
+
+	rets := make([]interface{}, len(nodeIdxs))
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodeIdxs))
+
+	for idx := 0; idx < len(nodeIdxs); idx += 1 {
+		go func(tmp int) {
+			if rs, err := conn.nodes[nodeIdxs[tmp]].Execute(opt, sql); err != nil {
+				rets[tmp] = err
+			} else {
+				rets[tmp] = rs
+			}
+		}(idx)
+	}
+
+	return nil, nil
 }

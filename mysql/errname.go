@@ -3,7 +3,7 @@
  *  data  : 18-3-24 下午3:51
  */
 
-package middleware
+package mysql
 
 var MySQLErrName = map[uint16]string{
 	ER_HASHCHK:                                       "hashchk",

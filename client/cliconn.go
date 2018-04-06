@@ -11,24 +11,24 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/lemonwx/xsql/middleware"
+	"github.com/lemonwx/xsql/mysql"
 )
 
-var DEFAULT_CAPABILITY uint32 = middleware.CLIENT_LONG_PASSWORD | middleware.CLIENT_LONG_FLAG |
-	middleware.CLIENT_CONNECT_WITH_DB | middleware.CLIENT_PROTOCOL_41 |
-	middleware.CLIENT_TRANSACTIONS | middleware.CLIENT_SECURE_CONNECTION
+var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
+	mysql.CLIENT_CONNECT_WITH_DB | mysql.CLIENT_PROTOCOL_41 |
+	mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_SECURE_CONNECTION
 
 var baseConnId int32 = 1000
 
 type CliConn struct {
 	conn         net.Conn
-	pkt          *middleware.PacketIO
+	pkt          *mysql.PacketIO
 	connectionId int32
 	salt         []byte
 	capability   uint32
 
 	status    uint16
-	collation middleware.CollationId
+	collation mysql.CollationId
 	charset   string
 
 	user string
@@ -42,14 +42,14 @@ func NewClieConn(conn net.Conn) *CliConn {
 
 	cli := &CliConn{
 		conn: conn,
-		pkt:  middleware.NewPacketIO(conn),
+		pkt:  mysql.NewPacketIO(conn),
 	}
 
 	cli.pkt.Sequence = 0
-	cli.status = middleware.SERVER_STATUS_AUTOCOMMIT
-	cli.salt, _ = middleware.RandomBuf(20)
-	cli.charset = middleware.DEFAULT_CHARSET
-	cli.collation = middleware.DEFAULT_COLLATION_ID
+	cli.status = mysql.SERVER_STATUS_AUTOCOMMIT
+	cli.salt, _ = mysql.RandomBuf(20)
+	cli.charset = mysql.DEFAULT_CHARSET
+	cli.collation = mysql.DEFAULT_COLLATION_ID
 	cli.connectionId = atomic.AddInt32(&baseConnId, 1)
 
 	return cli
@@ -81,7 +81,7 @@ func (c *CliConn) writeInitialHandshake() error {
 	data = append(data, 10)
 
 	//server version[00]
-	data = append(data, middleware.ServerVersion...)
+	data = append(data, mysql.ServerVersion...)
 	data = append(data, 0)
 
 	//connection id
@@ -97,7 +97,7 @@ func (c *CliConn) writeInitialHandshake() error {
 	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
 
 	//charset, utf-8 default
-	data = append(data, uint8(middleware.DEFAULT_COLLATION_ID))
+	data = append(data, uint8(mysql.DEFAULT_COLLATION_ID))
 
 	//status
 	data = append(data, byte(c.status), byte(c.status>>8))
@@ -153,18 +153,18 @@ func (c *CliConn) readHandshakeResponse() error {
 	pos++
 	auth := data[pos : pos+authLen]
 
-	checkAuth := middleware.CalcPassword(c.salt, []byte(c.defaultPasswd))
+	checkAuth := mysql.CalcPassword(c.salt, []byte(c.defaultPasswd))
 	if c.user != c.defaultUser || !bytes.Equal(auth, checkAuth) {
 
 	}
 	if false {
-		return middleware.NewDefaultError(middleware.ER_ACCESS_DENIED_ERROR, c.user, c.conn.RemoteAddr().String(), "Yes")
+		return mysql.NewDefaultError(mysql.ER_ACCESS_DENIED_ERROR, c.user, c.conn.RemoteAddr().String(), "Yes")
 	}
 
 	pos += authLen
 
 	var db string
-	if c.capability&middleware.CLIENT_CONNECT_WITH_DB > 0 {
+	if c.capability&mysql.CLIENT_CONNECT_WITH_DB > 0 {
 		if len(data[pos:]) == 0 {
 			return nil
 		}
@@ -178,18 +178,18 @@ func (c *CliConn) readHandshakeResponse() error {
 	return nil
 }
 
-func (c *CliConn) WriteOK(r *middleware.Result) error {
+func (c *CliConn) WriteOK(r *mysql.Result) error {
 	if r == nil {
-		r = &middleware.Result{Status: c.status}
+		r = &mysql.Result{Status: c.status}
 	}
 	data := make([]byte, 4, 32)
 
-	data = append(data, middleware.OK_HEADER)
+	data = append(data, mysql.OK_HEADER)
 
-	data = append(data, middleware.PutLengthEncodedInt(r.AffectedRows)...)
-	data = append(data, middleware.PutLengthEncodedInt(r.InsertId)...)
+	data = append(data, mysql.PutLengthEncodedInt(r.AffectedRows)...)
+	data = append(data, mysql.PutLengthEncodedInt(r.InsertId)...)
 
-	if c.capability&middleware.CLIENT_PROTOCOL_41 > 0 {
+	if c.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, byte(r.Status), byte(r.Status>>8))
 		data = append(data, 0, 0)
 	}
@@ -210,18 +210,18 @@ func (c *CliConn) SetPktSeq(sz uint8) {
 }
 
 func (c *CliConn) WriteError(e error) error {
-	var m *middleware.SqlError
+	var m *mysql.SqlError
 	var ok bool
-	if m, ok = e.(*middleware.SqlError); !ok {
-		m = middleware.NewError(middleware.ER_UNKNOWN_ERROR, e.Error())
+	if m, ok = e.(*mysql.SqlError); !ok {
+		m = mysql.NewError(mysql.ER_UNKNOWN_ERROR, e.Error())
 	}
 
 	data := make([]byte, 4, 16+len(m.Message))
 
-	data = append(data, middleware.ERR_HEADER)
+	data = append(data, mysql.ERR_HEADER)
 	data = append(data, byte(m.Code), byte(m.Code>>8))
 
-	if c.capability&middleware.CLIENT_PROTOCOL_41 > 0 {
+	if c.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, '#')
 		data = append(data, m.State...)
 	}
@@ -234,8 +234,8 @@ func (c *CliConn) WriteError(e error) error {
 func (c *CliConn) writeEOF(status uint16) error {
 	data := make([]byte, 4, 9)
 
-	data = append(data, middleware.EOF_HEADER)
-	if c.capability&middleware.CLIENT_PROTOCOL_41 > 0 {
+	data = append(data, mysql.EOF_HEADER)
+	if c.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 		data = append(data, 0, 0)
 		data = append(data, byte(status), byte(status>>8))
 	}

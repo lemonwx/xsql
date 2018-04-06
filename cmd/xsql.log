@@ -1,2 +1,14 @@
-2018/04/06 15:17:55 main.go:31: DEBUG: [this is xsql's log]
-2018/04/06 15:17:55 main.go:47: INFO: server run under &{0xc42000e0b8 192.168.1.2:1234}
+2018/04/06 16:13:32 main.go:31: DEBUG: [this is xsql's log]
+2018/04/06 16:13:32 main.go:47: INFO: server run under &{0xc42000e0b8 192.168.1.2:1234}
+2018/04/06 16:13:35 server.go:52: DEBUG: [192.168.1.2:59604] connected, midConn [1001] serve for it
+2018/04/06 16:13:35 midconn.go:100: DEBUG: recv [show databases] from cli
+2018/04/06 16:13:35 midconn.go:100: DEBUG: recv [show tables] from cli
+2018/04/06 16:13:35 midconn.go:100: DEBUG: recv [show tables] from cli
+2018/04/06 16:13:36 midconn.go:100: DEBUG: recv [show tables] from cli
+2018/04/06 16:13:37 midconn.go:100: DEBUG: recv [show tables] from cli
+2018/04/06 16:13:38 midconn.go:100: DEBUG: recv [] from cli
+2018/04/06 16:13:38 midconn.go:86: ERROR: cli conn read packet failed: connection was bad
+2018/04/06 16:13:38 server.go:55: ERROR: conn [192.168.1.2:59604] colesed, midconn [1001]'s goroutine will exit
+2018/04/06 16:13:38 server.go:52: DEBUG: [192.168.1.2:59606] connected, midConn [1002] serve for it
+2018/04/06 16:13:38 midconn.go:100: DEBUG: recv [select @@version_comment limit 1] from cli
+2018/04/06 16:13:39 midconn.go:100: DEBUG: recv [show tables] from cli

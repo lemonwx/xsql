@@ -3,7 +3,7 @@
  *  data  : 18-3-24 下午3:23
  */
 
-package middleware
+package mysql
 
 import (
 	"bufio"

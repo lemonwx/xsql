@@ -3,7 +3,7 @@
  *  data  : 18-3-24 下午3:49
  */
 
-package middleware
+package mysql
 
 const (
 	ER_ERROR_FIRST                                                      uint16 = 1000
