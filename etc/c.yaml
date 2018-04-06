@@ -1,0 +1,24 @@
+# xsql
+id: xsql_1
+addr : 192.168.1.2:1234
+loglevel : 100
+nodelay: false
+XA: true
+
+nodes:
+-
+  host: 172.17.0.2
+  port: 5518
+  user: root
+  password: root
+-
+  host: 172.17.0.2
+  port: 5518
+  user: root
+  password: root
+
+RedisCfg:
+  host: localhost
+  port: 6739
+  user: root
+  password: db10$ZTE

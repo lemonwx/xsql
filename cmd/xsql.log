@@ -1,0 +1,2 @@
+2018/04/06 15:17:55 main.go:31: DEBUG: [this is xsql's log]
+2018/04/06 15:17:55 main.go:47: INFO: server run under &{0xc42000e0b8 192.168.1.2:1234}

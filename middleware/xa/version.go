@@ -5,8 +5,15 @@
 
 package xa
 
+import (
+	"github.com/lemonwx/xsql/config"
+	"github.com/garyburd/redigo/redis"
+)
+
 // xsql support xa transaction by import Version for each data
 type Version uint64
+var Cfg *config.Conf
+var pool redis.Pool
 
 func NextVersion() (uint64, error) {
 	/*
@@ -28,4 +35,21 @@ func ReleaseVersionInfo(version uint64) error {
 		2. commit to redis
 	*/
 	return nil
+}
+
+
+func InitPool() {
+	pool = redis.Pool{
+		MaxIdle : 1,
+		MaxActive: 1000,
+		IdleTimeout: 10,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", "127.0.0.1:6379")
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+
+	}
 }

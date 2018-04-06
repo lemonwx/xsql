@@ -32,7 +32,7 @@ type CliConn struct {
 	charset   string
 
 	user string
-	db   string
+	Db   string
 
 	defaultUser   string
 	defaultPasswd string
@@ -64,11 +64,13 @@ func (c *CliConn) Handshake() error {
 		return err
 	}
 
+	/*
 	if err := c.WriteOK(nil); err != nil {
 		return err
 	}
-
 	c.pkt.Sequence = 0
+	*/
+
 	return nil
 }
 
@@ -168,10 +170,10 @@ func (c *CliConn) readHandshakeResponse() error {
 		}
 
 		db = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
-		pos += len(c.db) + 1
+		pos += len(c.Db) + 1
 
 	}
-	c.db = db
+	c.Db = db
 
 	return nil
 }

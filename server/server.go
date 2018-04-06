@@ -10,6 +10,7 @@ import (
 	"net"
 
 	"github.com/lemonwx/xsql/middleware/midconn"
+	"github.com/lemonwx/log"
 )
 
 type Server struct {
@@ -44,7 +45,14 @@ func (s *Server) Run() error {
 // serve for mysql client conn(get by lis.Accept)
 func (s *Server) ServeConn(conn net.Conn) {
 	// init and connect with back mysql server
-	midConn := midconn.NewMidConn(conn)
-	midConn.Serve()
-	fmt.Println("this goroutine will exit", midConn)
+	if midConn, err := midconn.NewMidConn(conn); err != nil {
+		log.Errorf("new mid conn failed: %v", err)
+		return
+	} else {
+		log.Debugf("[%s] connected, midConn [%d] serve for it",
+			midConn.RemoteAddr, midConn.COnnectionId)
+		midConn.Serve()
+		log.Errorf("conn [%s] colesed, midconn [%d]'s goroutine will exit",
+			conn.RemoteAddr(), midConn.COnnectionId)
+	}
 }

@@ -10,38 +10,75 @@ import (
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/node"
 	"net"
-	"os"
+	"github.com/lemonwx/xsql/middleware/meta"
+	"sync"
+	"github.com/lemonwx/log"
+	"sync/atomic"
+	"github.com/lemonwx/xsql/middleware"
 )
 
-var (
-	node1Addr = "192.168.1.5:5518"
-	node2Addr = "192.168.1.5:5520"
-)
+var baseConnId uint32 = 1000
 
 type MidConn struct {
 	cli  *client.CliConn
-	node []*node.Node
+	nodes []*node.Node
+	db string
+	closed bool
+	COnnectionId uint32
+	RemoteAddr net.Addr
+	status uint16
+
+
+
 }
 
-func NewMidConn(conn net.Conn) *MidConn {
+func NewMidConn(conn net.Conn) (*MidConn, error) {
 	// handshake with mysql client
+	var err error
 	cli := client.NewClieConn(conn)
-	err := cli.Handshake()
+	err = cli.Handshake()
 	if err != nil {
 		cli.WriteError(err)
-		os.Exit(-1)
+		return nil, err
 	}
 
 	midConn := new(MidConn)
 	// cli conn between mysqlCli and xsql, this cli has handshake with mysql cli
 	midConn.cli = cli
 	// init and connect to back mysql server
-	node1 := node.NewNode(node1Addr)
-	node2 := node.NewNode(node2Addr)
+	midConn.nodes = make([]*node.Node, len(meta.NodeAddrs))
 
-	midConn.node = []*node.Node{node1, node2}
+	for idx, nodeCfg := range meta.NodeAddrs {
+		tmpNode := node.NewNode(nodeCfg.Host, nodeCfg.Port, nodeCfg.User, nodeCfg.Password, cli.Db)
+		midConn.nodes[idx] = tmpNode
+	}
 
-	return midConn
+	var wg sync.WaitGroup
+	wg.Add(len(midConn.nodes))
+
+	for idx := 0; idx < len(midConn.nodes); idx += 1{
+		go func(tmp int) {
+			if err = midConn.nodes[tmp].Connect(); err != nil {
+				log.Errorf("connected to backend mysqld %d failed: %v", tmp, err)
+			}
+			wg.Done()
+		}(idx)
+	}
+	wg.Wait()
+
+	if err != nil {
+		midConn.cli.WriteError(err)
+	} else {
+		// hand shake with cli finish
+		midConn.cli.WriteOK(nil)
+		midConn.cli.SetPktSeq(0)
+	}
+	midConn.closed = false
+	baseConnId = atomic.AddUint32(&baseConnId, 1)
+	midConn.COnnectionId = baseConnId
+	midConn.RemoteAddr = conn.RemoteAddr()
+	midConn.status = middleware.SERVER_STATUS_AUTOCOMMIT
+	return midConn, nil
 }
 
 func (conn *MidConn) Serve() {
@@ -54,7 +91,6 @@ func (conn *MidConn) Serve() {
 		}
 		fmt.Println(data)
 		conn.cli.WriteOK(nil)
-
 		conn.cli.SetPktSeq(0)
 	}
 }
