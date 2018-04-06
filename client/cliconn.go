@@ -40,11 +40,13 @@ type CliConn struct {
 
 func NewClieConn(conn net.Conn) *CliConn {
 
-	cli := &CliConn{
-		conn: conn,
-		pkt:  mysql.NewPacketIO(conn),
-	}
+	tcpConn := conn.(*net.TCPConn)
+	tcpConn.SetNoDelay(false)
 
+	cli := &CliConn{
+		conn: tcpConn,
+		pkt: mysql.NewPacketIO(tcpConn),
+	}
 	cli.pkt.Sequence = 0
 	cli.status = mysql.SERVER_STATUS_AUTOCOMMIT
 	cli.salt, _ = mysql.RandomBuf(20)
@@ -241,4 +243,11 @@ func (c *CliConn) writeEOF(status uint16) error {
 	}
 
 	return c.writePacket(data)
+}
+
+func (c  *CliConn) Close() {
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
+	}
 }

@@ -7,9 +7,9 @@ package mysql
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"net"
+	"fmt"
 )
 
 const (
@@ -37,7 +37,6 @@ func NewPacketIO(conn net.Conn) *PacketIO {
 func (p *PacketIO) ReadPacket() ([]byte, error) {
 	header := []byte{0, 0, 0, 0}
 	if _, err := io.ReadFull(p.rb, header); err != nil {
-		fmt.Println("packet", err)
 		return nil, ErrBadConn
 	}
 

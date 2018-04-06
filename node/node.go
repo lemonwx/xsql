@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"net"
 	"encoding/binary"
+	"errors"
+	"bytes"
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
@@ -24,8 +26,11 @@ type Node struct {
 	password string
 	Db string
 
-	capcbility uint32
+	capability uint32
 	status uint16
+	collation mysql.CollationId
+	charset string
+	salt []byte
 }
 
 func NewNode(host string, port int, user, password, db string) *Node {
@@ -41,7 +46,174 @@ func NewNode(host string, port int, user, password, db string) *Node {
 }
 
 func (node *Node) Connect() error {
+	conn, err := net.Dial("tcp", node.addr)
+	if err != nil {
+		log.Errorf("dial to backend mysqld [%v] failed %v", node, err)
+	}
+
+	tcpConn := conn.(*net.TCPConn)
+	tcpConn.SetNoDelay(false)
+	node.conn = tcpConn
+	node.pkt = mysql.NewPacketIO(tcpConn)
+
+	if err := node.readInitialHandshake(); err != nil {
+		log.Errorf("read init handshake from mysqld [%v] failed: %v", node.addr, err)
+		node.Close()
+		return err
+	}
+
+	if err := node.writeAuthHandshake(); err != nil {
+		log.Errorf("write auth handshake from mysqld [%v] failed: %v", node.addr, err)
+		node.Close()
+		return err
+	}
+
+	if _, err := node.readOK(); err != nil {
+		log.Errorf("hand shake with mysqld [%v], read ok failed: %v", node.addr, err)
+		return err
+	}
+
 	return nil
+}
+
+func (node *Node) readInitialHandshake() error {
+	data, err := node.readPacket()
+	if err != nil {
+		return err
+	}
+
+	if data[0] == mysql.ERR_HEADER {
+		return errors.New("read initial handshake error")
+	}
+
+	if data[0] < mysql.MinProtocolVersion {
+		return fmt.Errorf("invalid protocol version %d, must >= 10", data[0])
+	}
+
+	//skip mysql version and connection id
+	//mysql version end with 0x00
+	//connection id length is 4
+	pos := 1 + bytes.IndexByte(data[1:], 0x00) + 1 + 4
+
+	node.salt = append(node.salt, data[pos:pos+8]...)
+
+	//skip filter
+	pos += 8 + 1
+
+	//capability lower 2 bytes
+	node.capability = uint32(binary.LittleEndian.Uint16(data[pos : pos+2]))
+
+	pos += 2
+
+	if len(data) > pos {
+		//skip server charset
+		//c.charset = data[pos]
+		pos += 1
+
+		node.status = binary.LittleEndian.Uint16(data[pos : pos+2])
+		pos += 2
+
+		node.capability = uint32(binary.LittleEndian.Uint16(data[pos:pos+2]))<<16 | node.capability
+
+		pos += 2
+
+		//skip auth data len or [00]
+		//skip reserved (all [00])
+		pos += 10 + 1
+
+		// The documentation is ambiguous about the length.
+		// The official Python library uses the fixed length 12
+		// mysql-proxy also use 12
+		// which is not documented but seems to work.
+		node.salt = append(node.salt, data[pos:pos+12]...)
+	}
+
+	return nil
+}
+
+func (node *Node) writeAuthHandshake() error {
+	// Adjust client capability flags based on server support
+	capability := mysql.CLIENT_PROTOCOL_41 | mysql.CLIENT_SECURE_CONNECTION |
+		mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_LONG_FLAG
+
+	capability &= node.capability
+
+	//packet length
+	//capbility 4
+	//max-packet size 4
+	//charset 1
+	//reserved all[0] 23
+	length := 4 + 4 + 1 + 23
+
+	//username
+	length += len(node.user) + 1
+
+	//we only support secure connection
+	auth := mysql.CalcPassword(node.salt, []byte(node.password))
+
+	length += 1 + len(auth)
+
+	if len(node.Db) > 0 {
+		capability |= mysql.CLIENT_CONNECT_WITH_DB
+
+		length += len(node.Db) + 1
+	}
+
+	node.capability = capability
+
+	data := make([]byte, length+4)
+
+	//capability [32 bit]
+	data[4] = byte(capability)
+	data[5] = byte(capability >> 8)
+	data[6] = byte(capability >> 16)
+	data[7] = byte(capability >> 24)
+
+	//MaxPacketSize [32 bit] (none)
+	//data[8] = 0x00
+	//data[9] = 0x00
+	//data[10] = 0x00
+	//data[11] = 0x00
+
+	//Charset [1 byte]
+	data[12] = byte(node.collation)
+
+	//Filler [23 bytes] (all 0x00)
+	pos := 13 + 23
+
+	//User [null terminated string]
+	if len(node.user) > 0 {
+		pos += copy(data[pos:], node.user)
+	}
+	//data[pos] = 0x00
+	pos++
+
+	// auth [length encoded integer]
+	data[pos] = byte(len(auth))
+	pos += 1 + copy(data[pos+1:], auth)
+
+	// db [null terminated string]
+	if len(node.Db) > 0 {
+		pos += copy(data[pos:], node.Db)
+		//data[pos] = 0x00
+	}
+
+	return node.writePacket(data)
+}
+
+func (node *Node) readOK() (*mysql.Result, error) {
+	data, err := node.readPacket()
+	if err != nil {
+		return nil, err
+	}
+
+	if data[0] == mysql.OK_HEADER {
+		return node.parseOKPkt(data)
+	} else if data[0] == mysql.ERR_HEADER {
+		return nil, node.parseErrPkt(data)
+	} else {
+		return nil, errors.New("invalid ok packet")
+	}
 }
 
 func (node *Node) Execute(opt uint8, data []byte) (*mysql.Result, error) {
@@ -117,7 +289,7 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 		}
 
 		if node.isEOFPacket(data) {
-			if node.capcbility & mysql.CLIENT_PROTOCOL_41 > 0 {
+			if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
 				result.Status = binary.LittleEndian.Uint16(data[3:])
 				node.status = result.Status
 			}
@@ -151,7 +323,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 		}
 
 		if node.isEOFPacket(data) {
-			if node.capcbility & mysql.CLIENT_PROTOCOL_41 > 0 {
+			if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
 				result.Status = binary.LittleEndian.Uint16(data[3:])
 				node.status = result.Status
 			}
@@ -186,11 +358,11 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error){
 	r.InsertId, _, n = mysql.LengthEncodedInt(data[pos:])
 	pos += n
 
-	if node.capcbility & mysql.CLIENT_PROTOCOL_41 > 0 {
+	if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
 		r.Status = binary.LittleEndian.Uint16(data[pos:])
 		node.status = r.Status
 		pos += 2
-	} else if node.capcbility & mysql.CLIENT_TRANSACTIONS > 0 {
+	} else if node.capability & mysql.CLIENT_TRANSACTIONS > 0 {
 		r.Status = binary.LittleEndian.Uint16(data[pos:])
 		node.status = r.Status
 		pos += 2
@@ -204,7 +376,7 @@ func (node *Node) parseErrPkt(data []byte) error {
 	e.Code = binary.LittleEndian.Uint16(data[pos:])
 	pos += 2
 
-	if node.capcbility & mysql.CLIENT_PROTOCOL_41 > 0 {
+	if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
 		pos += 1
 		e.State = string(data[pos : pos + 5])
 		pos += 5
@@ -220,4 +392,11 @@ func (node *Node) writePacket(data []byte) error {
 
 func (node *Node) readPacket()([]byte, error) {
 	return node.pkt.ReadPacket()
+}
+
+func (node *Node) Close() {
+	if node.conn != nil {
+		node.conn.Close()
+		node.conn = nil
+	}
 }

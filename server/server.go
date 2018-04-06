@@ -52,6 +52,7 @@ func (s *Server) ServeConn(conn net.Conn) {
 		log.Debugf("[%s] connected, midConn [%d] serve for it",
 			midConn.RemoteAddr, midConn.COnnectionId)
 		midConn.Serve()
+		midConn.Close()
 		log.Errorf("conn [%s] colesed, midconn [%d]'s goroutine will exit",
 			conn.RemoteAddr(), midConn.COnnectionId)
 	}

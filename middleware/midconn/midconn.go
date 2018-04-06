@@ -57,6 +57,8 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 		go func(tmp int) {
 			if err = midConn.nodes[tmp].Connect(); err != nil {
 				log.Errorf("connected to backend mysqld %d failed: %v", tmp, err)
+			} else {
+				log.Debugf("connect to mysqld [%v] success", midConn.nodes[tmp])
 			}
 			wg.Done()
 		}(idx)
@@ -67,7 +69,10 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 		midConn.cli.WriteError(err)
 	} else {
 		// hand shake with cli finish
-		midConn.cli.WriteOK(nil)
+		log.Debug("hand shake with cli and mysqld finish")
+		if err := midConn.cli.WriteOK(nil); err != nil {
+			return nil, err
+		}
 		midConn.cli.SetPktSeq(0)
 	}
 	midConn.closed = false
@@ -140,4 +145,12 @@ func (conn *MidConn) ExecuteMultiNode2(opt uint8, sql []byte, nodeIdxs []int)(
 	}
 
 	return nil, nil
+}
+
+func (conn *MidConn) Close() {
+	conn.closed = true
+	conn.cli.Close()
+	for _, node := range conn.nodes {
+		node.Close()
+	}
 }
