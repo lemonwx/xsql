@@ -145,6 +145,8 @@ func (conn *MidConn) handleQuery(sql string) error {
 		return conn.handleSelect(v, sql)
 	case *sqlparser.Show:
 		return conn.handleShow(v, sql)
+	case *sqlparser.Insert:
+		return conn.handleInsert(v, sql)
 
 
 	default:
