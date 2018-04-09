@@ -25,7 +25,7 @@ func NextVersion() (uint64, error) {
 	return 0, nil
 }
 
-func ActiveVersions() ([]uint64, error) {
+func VersionsInUse() ([]uint64, error) {
 	return []uint64{1, 2, 3}, nil
 }
 

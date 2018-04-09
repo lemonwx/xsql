@@ -32,6 +32,9 @@ type Node struct {
 	collation mysql.CollationId
 	charset string
 	salt []byte
+
+	VersionsInUse []uint64
+	NextVersion uint64
 }
 
 func NewNode(host string, port int, user, password, db string, connid uint32) *Node {
@@ -275,6 +278,11 @@ func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error)
 	}
 
 	count, _, n := mysql.LengthEncodedInt(data)
+	if node.VersionsInUse != nil {
+		log.Debugf("[%d] node [%v] read result need to hide extra col", node.ConnectionId, node.addr)
+		// count -= 1
+	}
+
 	if n != len(data) {
 		return nil, mysql.ErrMalformPacket
 	}
@@ -317,6 +325,7 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 		}
 
 		result.Fields[i], err = mysql.FieldData(data).Parse()
+		log.Debug(data, "----", result.Fields[i])
 		if err != nil {
 			return err
 		}
@@ -345,6 +354,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 
 			break
 		}
+		log.Debug(data)
 		result.RowDatas = append(result.RowDatas, data)
 	}
 

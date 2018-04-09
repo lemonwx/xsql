@@ -33,6 +33,9 @@ type MidConn struct {
 	ConnectionId uint32
 	RemoteAddr   net.Addr
 	status       uint16
+
+	VersionsInUse []uint64
+	NextVersion uint64
 }
 
 func NewMidConn(conn net.Conn) (*MidConn, error) {
@@ -242,7 +245,7 @@ func (conn *MidConn) HandleExecRets(rets []*mysql.Result) error {
 
 func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 
-	if rs, err := conn.mergeSelResult(nil, rets); err != nil {
+	if rs, err := conn.mergeSelResult2(rets); err != nil {
 		log.Errorf("merge select result failed: %v", err)
 		return conn.cli.WriteError(err)
 	} else if rs != nil {
@@ -261,6 +264,40 @@ func (conn *MidConn) mergeExecResult(rets []*mysql.Result) (*mysql.Result, error
 		ret.AffectedRows += r.AffectedRows
 	}
 	return ret, nil
+}
+
+func (conn *MidConn) mergeSelResult2(rets []*mysql.Result) (*mysql.Result, error) {
+	if len(rets) == 0 {
+		return nil, UNEXPECT_MIDDLE_WARE_ERR
+	}
+	if rets[0] == nil {
+		return nil, UNEXPECT_MIDDLE_WARE_ERR
+	}
+
+	rs := rets[0]
+
+	// merge data row numbers
+	finalLen := 0
+	for _, r := range rets {
+		finalLen += len(r.RowDatas)
+	}
+
+	tgtRs := &mysql.Resultset{
+		Fields     :rs.Fields,
+		RowDatas :make([]mysql.RowData, finalLen),
+	}
+
+	copy(tgtRs.RowDatas, rs.RowDatas)
+	for idx := 1; idx < len(rets); idx += 1{
+		from := len(rets[idx-1].RowDatas)
+		copy(tgtRs.RowDatas[from:], rets[idx].RowDatas)
+	}
+
+	return &mysql.Result{
+		Status: 0,
+		Resultset: tgtRs,
+	}, nil
+
 }
 
 func (conn *MidConn) mergeSelResult(versions []uint64, rets []*mysql.Result) (*mysql.Result, error) {
@@ -288,9 +325,9 @@ func (conn *MidConn) mergeSelResult(versions []uint64, rets []*mysql.Result) (*m
 				}
 				rd = rd[rdStart:]
 			}
-			val := r.Values[idx][startIdx:]
+			//val := r.Values[idx][startIdx:]
 			tgtRs.RowDatas = append(tgtRs.RowDatas, rd)
-			tgtRs.Values = append(tgtRs.Values, val)
+			//tgtRs.Values = append(tgtRs.Values, val)
 		}
 	}
 

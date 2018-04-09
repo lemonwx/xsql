@@ -9,6 +9,7 @@ import (
 	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/middleware/xa"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
@@ -34,6 +35,22 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 }
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
+
+	var err error
+	conn.VersionsInUse, err = xa.VersionsInUse()
+
+	conn.nodes[0].VersionsInUse = conn.VersionsInUse
+	conn.nodes[1].VersionsInUse = conn.VersionsInUse
+
+	conn.nodes[0].NextVersion= conn.NextVersion
+	conn.nodes[1].NextVersion= conn.NextVersion
+
+	if err != nil {
+		log.Debugf("[%d] get xa.VersionsInUse failed: %v", err)
+		return err
+	}
+
+
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
 	if err != nil {
 		return err
