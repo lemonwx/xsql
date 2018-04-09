@@ -14,6 +14,7 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
+	"utils"
 )
 
 type Node struct {
@@ -33,7 +34,7 @@ type Node struct {
 	charset string
 	salt []byte
 
-	VersionsInUse []uint64
+	VersionsInUse [][]byte
 	NextVersion uint64
 	NeedHide bool
 }
@@ -344,7 +345,10 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	var retErr error
 	var err error
 	var data []byte
-	for idx := 0 ;; idx += 1{
+	// pre row's version value
+	var preRowV []byte = nil
+
+	for {
 		data, err = node.pkt.ReadPacket()
 		if err != nil {
 			return err
@@ -355,29 +359,37 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 				result.Status = binary.LittleEndian.Uint16(data[3:])
 				node.status = result.Status
 			}
-
 			break
 		}
 
 		if node.NeedHide {
 			version := data[1 : data[0] + 1]
-			log.Debug(version, []byte{49, 50, 51, 52, 53, 54})
-			if bytes.Equal(version, []byte{49, 50, 51, 52, 53, 54}) {
+			if version == nil {
+				// version define is : version bigint unsigned not null default 0
+				retErr = errors.New("UNEXPECT VERSION IS NULL")
+			} else if bytes.Equal(version, preRowV) {
+				// if pre row's version == version , then not need to judge BytesContains
+				// for sure this row data is not used by other session
+				// so xsql can parse sql and data more faster...
+			} else if utils.BytesContains(version, node.VersionsInUse) {
 				retErr = errors.New("data in use by another session, pls try again later")
 			}
+			preRowV = version
 			data = data[data[0] + 1:]
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}
+	/*
+		no affect to send resultset to mysql cli
+		result.Values = make([][]interface{}, len(result.RowDatas))
+		for i := range result.Values {
+			result.Values[i], err = result.RowDatas[i].Parse(result.Fields, isBinary)
 
-	result.Values = make([][]interface{}, len(result.RowDatas))
-	for i := range result.Values {
-		result.Values[i], err = result.RowDatas[i].Parse(result.Fields, isBinary)
-
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
 		}
-	}
+		*/
 	return retErr
 }
 

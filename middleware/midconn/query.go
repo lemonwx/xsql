@@ -38,20 +38,15 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
 	var err error
 	conn.VersionsInUse, err = xa.VersionsInUse()
-
-	conn.nodes[0].VersionsInUse = conn.VersionsInUse
-	conn.nodes[0].VersionsInUse = conn.VersionsInUse
-	conn.nodes[0].NeedHide = true
-
-	conn.nodes[1].NextVersion= conn.NextVersion
-	conn.nodes[1].NextVersion= conn.NextVersion
-	conn.nodes[1].NeedHide = true
-
 	if err != nil {
 		log.Debugf("[%d] get xa.VersionsInUse failed: %v", err)
 		return err
 	}
 
+	for _, node := range conn.nodes {
+		node.VersionsInUse = conn.VersionsInUse
+		node.NeedHide = true
+	}
 
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
 	if err != nil {

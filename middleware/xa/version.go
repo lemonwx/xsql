@@ -8,6 +8,7 @@ package xa
 import (
 	"github.com/lemonwx/xsql/config"
 	"github.com/garyburd/redigo/redis"
+	"github.com/lemonwx/log"
 )
 
 // xsql support xa transaction by import Version for each data
@@ -25,8 +26,12 @@ func NextVersion() (uint64, error) {
 	return 0, nil
 }
 
-func VersionsInUse() ([]uint64, error) {
-	return []uint64{1, 2, 3}, nil
+func VersionsInUse() ([][]byte, error) {
+	conn := pool.Get()
+	defer conn.Close()
+	reply, err := conn.Do("SMEMBERS", "VersionsInUse")
+	log.Debug( reply, err)
+	return [][]byte{{1,2,3}}, nil
 }
 
 func ReleaseVersionInfo(version uint64) error {

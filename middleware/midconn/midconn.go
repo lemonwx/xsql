@@ -10,8 +10,8 @@ import (
 	"net"
 	"sync/atomic"
 	"strings"
+	"bytes"
 	"errors"
-	"strconv"
 
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/node"
@@ -19,8 +19,6 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"utils"
-	"bytes"
 )
 
 var baseConnId uint32 = 1000
@@ -34,7 +32,7 @@ type MidConn struct {
 	RemoteAddr   net.Addr
 	status       uint16
 
-	VersionsInUse []uint64
+	VersionsInUse [][]byte
 	NextVersion uint64
 }
 
@@ -245,7 +243,7 @@ func (conn *MidConn) HandleExecRets(rets []*mysql.Result) error {
 
 func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 
-	if rs, err := conn.mergeSelResult2(rets); err != nil {
+	if rs, err := conn.mergeSelResult(rets); err != nil {
 		log.Errorf("merge select result failed: %v", err)
 		return conn.cli.WriteError(err)
 	} else if rs != nil {
@@ -266,7 +264,7 @@ func (conn *MidConn) mergeExecResult(rets []*mysql.Result) (*mysql.Result, error
 	return ret, nil
 }
 
-func (conn *MidConn) mergeSelResult2(rets []*mysql.Result) (*mysql.Result, error) {
+func (conn *MidConn) mergeSelResult(rets []*mysql.Result) (*mysql.Result, error) {
 	if len(rets) == 0 {
 		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
@@ -298,43 +296,6 @@ func (conn *MidConn) mergeSelResult2(rets []*mysql.Result) (*mysql.Result, error
 		Resultset: tgtRs,
 	}, nil
 
-}
-
-func (conn *MidConn) mergeSelResult(versions []uint64, rets []*mysql.Result) (*mysql.Result, error) {
-	rs := rets[0]
-	tgtRs := new(mysql.Resultset)
-
-	// hide version columns
-	startIdx := 0
-	if _, ok := rs.Resultset.FieldNames["version"]; ok && versions != nil {
-		startIdx = 1
-	}
-	tgtRs.Fields = rs.Resultset.Fields[startIdx:]
-
-	for _, r := range rets {
-		for idx, _ := range r.RowDatas {
-			rd := r.RowDatas[idx]
-			if startIdx == 1 {
-				rdStart := rd[0] + 1
-				v, err := strconv.ParseUint(string(rd[1:rdStart]), 10, 64)
-				if err != nil {
-					log.Errorf("get version from every row failed: %v", err)
-				}
-				if utils.InArray(versions, v) {
-					return nil, ROW_DATA_IN_USE_ERR
-				}
-				rd = rd[rdStart:]
-			}
-			//val := r.Values[idx][startIdx:]
-			tgtRs.RowDatas = append(tgtRs.RowDatas, rd)
-			//tgtRs.Values = append(tgtRs.Values, val)
-		}
-	}
-
-	return &mysql.Result{
-		Status: 0,
-		Resultset: tgtRs,
-	}, nil
 }
 
 func (conn *MidConn) Close() {
