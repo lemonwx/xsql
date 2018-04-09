@@ -35,6 +35,7 @@ type Node struct {
 
 	VersionsInUse []uint64
 	NextVersion uint64
+	NeedHide bool
 }
 
 func NewNode(host string, port int, user, password, db string, connid uint32) *Node {
@@ -278,9 +279,9 @@ func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error)
 	}
 
 	count, _, n := mysql.LengthEncodedInt(data)
-	if node.VersionsInUse != nil {
+	if node.NeedHide {
 		log.Debugf("[%d] node [%v] read result need to hide extra col", node.ConnectionId, node.addr)
-		// count -= 1
+		count -= 1
 	}
 
 	if n != len(data) {
@@ -305,7 +306,7 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 	var data []byte
 	var err error
 
-	for  {
+	for idx:=0;;idx+=1 {
 		data, err = node.pkt.ReadPacket()
 		if err != nil {
 			return err
@@ -324,8 +325,11 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 			return err
 		}
 
+		if node.NeedHide && idx == 0 {
+			continue
+		}
+
 		result.Fields[i], err = mysql.FieldData(data).Parse()
-		log.Debug(data, "----", result.Fields[i])
 		if err != nil {
 			return err
 		}
@@ -337,11 +341,11 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 }
 
 func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
+	var retErr error
 	var err error
 	var data []byte
-	for {
+	for idx := 0 ;; idx += 1{
 		data, err = node.pkt.ReadPacket()
-
 		if err != nil {
 			return err
 		}
@@ -354,7 +358,15 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 
 			break
 		}
-		log.Debug(data)
+
+		if node.NeedHide {
+			version := data[1 : data[0] + 1]
+			log.Debug(version, []byte{49, 50, 51, 52, 53, 54})
+			if bytes.Equal(version, []byte{49, 50, 51, 52, 53, 54}) {
+				retErr = errors.New("data in use by another session, pls try again later")
+			}
+			data = data[data[0] + 1:]
+		}
 		result.RowDatas = append(result.RowDatas, data)
 	}
 
@@ -366,7 +378,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			return err
 		}
 	}
-	return nil
+	return retErr
 }
 
 func (node *Node) isEOFPacket(data []byte) bool {
@@ -458,4 +470,8 @@ func (node *Node) Close() {
 		node.conn.Close()
 		node.conn = nil
 	}
+}
+
+func (node *Node) SetPktSeq(sz uint8) {
+	node.pkt.Sequence = sz
 }
