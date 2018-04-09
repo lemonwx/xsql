@@ -26,6 +26,7 @@ type Node struct {
 	password string
 	Db string
 
+	ConnectionId uint32
 	capability uint32
 	status uint16
 	collation mysql.CollationId
@@ -33,13 +34,14 @@ type Node struct {
 	salt []byte
 }
 
-func NewNode(host string, port int, user, password, db string) *Node {
+func NewNode(host string, port int, user, password, db string, connid uint32) *Node {
 
 	node := &Node {
 		addr : fmt.Sprintf("%s:%d", host, port),
 		user: user,
 		password: password,
 		Db: db,
+		ConnectionId: connid,
 	}
 
 	return node
@@ -232,7 +234,7 @@ func (node *Node) executeSql(opt uint8, data []byte) error{
 	send[4] = opt
 	copy(send[5:], data)
 
-	log.Debugf("send  [%s] to node [%s]", data, node.addr)
+	log.Debugf("[%d] send [%s] to node [%s]", node.ConnectionId, data, node.addr)
 	return node.writePacket(send)
 }
 
@@ -252,9 +254,9 @@ func (node *Node) writeCommandStrStr(command byte, arg1 string, arg2 string) err
 func (node *Node) parseResult() (*mysql.Result, error) {
 	data, err := node.readPacket()
 	if err != nil {
-		log.Errorf("parse result from %v failed: %v", node.addr, err)
+		log.Errorf("[%d] parse result from %v failed: %v", node.ConnectionId, node.addr, err)
 	}
-	log.Debugf("recv [%d]-[%s] from node %v", data[0], data[1:], node.addr)
+	log.Debugf("[%d] recv [%d]-[%s] from node %v", node.ConnectionId, data[0], data[1:], node.addr)
 
 	switch data[0] {
 	case mysql.OK_HEADER:

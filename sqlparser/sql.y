@@ -102,7 +102,7 @@ var (
 
 // DDL Tokens
 %token <empty> CREATE ALTER DROP RENAME
-%token <empty> TABLE INDEX VIEW TO IGNORE IF UNIQUE USING
+%token <empty> TABLE INDEX VIEW TO IGNORE IF UNIQUE USING DATABASE
 
 %start any_command
 
@@ -286,7 +286,11 @@ admin_statement:
   }
 
 show_statement:
-  SHOW DATABASES like_or_where_opt 
+  DESC ID
+  {
+    $$ = &Show{Section: "desc "}
+  }
+| SHOW DATABASES like_or_where_opt
   {
     $$ = &Show{Section: "databases", LikeOrWhere: $3}
   }
@@ -300,7 +304,11 @@ show_statement:
   }
 
 create_statement:
-  CREATE TABLE not_exists_opt ID force_eof
+  CREATE DATABASE not_exists_opt ID force_eof
+  {
+    $$ = &DDL{Action: AST_CREATE, NewName: $4}
+  }
+| CREATE TABLE not_exists_opt ID force_eof
   {
     $$ = &DDL{Action: AST_CREATE, NewName: $4}
   }

@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"net"
-	"sync/atomic"
 
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/log"
@@ -24,7 +23,7 @@ var baseConnId int32 = 1000
 type CliConn struct {
 	conn         net.Conn
 	pkt          *mysql.PacketIO
-	connectionId int32
+	connectionId uint32
 	salt         []byte
 	capability   uint32
 
@@ -39,7 +38,7 @@ type CliConn struct {
 	defaultPasswd string
 }
 
-func NewClieConn(conn net.Conn) *CliConn {
+func NewClieConn(conn net.Conn, connid uint32) *CliConn {
 
 	tcpConn := conn.(*net.TCPConn)
 	tcpConn.SetNoDelay(false)
@@ -53,7 +52,7 @@ func NewClieConn(conn net.Conn) *CliConn {
 	cli.salt, _ = mysql.RandomBuf(20)
 	cli.charset = mysql.DEFAULT_CHARSET
 	cli.collation = mysql.DEFAULT_COLLATION_ID
-	cli.connectionId = atomic.AddInt32(&baseConnId, 1)
+	cli.connectionId = connid
 
 	return cli
 }
@@ -193,7 +192,7 @@ func (c *CliConn) ReadPacket() ([]byte, error) {
 
 
 func (c *CliConn) WriteResultset(status uint16, r *mysql.Resultset) error {
-	log.Debugf("send select rets [%v] to cli", r)
+	log.Debugf("[%d] send select rets [%v] to cli", c.connectionId, r.FieldNames)
 
 	total := make([]byte, 0, 4096)
 	data := make([]byte, 4, 512)
@@ -259,7 +258,7 @@ func (c *CliConn) WriteFieldList(status uint16, fs []*mysql.Field) error {
 
 
 func (c *CliConn) WriteOK(r *mysql.Result) error {
-	log.Debugf("send exec ok to cli: %v", r)
+	log.Debugf("[%d] send exec ok to cli: %v", c.connectionId, r )
 	if r == nil {
 		r = &mysql.Result{Status: c.status}
 	}
@@ -297,7 +296,7 @@ func (c *CliConn) WriteError(e error) error {
 
 	data = append(data, m.Message...)
 
-	log.Errorf("send err to cli: %v", e)
+	log.Errorf("[%d] send err to cli: %v", c.connectionId, e)
 	return c.writePacket(data)
 }
 

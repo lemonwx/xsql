@@ -49,11 +49,11 @@ func (s *Server) ServeConn(conn net.Conn) {
 		log.Errorf("new mid conn failed: %v", err)
 		return
 	} else {
-		log.Debugf("[%s] connected, midConn [%d] serve for it",
-			midConn.RemoteAddr, midConn.COnnectionId)
+		log.Debugf("[%d] [%s] connected, midConn [%d] serve for it",
+			midConn.ConnectionId, midConn.RemoteAddr, midConn.ConnectionId)
 		midConn.Serve()
 		midConn.Close()
-		log.Errorf("conn [%s] colesed, midconn [%d]'s goroutine will exit",
-			conn.RemoteAddr(), midConn.COnnectionId)
+		log.Errorf("[%d] conn [%s] colesed, midconn [%d]'s goroutine will exit",
+			midConn.ConnectionId, conn.RemoteAddr(), midConn.ConnectionId)
 	}
 }

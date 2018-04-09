@@ -97,6 +97,7 @@ var keywords = map[string]int{
 	"rename": RENAME,
 	"drop":   DROP,
 	"table":  TABLE,
+	"database": DATABASE,
 	"index":  INDEX,
 	"view":   VIEW,
 	"to":     TO,

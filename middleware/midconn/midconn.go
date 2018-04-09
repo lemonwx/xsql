@@ -26,33 +26,40 @@ import (
 var baseConnId uint32 = 1000
 
 type MidConn struct {
-	cli  *client.CliConn
-	nodes []*node.Node
-	db string
-	closed bool
-	COnnectionId uint32
-	RemoteAddr net.Addr
-	status uint16
+	cli          *client.CliConn
+	nodes        []*node.Node
+	db           string
+	closed       bool
+	ConnectionId uint32
+	RemoteAddr   net.Addr
+	status       uint16
 }
 
 func NewMidConn(conn net.Conn) (*MidConn, error) {
-	// handshake with mysql client
+
 	var err error
-	cli := client.NewClieConn(conn)
+	midConn := new(MidConn)
+
+	// conn id
+	baseConnId = atomic.AddUint32(&baseConnId, 1)
+	midConn.ConnectionId = baseConnId
+
+	cli := client.NewClieConn(conn, midConn.ConnectionId)
 	err = cli.Handshake()
 	if err != nil {
 		cli.WriteError(err)
 		return nil, err
 	}
 
-	midConn := new(MidConn)
 	// cli conn between mysqlCli and xsql, this cli has handshake with mysql cli
 	midConn.cli = cli
+
 	// init and connect to back mysql server
 	midConn.nodes = make([]*node.Node, len(meta.NodeAddrs))
 
 	for idx, nodeCfg := range meta.NodeAddrs {
-		tmpNode := node.NewNode(nodeCfg.Host, nodeCfg.Port, nodeCfg.User, nodeCfg.Password, cli.Db)
+		tmpNode := node.NewNode(nodeCfg.Host, nodeCfg.Port, nodeCfg.User, nodeCfg.Password,
+			cli.Db, midConn.ConnectionId)
 		midConn.nodes[idx] = tmpNode
 	}
 
@@ -64,7 +71,8 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 			if err = midConn.nodes[tmp].Connect(); err != nil {
 				log.Errorf("connected to backend mysqld %d failed: %v", tmp, err)
 			} else {
-				log.Debugf("connect to mysqld [%v] success", midConn.nodes[tmp])
+				log.Debugf("[%d] connect to mysqld [%v] success",
+					midConn.ConnectionId, midConn.nodes[tmp])
 			}
 			wg.Done()
 		}(idx)
@@ -76,15 +84,13 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 		return nil, err
 	} else {
 		// hand shake with cli finish
-		log.Debug("hand shake with cli and mysqld finish")
+		log.Debugf("[%d] hand shake with cli and mysqld finish", midConn.ConnectionId)
 		if err := midConn.cli.WriteOK(nil); err != nil {
 			return nil, err
 		}
 		midConn.cli.SetPktSeq(0)
 	}
 	midConn.closed = false
-	baseConnId = atomic.AddUint32(&baseConnId, 1)
-	midConn.COnnectionId = baseConnId
 	midConn.RemoteAddr = conn.RemoteAddr()
 	midConn.status = mysql.SERVER_STATUS_AUTOCOMMIT
 	return midConn, nil
@@ -95,7 +101,7 @@ func (conn *MidConn) Serve() {
 		conn.cli.SetPktSeq(0)
 		data, err := conn.cli.ReadPacket()
 		if err != nil {
-			log.Errorf("cli conn read packet failed: %v", err)
+			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
 			break
 		}
 		if err = conn.dispatch(data); err != nil {
@@ -107,7 +113,7 @@ func (conn *MidConn) Serve() {
 
 func (conn *MidConn) dispatch(sql []byte) error {
 	opt, sql := sql[0], sql[1:]
-	log.Debugf("recv [%d:%s] from cli", opt, sql)
+	log.Debugf("[%d] recv [%d:%s] from cli", conn.ConnectionId, opt, sql)
 	switch opt {
 	case mysql.COM_QUERY:
 		return conn.handleQuery(string(sql))
@@ -118,6 +124,32 @@ func (conn *MidConn) dispatch(sql []byte) error {
 		return conn.handleUse(sql)
 	}
 
+	return nil
+}
+
+func (conn *MidConn) handleQuery(sql string) error {
+
+	sql = strings.TrimRight(sql, ";")
+	stmt, err := sqlparser.Parse(sql)
+	if err != nil {
+		log.Errorf("[%d] parse [%s] failed: %v", conn.ConnectionId, sql, err)
+		return err
+	}
+
+	switch v := stmt.(type) {
+	case *sqlparser.DDL:
+		return conn.handleDDL(v, sql)
+	case *sqlparser.SimpleSelect:
+		return conn.handleSimpleSelect(v, sql)
+	case *sqlparser.Select:
+		return conn.handleSelect(v, sql)
+	case *sqlparser.Show:
+		return conn.handleShow(v, sql)
+
+
+	default:
+		return errors.New("not support this sql")
+	}
 	return nil
 }
 
@@ -137,41 +169,6 @@ func (conn *MidConn) handleFieldList(data []byte) error {
 	} else {
 		return conn.cli.WriteFieldList(conn.status, fs)
 	}
-}
-
-
-func (conn *MidConn) handleQuery(sql string) error {
-
-	sql = strings.TrimRight(sql, ";")
-	stmt, err := sqlparser.Parse(sql)
-	if err != nil {
-		log.Errorf("parse [%s] failed: %v", sql, err)
-		return err
-	}
-
-	if strings.ToLower(sql[:4]) == "desc" {
-		rs, err := conn.nodes[0].Execute(mysql.COM_QUERY, []byte(sql))
-		if err != nil {
-			return err
-		} else {
-			return conn.cli.WriteResultset(rs.Status, rs.Resultset)
-		}
-	}
-
-	// switch v := stmt.(type) {
-	switch v := stmt.(type) {
-	case *sqlparser.SimpleSelect:
-		return conn.handleSimpleSelect(v, sql)
-	case *sqlparser.Select:
-		return conn.handleSelect(v, sql)
-	case *sqlparser.Show:
-		return conn.handleShow(v, sql)
-
-
-	default:
-		return errors.New("not support this sql")
-	}
-	return nil
 }
 
 func (conn *MidConn) handleUse(db []byte) error {
@@ -195,7 +192,8 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int)(
 	[]*mysql.Result, error) {
 
 	if nodeIdxs == nil {
-		log.Debug("nodeIdxs is nil. use meta.FullNodeIdxs to execute")
+		log.Debugf("[%d] nodeIdxs is nil. use meta.FullNodeIdxs to execute",
+			conn.ConnectionId)
 		nodeIdxs = meta.FullNodeIdxs
 	}
 
