@@ -30,8 +30,19 @@ func VersionsInUse() ([][]byte, error) {
 	conn := pool.Get()
 	defer conn.Close()
 	reply, err := conn.Do("SMEMBERS", "VersionsInUse")
-	log.Debug( reply, err)
-	return [][]byte{{1,2,3}}, nil
+	if err != nil {
+		return nil, err
+	}
+	t := reply.([]interface{})
+
+	rets := make([][]byte, len(t))
+
+	for idx, item := range t {
+		rets[idx] = item.([]byte)
+	}
+	log.Debug(rets)
+
+	return rets , nil
 }
 
 func ReleaseVersionInfo(version uint64) error {
