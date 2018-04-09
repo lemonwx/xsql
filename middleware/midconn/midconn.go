@@ -286,9 +286,10 @@ func (conn *MidConn) mergeSelResult(rets []*mysql.Result) (*mysql.Result, error)
 	}
 
 	copy(tgtRs.RowDatas, rs.RowDatas)
-	for idx := 1; idx < len(rets); idx += 1{
-		from := len(rets[idx-1].RowDatas)
-		copy(tgtRs.RowDatas[from:], rets[idx].RowDatas)
+	from := len(rs.RowDatas)
+	for _, rs := range rets[1:] {
+		copy(tgtRs.RowDatas[from:], rs.RowDatas)
+		from += len(rs.RowDatas)
 	}
 
 	return &mysql.Result{
