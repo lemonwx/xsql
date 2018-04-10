@@ -190,6 +190,63 @@ func (c *CliConn) ReadPacket() ([]byte, error) {
 	return c.pkt.ReadPacket()
 }
 
+func (c *CliConn) WriteResultsets(status uint16, rs []*mysql.Resultset) error {
+	log.Debugf("[%d] send select rets [%v] to cli", c.connectionId, rs[0].FieldNames)
+
+	total := make([]byte, 0, 4096)
+	data := make([]byte, 4, 512)
+	var err error
+
+	columnLen := mysql.PutLengthEncodedInt(uint64(len(rs[0].Fields)))
+
+	data = append(data, columnLen...)
+	total, err = c.writePacketBatch(total, data, false)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range rs[0].Fields {
+		data = data[0:4]
+		data = append(data, v.Dump()...)
+		total, err = c.writePacketBatch(total, data, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	total, err = c.writeEOFBatch(total, status, false)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range rs[0].RowDatas {
+		data = data[0:4]
+		data = append(data, v...)
+		total, err = c.writePacketBatch(total, data, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, r := range rs[1:] {
+		for _, v := range r.RowDatas {
+			data = data[0:4]
+			data = append(data, v...)
+			total, err = c.writePacketBatch(total, data, false)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	total, err = c.writeEOFBatch(total, status, true)
+	total = nil
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func (c *CliConn) WriteResultset(status uint16, r *mysql.Resultset) error {
 	log.Debugf("[%d] send select rets [%v] to cli", c.connectionId, r.FieldNames)

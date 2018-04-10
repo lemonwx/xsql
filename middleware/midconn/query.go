@@ -10,6 +10,7 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/xa"
+	"time"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
@@ -36,6 +37,7 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
+	ts := time.Now()
 	var err error
 	conn.VersionsInUse, err = xa.VersionsInUse()
 	if err != nil {
@@ -53,5 +55,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 		return err
 	}
 
-	return conn.HandleSelRets(rets)
+	err = conn.HandleSelRets(rets)
+	log.Debugf("[%d] handle select cost: %v", conn.ConnectionId, time.Since(ts))
+	return err
 }

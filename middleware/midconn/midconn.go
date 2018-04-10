@@ -243,6 +243,17 @@ func (conn *MidConn) HandleExecRets(rets []*mysql.Result) error {
 
 func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 
+	if len(rets) == 0 {
+		return UNEXPECT_MIDDLE_WARE_ERR
+	}
+
+	rs := make([]*mysql.Resultset, len(rets))
+	for idx, ret := range rets {
+		rs[idx] = ret.Resultset
+	}
+	return conn.cli.WriteResultsets(conn.status, rs)
+
+	/*
 	if rs, err := conn.mergeSelResult(rets); err != nil {
 		log.Errorf("merge select result failed: %v", err)
 		return conn.cli.WriteError(err)
@@ -251,6 +262,7 @@ func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 	} else {
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
+	*/
 
 }
 
