@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/lemonwx/log"
@@ -8,7 +9,6 @@ import (
 	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/middleware/xa"
 	"github.com/lemonwx/xsql/middleware/meta"
-	"fmt"
 )
 
 var cfg *config.Conf
