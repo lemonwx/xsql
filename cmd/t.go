@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/lemonwx/xsql/middleware/xa"
 )
 
-func main() {
+func main1() {
 	a := []byte{}
 	fmt.Println(a == nil)
 	fmt.Println(len(a))
@@ -22,4 +23,9 @@ func main() {
 		fmt.Println(idx, item)
 	}
 	fmt.Println("------------")
+}
+
+
+func main() {
+	xa.NextVersion()
 }

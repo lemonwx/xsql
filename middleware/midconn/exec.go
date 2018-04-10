@@ -9,10 +9,17 @@ import (
 	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/middleware/xa"
 )
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 
+	nextV, err := xa.NextVersion()
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("[%d] get next version : %v", conn.ConnectionId, nextV)
 	// add extra col
 	extraCol := &sqlparser.NonStarExpr{
 		Expr: &sqlparser.ColName{Name: []byte(extraColName)},
@@ -22,7 +29,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 
 	for idx, row := range stmt.Rows.(sqlparser.Values) {
 		t := row.(sqlparser.ValTuple)
-		t = append(t, sqlparser.NumVal("123456"))
+		t = append(t, sqlparser.NumVal(nextV))
 		vals[idx] = t
 	}
 	stmt.Rows = vals
@@ -34,7 +41,11 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	if err != nil {
 		return err
 	} else {
-		return conn.HandleExecRets(rs)
+		err = conn.HandleExecRets(rs)
+		if err != nil {
+			return err
+		}
+		return xa.ReleaseVersion(nextV)
 	}
 }
 

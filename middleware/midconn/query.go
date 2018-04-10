@@ -41,10 +41,10 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	var err error
 	conn.VersionsInUse, err = xa.VersionsInUse()
 	if err != nil {
-		log.Debugf("[%d] get xa.VersionsInUse failed: %v", err)
+		log.Errorf("[%d] get xa.VersionsInUse failed: %v", err)
 		return err
 	}
-
+	log.Debugf("[%d] get xa.VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
 	for _, node := range conn.nodes {
 		node.VersionsInUse = conn.VersionsInUse
 		node.NeedHide = true
