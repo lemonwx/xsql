@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/lemonwx/xsql/middleware/xa"
+	"sync/atomic"
 )
 
 func main1() {
@@ -27,5 +27,9 @@ func main1() {
 
 
 func main() {
-	xa.NextVersion()
+	baseid := uint64(1000)
+	tmp := atomic.AddUint64(&baseid, 1)
+	fmt.Println(baseid, tmp)
+
+
 }

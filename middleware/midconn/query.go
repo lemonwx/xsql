@@ -9,7 +9,7 @@ import (
 	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/xa"
+	"github.com/lemonwx/xsql/middleware/version"
 	"time"
 )
 
@@ -39,7 +39,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
 	ts := time.Now()
 	var err error
-	conn.VersionsInUse, err = xa.VersionsInUse()
+	conn.VersionsInUse, err = version.VersionsInUse()
 	if err != nil {
 		log.Errorf("[%d] get xa.VersionsInUse failed: %v", err)
 		return err

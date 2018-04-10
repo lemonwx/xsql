@@ -9,12 +9,12 @@ import (
 	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
-	"github.com/lemonwx/xsql/middleware/xa"
+	"github.com/lemonwx/xsql/middleware/version"
 )
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 
-	nextV, err := xa.NextVersion()
+	nextV, err := version.NextVersion()
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 		if err != nil {
 			return err
 		}
-		return xa.ReleaseVersion(nextV)
+		return version.ReleaseVersion(nextV)
 	}
 }
 

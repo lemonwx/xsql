@@ -1,9 +1,11 @@
+package version
 /**
  *  author: lim
  *  data  : 18-3-24 下午4:54
  */
 
-package xa
+ /*
+package version
 
 import (
 	"strconv"
@@ -26,6 +28,7 @@ func NextVersion() ([]byte, error) {
 		3. write [next version ]into redis's active versions list belong to this xsql id
 		4. commit to redis
 	*/
+	/*
 
 	for {
 		conn := pool.Get()
@@ -85,6 +88,8 @@ func NextVersion() ([]byte, error) {
 	}
 }
 
+
+	/*
 func VersionsInUse() ([][]byte, error) {
 	conn := pool.Get()
 	defer conn.Close()
@@ -101,6 +106,7 @@ func ReleaseVersion(version []byte) error {
 		1. remove the param version from redis's active versions list belong to this xsql id
 		2. commit to redis
 	*/
+	/*
 	conn := pool.Get()
 	defer  conn.Close()
 
@@ -109,7 +115,7 @@ func ReleaseVersion(version []byte) error {
 	return err
 }
 
-
+/*
 func InitPool() {
 	pool = redis.Pool{
 		MaxIdle : 1,
@@ -125,3 +131,5 @@ func InitPool() {
 
 	}
 }
+
+*/

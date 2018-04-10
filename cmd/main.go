@@ -7,7 +7,7 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/server"
 	"github.com/lemonwx/xsql/config"
-	"github.com/lemonwx/xsql/middleware/xa"
+	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/middleware/meta"
 )
 
@@ -37,7 +37,7 @@ func main() {
 	fmt.Println("init cfg done.")
 	setupLogger()
 	fmt.Println("init log done.")
-	xa.InitPool()
+	version.InitPool()
 
 	s, err := server.NewServer(cfg.Addr)
 	if err != nil {
