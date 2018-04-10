@@ -34,6 +34,8 @@ type Conf struct {
 	LogLevel int `yaml:"loglevel"`
 	RedisCfg RedisConf `yaml:"RedisCfg"`
 	Xa bool `yaml:"XA"`
+	VerSeqAddr string `yaml:"VerSeqAddr"`
+	ConnSize int `yaml:"ConnSize"`
 }
 
 func ReadConf() (*Conf) {

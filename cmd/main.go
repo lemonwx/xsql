@@ -36,8 +36,8 @@ func main() {
 	setupConfig()
 	fmt.Println("init cfg done.")
 	setupLogger()
-	fmt.Println("init log done.")
-	version.InitPool()
+	fmt.Println("init log done.", cfg.ConnSize, cfg.VerSeqAddr)
+	version.NewRpcPool(cfg.ConnSize, cfg.VerSeqAddr)
 
 	s, err := server.NewServer(cfg.Addr)
 	if err != nil {

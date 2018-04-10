@@ -50,23 +50,32 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 }
 
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
-	nextVersion := 1236
+	nextVersion, err := version.NextVersion()
+	if err != nil {
+		log.Errorf("[%d] get nextversion failed: %v", conn.ConnectionId, err)
+		return err
+	}
 	log.Debugf("[%d] get nextversion is: %d", conn.ConnectionId, nextVersion)
 
 	expr := &sqlparser.UpdateExpr{
 		Name: &sqlparser.ColName{
 			Name: []byte(extraColName),
 		},
-		Expr:sqlparser.NumVal("654321"),
+		Expr:sqlparser.NumVal(nextVersion),
 	}
 	stmt.Exprs = append(stmt.Exprs, expr)
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
 
-	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil);err != nil {
+	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil);err != nil {
 			return err
 	} else {
-		return conn.HandleExecRets(rs)
+		err = conn.HandleExecRets(rs)
+		if err != nil {
+			return err
+		} else {
+			return version.ReleaseVersion(nextVersion)
+		}
 	}
 }
 

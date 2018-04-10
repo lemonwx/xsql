@@ -41,10 +41,10 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	var err error
 	conn.VersionsInUse, err = version.VersionsInUse()
 	if err != nil {
-		log.Errorf("[%d] get xa.VersionsInUse failed: %v", err)
+		log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
 		return err
 	}
-	log.Debugf("[%d] get xa.VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
+	log.Debugf("[%d] get VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
 
 	conn.setupNodeStatus(conn.VersionsInUse, true)
 	defer conn.setupNodeStatus(nil, false)

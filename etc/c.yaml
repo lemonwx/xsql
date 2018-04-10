@@ -5,6 +5,9 @@ loglevel : 100
 nodelay: false
 XA: true
 
+VerSeqAddr: 192.168.1.4:1235
+ConnSize: 100
+
 nodes:
 -
   host: 172.17.0.2
