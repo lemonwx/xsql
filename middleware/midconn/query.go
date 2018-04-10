@@ -45,10 +45,9 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 		return err
 	}
 	log.Debugf("[%d] get xa.VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
-	for _, node := range conn.nodes {
-		node.VersionsInUse = conn.VersionsInUse
-		node.NeedHide = true
-	}
+
+	conn.setupNodeStatus(conn.VersionsInUse, true)
+	defer conn.setupNodeStatus(nil, false)
 
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
 	if err != nil {
@@ -57,5 +56,13 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
 	err = conn.HandleSelRets(rets)
 	log.Debugf("[%d] handle select cost: %v", conn.ConnectionId, time.Since(ts))
+
 	return err
+}
+
+func (conn *MidConn) setupNodeStatus(vInUse [][]byte, hide bool) {
+	for _, node := range conn.nodes {
+		node.VersionsInUse = vInUse
+		node.NeedHide = hide
+	}
 }
