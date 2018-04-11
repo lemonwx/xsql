@@ -138,6 +138,12 @@ func (conn *MidConn) handleQuery(sql string) error {
 	}
 
 	switch v := stmt.(type) {
+	case *sqlparser.Begin, *sqlparser.Commit, *sqlparser.Rollback:
+		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+		if err != nil {
+			return err
+		}
+		return conn.HandleExecRets(rets)
 	case *sqlparser.DDL:
 		return conn.handleDDL(v, sql)
 	case *sqlparser.SimpleSelect:
@@ -150,8 +156,8 @@ func (conn *MidConn) handleQuery(sql string) error {
 		return conn.handleInsert(v, sql)
 	case *sqlparser.Update:
 		return conn.handleUpdate(v, sql)
-
-
+	case *sqlparser.Delete:
+		return conn.handleDelete(v, sql)
 	default:
 		return errors.New("not support this sql")
 	}

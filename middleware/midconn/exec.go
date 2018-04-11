@@ -6,12 +6,53 @@
 package midconn
 
 import (
+	"fmt"
+
 	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/middleware/version"
-	"fmt"
 )
+
+func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
+
+	tb := sqlparser.String(stmt.Table)
+	where := sqlparser.String(stmt.Where)
+	err := conn.handleSelectForUpdate(tb, where, nil)
+	if  err != nil {
+		log.Warnf("[%d] select for update failed: %v", conn.ConnectionId, err)
+		return err
+	}
+
+	nextV, err := version.NextVersion()
+	if err != nil {
+		log.Errorf("[%d] request for next version failed: %v", conn.ConnectionId, err)
+		return err
+	}
+	log.Debugf("[%d] get next version: %v", conn.ConnectionId, nextV)
+
+	updateSql := fmt.Sprintf("update %s set version = %s %s", tb, nextV, where)
+	log.Debugf("[%d] exec update sql : %s", conn.ConnectionId, updateSql)
+
+	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), nil)
+	if err != nil {
+		log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
+		return err
+	}
+	log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
+	log.Debugf("[%d] after convert sql: %s", conn.ConnectionId, sql)
+
+	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+	if err != nil {
+		return err
+	} else {
+		err = conn.HandleExecRets(rs)
+		if err != nil {
+			return err
+		}
+		return version.ReleaseVersion(nextV)
+	}
+}
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 
@@ -52,7 +93,8 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 
-	if err := conn.handleSelectForUpdate(stmt, nil); err != nil {
+	if err := conn.handleSelectForUpdate(
+		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where), nil);err != nil {
 		log.Debugf("[%d] row data in use by another session, update failed",
 			conn.ConnectionId)
 		return err
@@ -87,9 +129,8 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 	}
 }
 
-func (conn *MidConn) handleSelectForUpdate(uStmt *sqlparser.Update, nodeIdx []int) error {
-	selSql := fmt.Sprintf("select version from %s %s for update",
-		sqlparser.String(uStmt.Table), sqlparser.String(uStmt.Where))
+func (conn *MidConn) handleSelectForUpdate(table, where string, nodeIdx []int) error {
+	selSql := fmt.Sprintf("select version from %s %s for update",table, where)
 	log.Debugf("[%d] select for update sql: %s",
 		conn.ConnectionId, selSql)
 
