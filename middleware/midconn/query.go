@@ -46,10 +46,31 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	}
 	log.Debugf("[%d] get VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
 
+
+	if _, ok := stmt.SelectExprs[0].(*sqlparser.StarExpr); ok {
+		log.Debugf("[%d] select * not need to convert", conn.ConnectionId)
+	}
+
+	if expr, ok := stmt.SelectExprs[0].(*sqlparser.NonStarExpr); ok {
+		colName := sqlparser.String(expr)
+		log.Debugf("[%d] select %s, expr, add extra col add first", conn.ConnectionId, colName)
+		if colName != extraColName {
+			tmp := make(sqlparser.SelectExprs, len(stmt.SelectExprs) + 1)
+			copy(tmp[1:], stmt.SelectExprs[:])
+			tmp[0] = &sqlparser.NonStarExpr{
+				Expr:&sqlparser.ColName{Name: []byte(extraColName)},
+			}
+			stmt.SelectExprs = tmp
+		}
+	}
+
+	newSql := sqlparser.String(stmt)
+	log.Debugf("[%d] convert sql to %s", conn.ConnectionId, newSql)
+
 	conn.setupNodeStatus(conn.VersionsInUse, true)
 	defer conn.setupNodeStatus(nil, false)
 
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil)
 	if err != nil {
 		return err
 	}
