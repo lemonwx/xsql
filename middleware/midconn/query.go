@@ -37,6 +37,8 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
+	hide := true
+
 	ts := time.Now()
 	var err error
 	conn.VersionsInUse, err = version.VersionsInUse()
@@ -61,14 +63,19 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 				Expr:&sqlparser.ColName{Name: []byte(extraColName)},
 			}
 			stmt.SelectExprs = tmp
+		} else {
+			log.Debugf("[%d] select contains extra col, set hide = false", conn.ConnectionId)
+			hide = false
 		}
 	}
 
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] convert sql to %s", conn.ConnectionId, newSql)
 
-	conn.setupNodeStatus(conn.VersionsInUse, true)
-	defer conn.setupNodeStatus(nil, false)
+	if hide {
+		conn.setupNodeStatus(conn.VersionsInUse, true)
+		defer conn.setupNodeStatus(nil, false)
+	}
 
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil)
 	if err != nil {
