@@ -206,8 +206,11 @@ func (c *CliConn) WriteResultsets(status uint16, rs []*mysql.Resultset) error {
 	}
 
 	for _, v := range rs[0].Fields {
+
+
 		data = data[0:4]
 		data = append(data, v.Dump()...)
+
 		total, err = c.writePacketBatch(total, data, false)
 		if err != nil {
 			return err
@@ -218,20 +221,13 @@ func (c *CliConn) WriteResultsets(status uint16, rs []*mysql.Resultset) error {
 	if err != nil {
 		return err
 	}
-
-	for _, v := range rs[0].RowDatas {
-		data = data[0:4]
-		data = append(data, v...)
-		total, err = c.writePacketBatch(total, data, false)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, r := range rs[1:] {
+	
+	for _, r := range rs {
 		for _, v := range r.RowDatas {
+
 			data = data[0:4]
 			data = append(data, v...)
+
 			total, err = c.writePacketBatch(total, data, false)
 			if err != nil {
 				return err

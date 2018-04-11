@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sync/atomic"
 )
 
 func main1() {
@@ -27,9 +26,16 @@ func main1() {
 
 
 func main() {
-	baseid := uint64(1000)
-	tmp := atomic.AddUint64(&baseid, 1)
-	fmt.Println(baseid, tmp)
+	data := make([]byte, 0, 512)
+	a := []byte{1,2,3,4}
+
+	copy(data, a[:4])
+
+	fmt.Println(data[0], len(data), cap(data))
+
+	data = data[0:4]
+
+	fmt.Println(data, len(data), cap(data))
 
 
 }

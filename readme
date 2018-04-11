@@ -1,1 +1,6 @@
 a mysql proxy support xa transaction
+
+todo list:
+
+1. transaction optimize
+2. node pool
