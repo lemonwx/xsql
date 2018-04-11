@@ -10,6 +10,7 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/middleware/version"
+	"fmt"
 )
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
@@ -50,6 +51,13 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 }
 
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
+
+	if err := conn.handleSelectForUpdate(stmt, nil); err != nil {
+		log.Debugf("[%d] row data in use by another session, update failed",
+			conn.ConnectionId)
+		return err
+	}
+
 	nextVersion, err := version.NextVersion()
 	if err != nil {
 		log.Errorf("[%d] get nextversion failed: %v", conn.ConnectionId, err)
@@ -79,6 +87,25 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 	}
 }
 
-func (conn *MidConn) handleSelectForUpdate(sql string, node []int) error {
+func (conn *MidConn) handleSelectForUpdate(uStmt *sqlparser.Update, nodeIdx []int) error {
+	selSql := fmt.Sprintf("select version from %s %s for update",
+		sqlparser.String(uStmt.Table), sqlparser.String(uStmt.Where))
+	log.Debugf("[%d] select for update sql: %s",
+		conn.ConnectionId, selSql)
+
+	vInuse, err := version.VersionsInUse()
+	if err != nil {
+		return err
+	}
+	log.Debugf("[%d] get vInuse: %v", conn.ConnectionId, vInuse)
+
+	conn.setupNodeStatus(vInuse, true)
+	defer conn.setupNodeStatus(vInuse, false)
+
+	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(selSql), nodeIdx)
+	if err != nil {
+		return err
+	}
+	log.Debugf("[%d] select for update success", conn.ConnectionId)
 	return nil
 }

@@ -361,7 +361,6 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			}
 			break
 		}
-
 		if node.NeedHide {
 			version := data[1 : data[0] + 1]
 			if version == nil {
