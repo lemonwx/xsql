@@ -15,3 +15,15 @@ type extraColType uint64
 
 var ROW_DATA_IN_USE_ERR error = errors.New("this row data inuse by another session, pls try again later")
 var UNEXPECT_MIDDLE_WARE_ERR error = errors.New("UNEXPECT MIDDLE WARE ERROR")
+
+
+// for all back node conn, autocommit = 0
+// mid conn status:
+// liucheng
+const (
+	AUTOCOMMIT = iota
+	IN_TRANSACTION
+
+
+
+)

@@ -73,7 +73,7 @@ var (
 %left <empty> UNION MINUS EXCEPT INTERSECT
 %left <empty> ','
 %left <empty> JOIN STRAIGHT_JOIN LEFT RIGHT INNER OUTER CROSS NATURAL USE FORCE
-%left <empty> ON
+%left <empty> ON OFF
 %left <empty> AND OR
 %right <empty> NOT
 %left <empty> '&' '|' '^'
@@ -85,7 +85,7 @@ var (
 %left <empty> END
 
 // Transaction Tokens
-%token <empty> BEGIN COMMIT ROLLBACK
+%token <empty> BEGIN COMMIT ROLLBACK AUTOCOMMIT
 
 // Charset Tokens
 %token <empty> NAMES 
@@ -252,11 +252,12 @@ delete_statement:
   }
 
 set_statement:
+
   SET comment_opt update_list
   {
     $$ = &Set{Comments: Comments($2), Exprs: $3}
   }
-| SET comment_opt NAMES ID 
+| SET comment_opt NAMES ID
   {
     $$ = &Set{Comments: Comments($2), Exprs: UpdateExprs{&UpdateExpr{Name: &ColName{Name:[]byte("names")}, Expr: StrVal($4)}}}
   }
@@ -1058,6 +1059,11 @@ update_expression:
   column_name '=' value_expression
   {
     $$ = &UpdateExpr{Name: $1, Expr: $3} 
+  }
+|
+  column_name '=' ON
+  {
+    $$ = &UpdateExpr{Name: $1, Expr: StrVal([]byte("ON")) }
   }
 
 exists_opt:

@@ -31,6 +31,7 @@ type MidConn struct {
 	ConnectionId uint32
 	RemoteAddr   net.Addr
 	status       uint16
+	defaultStatus uint16
 
 	VersionsInUse [][]byte
 	NextVersion uint64
@@ -93,7 +94,8 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	}
 	midConn.closed = false
 	midConn.RemoteAddr = conn.RemoteAddr()
-	midConn.status = mysql.SERVER_STATUS_AUTOCOMMIT
+	midConn.defaultStatus = mysql.SERVER_STATUS_AUTOCOMMIT
+	midConn.status = midConn.defaultStatus
 	return midConn, nil
 }
 
@@ -138,7 +140,13 @@ func (conn *MidConn) handleQuery(sql string) error {
 	}
 
 	switch v := stmt.(type) {
-	case *sqlparser.Begin, *sqlparser.Commit, *sqlparser.Rollback:
+	case *sqlparser.Set:
+		return conn.handleSet(v, sql)
+	case *sqlparser.Begin:
+		conn.status = mysql.SERVER_STATUS_IN_TRANS
+		return conn.cli.WriteOK(nil)
+	case *sqlparser.Commit, *sqlparser.Rollback:
+		conn.status = conn.defaultStatus
 		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
 		if err != nil {
 			return err

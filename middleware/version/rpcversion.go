@@ -9,7 +9,6 @@ import (
 	"net/rpc"
 	"sync"
 	"errors"
-	"github.com/lemonwx/log"
 )
 
 const(
@@ -90,7 +89,6 @@ func NextVersion() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debug(nextVer)
 
 	return nextVer, nil
 }

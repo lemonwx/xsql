@@ -221,7 +221,7 @@ func (c *CliConn) WriteResultsets(status uint16, rs []*mysql.Resultset) error {
 	if err != nil {
 		return err
 	}
-	
+
 	for _, r := range rs {
 		for _, v := range r.RowDatas {
 

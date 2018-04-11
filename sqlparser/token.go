@@ -65,6 +65,7 @@ var keywords = map[string]int{
 	"use":           USE,
 	"force":         FORCE,
 	"on":            ON,
+	"off": OFF,
 	"into":          INTO,
 
 	"distinct":  DISTINCT,
@@ -116,6 +117,7 @@ var keywords = map[string]int{
 	"show":      SHOW,
 	"databases": DATABASES,
 	"tables":    TABLES,
+
 
 	//for mixer admin
 	"admin": ADMIN,
