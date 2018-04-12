@@ -17,6 +17,7 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/middleware/version"
 )
 
 
@@ -31,21 +32,37 @@ func (conn *MidConn) handleBegin() {
 }
 
 
-func (conn *MidConn) handleCommit(nodeIdx []int) error {
-	if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
-		if conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
+func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 
-			log.Debugf("[%d] %v send commit to node", conn.ConnectionId, conn.status )
-			_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte("commit"), nil)
-			if  err != nil {
-				return err
-			}
-			conn.status[0] = mysql.SERVER_STATUS_AUTOCOMMIT
-			return err
-		}
+	commit := false
+
+	switch {
+	case conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
+		conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT:
+		commit = true
+	case sql == "commit":
+		commit = true
+	default:
+		commit = false
 	}
 
+	if commit{
+		log.Debugf("[%d] need commit", conn.ConnectionId)
+
+		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte("commit"), nil)
+		if  err != nil {
+			return err
+		}
+		conn.status[0] = conn.defaultStatus
+
+		if conn.NextVersion != nil {
+			version.ReleaseVersion(conn.NextVersion)
+		}
+		conn.NextVersion = nil
+		conn.VersionsInUse = nil
+	}
 	return nil
+
 }
 
 func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
@@ -69,6 +86,6 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 		log.Debugf("exec errr %v", err)
 		return err
 	}
-	err = conn.handleCommit(nil)
+	err = conn.handleCommit(nil, "")
 	return err
 }

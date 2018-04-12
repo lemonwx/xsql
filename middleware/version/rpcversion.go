@@ -9,6 +9,7 @@ import (
 	"net/rpc"
 	"sync"
 	"errors"
+	"github.com/lemonwx/log"
 )
 
 const(
@@ -94,6 +95,7 @@ func NextVersion() ([]byte, error) {
 }
 
 func ReleaseVersion(version []byte) error {
+	log.Debugf("release %v", version)
 	cli := pool.getConn()
 	if cli == nil {
 		return GET_VERSION_CONN_FAILED

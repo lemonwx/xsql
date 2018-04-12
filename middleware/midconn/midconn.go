@@ -34,7 +34,9 @@ type MidConn struct {
 	defaultStatus uint16
 
 	VersionsInUse [][]byte
-	NextVersion uint64
+	NextVersion []byte
+
+	NodeIdxs []int // node that has exec sql in the trx
 }
 
 func NewMidConn(conn net.Conn) (*MidConn, error) {
@@ -96,6 +98,10 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	midConn.RemoteAddr = conn.RemoteAddr()
 	midConn.defaultStatus = mysql.SERVER_STATUS_AUTOCOMMIT
 	midConn.status = []uint16{midConn.defaultStatus, midConn.defaultStatus}
+
+	midConn.VersionsInUse = nil
+	midConn.NextVersion = nil
+
 	return midConn, nil
 }
 
@@ -143,15 +149,18 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Set:
 		return conn.handleSet(v, sql)
 	case *sqlparser.Begin:
-		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_IN_TRANS}
+		/*
+		1. get next version
+		2. get versions in use
+		*/
+		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
 		return conn.cli.WriteOK(nil)
 	case *sqlparser.Commit, *sqlparser.Rollback:
-		conn.status = []uint16{conn.defaultStatus, conn.defaultStatus}
-		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+		err = conn.handleCommit(nil, sql)
 		if err != nil {
 			return err
 		}
-		return conn.HandleExecRets(rets)
+		return conn.cli.WriteOK(nil)
 	case *sqlparser.DDL:
 		return conn.handleDDL(v, sql)
 	case *sqlparser.SimpleSelect:

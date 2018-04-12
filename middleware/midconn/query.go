@@ -37,14 +37,17 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
-	hide := true
-
 	ts := time.Now()
+
+	hide := true
 	var err error
-	conn.VersionsInUse, err = version.VersionsInUse()
-	if err != nil {
-		log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
-		return err
+
+	if conn.VersionsInUse == nil {
+		conn.VersionsInUse, err = version.VersionsInUse()
+		if err != nil {
+			log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
+			return err
+		}
 	}
 	log.Debugf("[%d] get VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
 

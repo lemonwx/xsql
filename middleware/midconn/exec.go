@@ -56,12 +56,17 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 
-	nextV, err := version.NextVersion()
-	if err != nil {
-		return err
+	var err error
+	if conn.NextVersion == nil {
+		conn.NextVersion, err = version.NextVersion()
+		if err != nil {
+			log.Debugf("[%d] conn next version is nil, but get failed %v", conn.ConnectionId, conn.NextVersion)
+			return err
+		}
+		log.Debugf("[%d] conn next version is nil, get one: %v", conn.ConnectionId, conn.NextVersion)
+	} else {
+		log.Debugf("[%d] use next version get from pre sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
 	}
-
-	log.Debugf("[%d] get next version : %v", conn.ConnectionId, nextV)
 	// add extra col
 	extraCol := &sqlparser.NonStarExpr{
 		Expr: &sqlparser.ColName{Name: []byte(extraColName)},
@@ -71,7 +76,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 
 	for idx, row := range stmt.Rows.(sqlparser.Values) {
 		t := row.(sqlparser.ValTuple)
-		t = append(t, sqlparser.NumVal(nextV))
+		t = append(t, sqlparser.NumVal(conn.NextVersion))
 		vals[idx] = t
 	}
 	stmt.Rows = vals
@@ -83,11 +88,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	if err != nil {
 		return err
 	} else {
-		err = conn.HandleExecRets(rs)
-		if err != nil {
-			return err
-		}
-		return version.ReleaseVersion(nextV)
+		return conn.HandleExecRets(rs)
 	}
 }
 
