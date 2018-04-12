@@ -5,10 +5,10 @@ import (
 	"os"
 
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/server"
 	"github.com/lemonwx/xsql/config"
-	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/middleware/meta"
+	"github.com/lemonwx/xsql/middleware/version"
+	"github.com/lemonwx/xsql/server"
 )
 
 var cfg *config.Conf
@@ -30,7 +30,6 @@ func setupLogger() {
 	log.SetLevel(cfg.LogLevel)
 	log.Debug("this is xsql's log")
 }
-
 
 func main() {
 	setupConfig()

@@ -4,37 +4,34 @@
  */
 
 package meta
+
 import (
 	"github.com/lemonwx/xsql/config"
 )
 
 var (
 	NodeAddrs = []*config.Node{}
-
 )
 
-
-var FullNodeIdxs = []int{
-
-}
+var FullNodeIdxs = []int{}
 
 type Meta struct {
-	Db string
-	Tb string
-	DisKey string
+	Db      string
+	Tb      string
+	DisKey  string
 	DisType string
 	DisNode []int
 }
 
-func NewMeta(sql string) (*Meta) {
+func NewMeta(sql string) *Meta {
 	return &Meta{}
 }
 
 const (
-	HASH string = "hash"
+	HASH  string = "hash"
 	RANGE string = "range"
-	LIST string = "list"
-	DUP string = "dup"
+	LIST  string = "list"
+	DUP   string = "dup"
 )
 
 func Hash(val int64) int64 {

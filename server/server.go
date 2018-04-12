@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/lemonwx/xsql/middleware/midconn"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/middleware/midconn"
 )
 
 type Server struct {

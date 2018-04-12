@@ -6,35 +6,35 @@
 package midconn
 
 import (
-	"sync"
-	"net"
-	"sync/atomic"
-	"strings"
 	"bytes"
 	"errors"
+	"net"
+	"strings"
+	"sync"
+	"sync/atomic"
 
-	"github.com/lemonwx/xsql/client"
-	"github.com/lemonwx/xsql/node"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/client"
+	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
 var baseConnId uint32 = 1000
 
 type MidConn struct {
-	cli          *client.CliConn
-	nodes        []*node.Node
-	db           string
-	closed       bool
-	ConnectionId uint32
-	RemoteAddr   net.Addr
-	status       []uint16 // 0:trx status, 1:defaultStatus at trx begin
+	cli           *client.CliConn
+	nodes         []*node.Node
+	db            string
+	closed        bool
+	ConnectionId  uint32
+	RemoteAddr    net.Addr
+	status        []uint16 // 0:trx status, 1:defaultStatus at trx begin
 	defaultStatus uint16
 
 	VersionsInUse [][]byte
-	NextVersion []byte
+	NextVersion   []byte
 
 	NodeIdxs []int // node that has exec sql in the trx
 }
@@ -70,7 +70,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	var wg sync.WaitGroup
 	wg.Add(len(midConn.nodes))
 
-	for idx := 0; idx < len(midConn.nodes); idx += 1{
+	for idx := 0; idx < len(midConn.nodes); idx += 1 {
 		go func(tmp int) {
 			if err = midConn.nodes[tmp].Connect(); err != nil {
 				log.Errorf("connected to backend mysqld %d failed: %v", tmp, err)
@@ -150,8 +150,8 @@ func (conn *MidConn) handleQuery(sql string) error {
 		return conn.handleSet(v, sql)
 	case *sqlparser.Begin:
 		/*
-		1. get next version
-		2. get versions in use
+			1. get next version
+			2. get versions in use
 		*/
 		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
 		return conn.cli.WriteOK(nil)
@@ -182,7 +182,6 @@ func (conn *MidConn) handleFieldList(data []byte) error {
 	table := string(data[0:index])
 	wildcard := string(data[index+1:])
 
-
 	if conn.db == "" {
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
@@ -201,7 +200,7 @@ func (conn *MidConn) handleUse(db []byte) error {
 	conn.cli.Db = tmp
 	// rets, errs := conn
 
-	rets, err := conn.ExecuteMultiNode(mysql.COM_INIT_DB,  db, nil)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_INIT_DB, db, nil)
 	if err != nil {
 		return err
 	}
@@ -212,7 +211,7 @@ func (conn *MidConn) writeResultset(status uint16, r *mysql.Resultset) error {
 	return conn.cli.WriteResultset(status, r)
 }
 
-func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int)(
+func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 	[]*mysql.Result, error) {
 
 	if nodeIdxs == nil {
@@ -244,7 +243,7 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int)(
 		if err, ok := ret.(error); ok {
 			return nil, err
 		}
-		rs = append(rs,  ret.(*mysql.Result))
+		rs = append(rs, ret.(*mysql.Result))
 	}
 	return rs, nil
 }
@@ -270,18 +269,18 @@ func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 	for idx, ret := range rets {
 		rs[idx] = ret.Resultset
 	}
-	log.Debugf("----%v-----",conn.status[0])
+	log.Debugf("----%v-----", conn.status[0])
 	return conn.cli.WriteResultsets(conn.status[0], rs)
 
 	/*
-	if rs, err := conn.mergeSelResult(rets); err != nil {
-		log.Errorf("merge select result failed: %v", err)
-		return conn.cli.WriteError(err)
-	} else if rs != nil {
-		return conn.cli.WriteResultset(conn.status, rs.Resultset)
-	} else {
-		return UNEXPECT_MIDDLE_WARE_ERR
-	}
+		if rs, err := conn.mergeSelResult(rets); err != nil {
+			log.Errorf("merge select result failed: %v", err)
+			return conn.cli.WriteError(err)
+		} else if rs != nil {
+			return conn.cli.WriteResultset(conn.status, rs.Resultset)
+		} else {
+			return UNEXPECT_MIDDLE_WARE_ERR
+		}
 	*/
 
 }
@@ -313,8 +312,8 @@ func (conn *MidConn) mergeSelResult(rets []*mysql.Result) (*mysql.Result, error)
 	}
 
 	tgtRs := &mysql.Resultset{
-		Fields     :rs.Fields,
-		RowDatas :make([]mysql.RowData, finalLen),
+		Fields:   rs.Fields,
+		RowDatas: make([]mysql.RowData, finalLen),
 	}
 
 	copy(tgtRs.RowDatas, rs.RowDatas)
@@ -325,7 +324,7 @@ func (conn *MidConn) mergeSelResult(rets []*mysql.Result) (*mysql.Result, error)
 	}
 
 	return &mysql.Result{
-		Status: 0,
+		Status:    0,
 		Resultset: tgtRs,
 	}, nil
 

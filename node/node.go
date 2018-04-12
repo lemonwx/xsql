@@ -6,11 +6,11 @@
 package node
 
 import (
-	"fmt"
-	"net"
+	"bytes"
 	"encoding/binary"
 	"errors"
-	"bytes"
+	"fmt"
+	"net"
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
@@ -19,33 +19,32 @@ import (
 
 type Node struct {
 	conn net.Conn
-	pkt *mysql.PacketIO
-
+	pkt  *mysql.PacketIO
 
 	addr     string
 	user     string
 	password string
-	Db string
+	Db       string
 
 	ConnectionId uint32
-	capability uint32
-	status uint16
-	collation mysql.CollationId
-	charset string
-	salt []byte
+	capability   uint32
+	status       uint16
+	collation    mysql.CollationId
+	charset      string
+	salt         []byte
 
 	VersionsInUse [][]byte
-	NextVersion uint64
-	NeedHide bool
+	NextVersion   uint64
+	NeedHide      bool
 }
 
 func NewNode(host string, port int, user, password, db string, connid uint32) *Node {
 
-	node := &Node {
-		addr : fmt.Sprintf("%s:%d", host, port),
-		user: user,
-		password: password,
-		Db: db,
+	node := &Node{
+		addr:         fmt.Sprintf("%s:%d", host, port),
+		user:         user,
+		password:     password,
+		Db:           db,
 		ConnectionId: connid,
 	}
 
@@ -238,10 +237,10 @@ func (node *Node) Execute(opt uint8, data []byte) (*mysql.Result, error) {
 
 }
 
-func (node *Node) executeSql(opt uint8, data []byte) error{
+func (node *Node) executeSql(opt uint8, data []byte) error {
 	node.pkt.Sequence = 0
 	length := len(data) + 1
-	send := make([]byte, length + 4)
+	send := make([]byte, length+4)
 	send[4] = opt
 	copy(send[5:], data)
 
@@ -280,9 +279,9 @@ func (node *Node) parseResult() (*mysql.Result, error) {
 
 func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error) {
 	ret := &mysql.Result{
-		Status: 0,
+		Status:       0,
 		AffectedRows: 0,
-		Resultset: &mysql.Resultset{},
+		Resultset:    &mysql.Resultset{},
 	}
 
 	count, _, n := mysql.LengthEncodedInt(data)
@@ -305,7 +304,6 @@ func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error)
 	}
 	return ret, nil
 
-
 }
 
 func (node *Node) readResultColumns(result *mysql.Result) error {
@@ -313,14 +311,14 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 	var data []byte
 	var err error
 
-	for idx:=0;;idx+=1 {
+	for idx := 0; ; idx += 1 {
 		data, err = node.pkt.ReadPacket()
 		if err != nil {
 			return err
 		}
 
 		if node.isEOFPacket(data) {
-			if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
+			if node.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 				result.Status = binary.LittleEndian.Uint16(data[3:])
 				node.status = result.Status
 			}
@@ -361,14 +359,14 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 		}
 
 		if node.isEOFPacket(data) {
-			if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
+			if node.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 				result.Status = binary.LittleEndian.Uint16(data[3:])
 				node.status = result.Status
 			}
 			break
 		}
 		if node.NeedHide {
-			version := data[1 : data[0] + 1]
+			version := data[1 : data[0]+1]
 			if version == nil {
 				// version define is : version bigint unsigned not null default 0
 				retErr = errors.New("UNEXPECT VERSION IS NULL")
@@ -380,7 +378,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 				retErr = errors.New("data in use by another session, pls try again later")
 			}
 			preRowV = version
-			data = data[data[0] + 1:]
+			data = data[data[0]+1:]
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}
@@ -394,7 +392,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 				return err
 			}
 		}
-		*/
+	*/
 	return retErr
 }
 
@@ -402,21 +400,21 @@ func (node *Node) isEOFPacket(data []byte) bool {
 	return data[0] == mysql.EOF_HEADER && len(data) <= 5
 }
 
-func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error){
+func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 	var n int
 	var pos int = 1
 
 	r := new(mysql.Result)
-	r.AffectedRows, _,n = mysql.LengthEncodedInt(data[pos:])
+	r.AffectedRows, _, n = mysql.LengthEncodedInt(data[pos:])
 	pos += n
 	r.InsertId, _, n = mysql.LengthEncodedInt(data[pos:])
 	pos += n
 
-	if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
+	if node.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 		r.Status = binary.LittleEndian.Uint16(data[pos:])
 		node.status = r.Status
 		pos += 2
-	} else if node.capability & mysql.CLIENT_TRANSACTIONS > 0 {
+	} else if node.capability&mysql.CLIENT_TRANSACTIONS > 0 {
 		r.Status = binary.LittleEndian.Uint16(data[pos:])
 		node.status = r.Status
 		pos += 2
@@ -430,15 +428,14 @@ func (node *Node) parseErrPkt(data []byte) error {
 	e.Code = binary.LittleEndian.Uint16(data[pos:])
 	pos += 2
 
-	if node.capability & mysql.CLIENT_PROTOCOL_41 > 0 {
+	if node.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 		pos += 1
-		e.State = string(data[pos : pos + 5])
+		e.State = string(data[pos : pos+5])
 		pos += 5
 	}
 	e.Message = string(data[pos:])
 	return e
 }
-
 
 func (node *Node) FieldList(table string, wildcard string) ([]*mysql.Field, error) {
 	if err := node.writeCommandStrStr(mysql.COM_FIELD_LIST, table, wildcard); err != nil {
@@ -478,7 +475,7 @@ func (node *Node) writePacket(data []byte) error {
 	return node.pkt.WritePacket(data)
 }
 
-func (node *Node) readPacket()([]byte, error) {
+func (node *Node) readPacket() ([]byte, error) {
 	return node.pkt.ReadPacket()
 }
 

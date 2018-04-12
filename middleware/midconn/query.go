@@ -6,16 +6,16 @@
 package midconn
 
 import (
-	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/version"
+	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/sqlparser"
 	"time"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 	// show only send to one node
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), []int{0,})
+	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), []int{0})
 	if err != nil {
 		log.Errorf("execute in multi node failed: %v", err)
 		return err
@@ -51,7 +51,6 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	}
 	log.Debugf("[%d] get VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
 
-
 	if _, ok := stmt.SelectExprs[0].(*sqlparser.StarExpr); ok {
 		log.Debugf("[%d] select * not need to convert", conn.ConnectionId)
 	}
@@ -60,10 +59,10 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 		colName := sqlparser.String(expr)
 		log.Debugf("[%d] select %s, expr, add extra col add first", conn.ConnectionId, colName)
 		if colName != extraColName {
-			tmp := make(sqlparser.SelectExprs, len(stmt.SelectExprs) + 1)
+			tmp := make(sqlparser.SelectExprs, len(stmt.SelectExprs)+1)
 			copy(tmp[1:], stmt.SelectExprs[:])
 			tmp[0] = &sqlparser.NonStarExpr{
-				Expr:&sqlparser.ColName{Name: []byte(extraColName)},
+				Expr: &sqlparser.ColName{Name: []byte(extraColName)},
 			}
 			stmt.SelectExprs = tmp
 		} else {

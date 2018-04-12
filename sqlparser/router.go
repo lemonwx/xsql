@@ -4,8 +4,7 @@
 
 package sqlparser
 
-import (
-)
+import ()
 
 const (
 	EID_NODE = iota

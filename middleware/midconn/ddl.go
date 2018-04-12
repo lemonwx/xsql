@@ -6,9 +6,9 @@
 package midconn
 
 import (
-	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/sqlparser"
 	"strings"
 )
 

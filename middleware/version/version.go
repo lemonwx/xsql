@@ -1,10 +1,11 @@
 package version
+
 /**
  *  author: lim
  *  data  : 18-3-24 下午4:54
  */
 
- /*
+/*
 package version
 
 import (
@@ -27,8 +28,8 @@ func NextVersion() ([]byte, error) {
 		2. let nexy version += 1
 		3. write [next version ]into redis's active versions list belong to this xsql id
 		4. commit to redis
-	*/
-	/*
+*/
+/*
 
 	for {
 		conn := pool.Get()
@@ -105,8 +106,8 @@ func ReleaseVersion(version []byte) error {
 	/*
 		1. remove the param version from redis's active versions list belong to this xsql id
 		2. commit to redis
-	*/
-	/*
+*/
+/*
 	conn := pool.Get()
 	defer  conn.Close()
 

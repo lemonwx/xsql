@@ -10,8 +10,8 @@ import (
 	"encoding/binary"
 	"net"
 
-	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/mysql"
 )
 
 var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
@@ -45,7 +45,7 @@ func NewClieConn(conn net.Conn, connid uint32) *CliConn {
 
 	cli := &CliConn{
 		conn: tcpConn,
-		pkt: mysql.NewPacketIO(tcpConn),
+		pkt:  mysql.NewPacketIO(tcpConn),
 	}
 	cli.pkt.Sequence = 0
 	cli.status = mysql.SERVER_STATUS_AUTOCOMMIT
@@ -67,10 +67,10 @@ func (c *CliConn) Handshake() error {
 	}
 
 	/*
-	if err := c.WriteOK(nil); err != nil {
-		return err
-	}
-	c.pkt.Sequence = 0
+		if err := c.WriteOK(nil); err != nil {
+			return err
+		}
+		c.pkt.Sequence = 0
 	*/
 
 	return nil
@@ -180,11 +180,9 @@ func (c *CliConn) readHandshakeResponse() error {
 	return nil
 }
 
-
 func (c *CliConn) SetPktSeq(sz uint8) {
 	c.pkt.Sequence = sz
 }
-
 
 func (c *CliConn) ReadPacket() ([]byte, error) {
 	return c.pkt.ReadPacket()
@@ -206,7 +204,6 @@ func (c *CliConn) WriteResultsets(status uint16, rs []*mysql.Resultset) error {
 	}
 
 	for _, v := range rs[0].Fields {
-
 
 		data = data[0:4]
 		data = append(data, v.Dump()...)
@@ -309,9 +306,8 @@ func (c *CliConn) WriteFieldList(status uint16, fs []*mysql.Field) error {
 	return nil
 }
 
-
 func (c *CliConn) WriteOK(r *mysql.Result) error {
-	log.Debugf("[%d] send exec ok to cli: %v", c.connectionId, r )
+	log.Debugf("[%d] send exec ok to cli: %v", c.connectionId, r)
 	if r == nil {
 		r = &mysql.Result{Status: c.status}
 	}
@@ -353,7 +349,6 @@ func (c *CliConn) WriteError(e error) error {
 	return c.writePacket(data)
 }
 
-
 func (c *CliConn) writePacket(data []byte) error {
 	return c.pkt.WritePacket(data)
 }
@@ -386,8 +381,7 @@ func (c *CliConn) writeEOFBatch(total []byte, status uint16, direct bool) ([]byt
 	return c.writePacketBatch(total, data, direct)
 }
 
-
-func (c  *CliConn) Close() {
+func (c *CliConn) Close() {
 	if c.conn != nil {
 		c.conn.Close()
 		c.conn = nil

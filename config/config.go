@@ -6,39 +6,39 @@
 package config
 
 import (
-	"io/ioutil"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/go-yaml/yaml"
 )
 
 type Node struct {
-	Host string
-	Port int
-	User string
+	Host     string
+	Port     int
+	User     string
 	Password string
 }
 
 type RedisConf struct {
-	Host string
-	Port int
-	User string
+	Host     string
+	Port     int
+	User     string
 	Password string
 }
 
 type Conf struct {
-	Id string
-	Addr string
-	Nodes []*Node
-	LogLevel int `yaml:"loglevel"`
-	RedisCfg RedisConf `yaml:"RedisCfg"`
-	Xa bool `yaml:"XA"`
-	VerSeqAddr string `yaml:"VerSeqAddr"`
-	ConnSize int `yaml:"ConnSize"`
+	Id         string
+	Addr       string
+	Nodes      []*Node
+	LogLevel   int       `yaml:"loglevel"`
+	RedisCfg   RedisConf `yaml:"RedisCfg"`
+	Xa         bool      `yaml:"XA"`
+	VerSeqAddr string    `yaml:"VerSeqAddr"`
+	ConnSize   int       `yaml:"ConnSize"`
 }
 
-func ReadConf() (*Conf) {
+func ReadConf() *Conf {
 
 	c := &Conf{}
 	yamlF, err := ioutil.ReadFile("../etc/c.yaml")

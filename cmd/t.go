@@ -24,10 +24,9 @@ func main1() {
 	fmt.Println("------------")
 }
 
-
 func main() {
 	data := make([]byte, 0, 512)
-	a := []byte{1,2,3,4}
+	a := []byte{1, 2, 3, 4}
 
 	copy(data, a[:4])
 
@@ -36,6 +35,5 @@ func main() {
 	data = data[0:4]
 
 	fmt.Println(data, len(data), cap(data))
-
 
 }

@@ -6,18 +6,17 @@
 package version
 
 import (
-	"net/rpc"
-	"sync"
 	"errors"
 	"github.com/lemonwx/log"
+	"net/rpc"
+	"sync"
 )
 
-const(
+const (
 	DIALERR = iota
 	USEING
 	FREE
 	CLOSED
-
 )
 
 var GET_VERSION_CONN_FAILED error = errors.New("GET VERSION CONN FAILED")
@@ -39,8 +38,8 @@ type Pool struct {
 	mu   sync.RWMutex
 }
 
-
 var pool Pool
+
 func NewRpcPool(size int, addr string) {
 	pool = Pool{}
 	pool.clis = make([]*Cli, size)
@@ -48,7 +47,7 @@ func NewRpcPool(size int, addr string) {
 
 	for idx := 0; idx < size; idx += 1 {
 		cli, err := rpc.DialHTTP("tcp", addr)
-		pool.clis[idx] = &Cli{cli:cli, idx:idx}
+		pool.clis[idx] = &Cli{cli: cli, idx: idx}
 		if err != nil {
 			pool.used[idx] = DIALERR
 		} else {
@@ -69,14 +68,12 @@ func (p *Pool) getConn() *Cli {
 	return nil
 }
 
-
 func (p *Pool) Close() {
 	for idx, cli := range p.clis {
 		cli.cli.Close()
 		p.used[idx] = CLOSED
 	}
 }
-
 
 func NextVersion() ([]byte, error) {
 	cli := pool.getConn()
@@ -109,12 +106,12 @@ func ReleaseVersion(version []byte) error {
 	}
 	if ret {
 		return nil
-	}else {
+	} else {
 		return RELEASE_FAILED
 	}
 }
 
-func VersionsInUse() ([][]byte, error ){
+func VersionsInUse() ([][]byte, error) {
 	cli := pool.getConn()
 	if cli == nil {
 		return nil, GET_VERSION_CONN_FAILED

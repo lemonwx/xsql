@@ -10,17 +10,14 @@
 // 		proxy default is autocommit,
 // 			[[[ --- for mysqld used to --- ]]]
 
-
 package midconn
 
 import (
-	"github.com/lemonwx/xsql/mysql"
-	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/version"
+	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/sqlparser"
 )
-
-
 
 func (conn *MidConn) handleBegin() {
 
@@ -30,7 +27,6 @@ func (conn *MidConn) handleBegin() {
 
 	log.Debug(conn.status)
 }
-
 
 func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 
@@ -46,11 +42,11 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 		commit = false
 	}
 
-	if commit{
+	if commit {
 		log.Debugf("[%d] need commit", conn.ConnectionId)
 
 		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte("commit"), nil)
-		if  err != nil {
+		if err != nil {
 			return err
 		}
 		conn.status[0] = conn.defaultStatus

@@ -7,9 +7,9 @@ package mysql
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"net"
-	"fmt"
 )
 
 const (

@@ -8,10 +8,10 @@ package midconn
 import (
 	"fmt"
 
-	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/middleware/version"
+	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/sqlparser"
 )
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
@@ -19,7 +19,7 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	tb := sqlparser.String(stmt.Table)
 	where := sqlparser.String(stmt.Where)
 	err := conn.handleSelectForUpdate(tb, where, nil)
-	if  err != nil {
+	if err != nil {
 		log.Warnf("[%d] select for update failed: %v", conn.ConnectionId, err)
 		return err
 	}
@@ -95,7 +95,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 
 	if err := conn.handleSelectForUpdate(
-		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where), nil);err != nil {
+		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where), nil); err != nil {
 		log.Debugf("[%d] row data in use by another session, update failed",
 			conn.ConnectionId)
 		return err
@@ -112,14 +112,14 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 		Name: &sqlparser.ColName{
 			Name: []byte(extraColName),
 		},
-		Expr:sqlparser.NumVal(nextVersion),
+		Expr: sqlparser.NumVal(nextVersion),
 	}
 	stmt.Exprs = append(stmt.Exprs, expr)
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
 
-	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil);err != nil {
-			return err
+	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil); err != nil {
+		return err
 	} else {
 		err = conn.HandleExecRets(rs)
 		if err != nil {
@@ -131,7 +131,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 }
 
 func (conn *MidConn) handleSelectForUpdate(table, where string, nodeIdx []int) error {
-	selSql := fmt.Sprintf("select version from %s %s for update",table, where)
+	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
 	log.Debugf("[%d] select for update sql: %s",
 		conn.ConnectionId, selSql)
 
