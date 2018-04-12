@@ -4,3 +4,8 @@ todo list:
 
 1. transaction optimize
 2. node pool
+
+3. optimize: rpc version server / rpc cli pool
+4. optimize: log
+5. benchmark
+6. xa trx test (zz)
