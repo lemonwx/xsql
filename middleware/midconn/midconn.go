@@ -30,7 +30,7 @@ type MidConn struct {
 	closed       bool
 	ConnectionId uint32
 	RemoteAddr   net.Addr
-	status       uint16
+	status       []uint16 // 0:trx status, 1:defaultStatus at trx begin
 	defaultStatus uint16
 
 	VersionsInUse [][]byte
@@ -95,7 +95,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	midConn.closed = false
 	midConn.RemoteAddr = conn.RemoteAddr()
 	midConn.defaultStatus = mysql.SERVER_STATUS_AUTOCOMMIT
-	midConn.status = midConn.defaultStatus
+	midConn.status = []uint16{midConn.defaultStatus, midConn.defaultStatus}
 	return midConn, nil
 }
 
@@ -143,10 +143,10 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Set:
 		return conn.handleSet(v, sql)
 	case *sqlparser.Begin:
-		conn.status = mysql.SERVER_STATUS_IN_TRANS
+		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_IN_TRANS}
 		return conn.cli.WriteOK(nil)
 	case *sqlparser.Commit, *sqlparser.Rollback:
-		conn.status = conn.defaultStatus
+		conn.status = []uint16{conn.defaultStatus, conn.defaultStatus}
 		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
 		if err != nil {
 			return err
@@ -156,16 +156,12 @@ func (conn *MidConn) handleQuery(sql string) error {
 		return conn.handleDDL(v, sql)
 	case *sqlparser.SimpleSelect:
 		return conn.handleSimpleSelect(v, sql)
-	case *sqlparser.Select:
-		return conn.handleSelect(v, sql)
 	case *sqlparser.Show:
 		return conn.handleShow(v, sql)
-	case *sqlparser.Insert:
-		return conn.handleInsert(v, sql)
-	case *sqlparser.Update:
-		return conn.handleUpdate(v, sql)
-	case *sqlparser.Delete:
-		return conn.handleDelete(v, sql)
+	case *sqlparser.Select, *sqlparser.Insert, *sqlparser.Update, *sqlparser.Delete:
+		log.Debugf("[%d] sql need to execute in trx", conn.ConnectionId)
+		return conn.handleTrx(stmt, sql)
+
 	default:
 		return errors.New("not support this sql")
 	}
@@ -186,7 +182,7 @@ func (conn *MidConn) handleFieldList(data []byte) error {
 		log.Errorf("node 0 execute fieldList failed: %v", err)
 		return err
 	} else {
-		return conn.cli.WriteFieldList(conn.status, fs)
+		return conn.cli.WriteFieldList(conn.status[0], fs)
 	}
 }
 
@@ -265,7 +261,8 @@ func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 	for idx, ret := range rets {
 		rs[idx] = ret.Resultset
 	}
-	return conn.cli.WriteResultsets(conn.status, rs)
+	log.Debugf("----%v-----",conn.status[0])
+	return conn.cli.WriteResultsets(conn.status[0], rs)
 
 	/*
 	if rs, err := conn.mergeSelResult(rets); err != nil {

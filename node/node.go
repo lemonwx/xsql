@@ -80,6 +80,12 @@ func (node *Node) Connect() error {
 		return err
 	}
 
+	_, err = node.Execute(mysql.COM_QUERY, []byte("set autocommit = 0"))
+	if err != nil {
+		log.Errorf("[%d] execute set autocommit = 0 failed: %v", node.ConnectionId, err)
+		return err
+	}
+
 	return nil
 }
 
