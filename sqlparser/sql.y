@@ -98,7 +98,7 @@ var (
 
 // Show
 %token <empty> SHOW
-%token <empty> DATABASES TABLES PROXY
+%token <empty> DATABASES TABLES PROXY VARIABLES STATUS
 
 // DDL Tokens
 %token <empty> CREATE ALTER DROP RENAME
@@ -287,7 +287,15 @@ admin_statement:
   }
 
 show_statement:
-  DESC ID
+    SHOW VARIABLES LIKE value_expression
+    {
+        $$ = &Show{Section: "variables"}
+    }
+    |SHOW STATUS LIKE value_expression
+        {
+            $$ = &Show{Section: "variables"}
+        }
+| DESC ID
   {
     $$ = &Show{Section: "desc "}
   }

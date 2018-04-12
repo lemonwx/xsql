@@ -23,7 +23,7 @@ func (conn *MidConn)handleSet(stmt *sqlparser.Set, sql string) error {
 	}
 
 	if v, ok := expr.Expr.(sqlparser.StrVal); ok {
-		log.Debugf("[%d], set str %v", conn.ConnectionId, v)
+		log.Debugf("[%d], set str d g%v", conn.ConnectionId, v)
 	}
 
 

@@ -117,6 +117,8 @@ var keywords = map[string]int{
 	"show":      SHOW,
 	"databases": DATABASES,
 	"tables":    TABLES,
+	"variables": VARIABLES,
+	"status": STATUS,
 
 
 	//for mixer admin
