@@ -41,7 +41,7 @@ func main2() {
 }
 
 func main() {
-	count := 100000000
+	count := 1
 	idx := 0
 	ts := time.Now()
 	var b bool
@@ -68,5 +68,19 @@ func main() {
 	i, _ := strconv.ParseUint(string(abc), 10, 64)
 	j := string(abc)
 	fmt.Println(i, j)
+
+
+
+	tt := make(map[string]int)
+	fmt.Println(tt, len(tt))
+
+	var aa []byte
+
+	aa = nil
+
+	if v, ok := tt[string(aa)]; ok {
+		fmt.Println(v, ok)
+	}
+
 
 }

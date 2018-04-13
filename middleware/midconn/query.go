@@ -44,6 +44,13 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
 	if conn.VersionsInUse == nil {
 		conn.VersionsInUse, err = version.VersionsInUse()
+
+		if _, ok := conn.VersionsInUse[string(conn.NextVersion)]; ok {
+			delete(conn.VersionsInUse, string(conn.NextVersion))
+			log.Debugf("[%d] delete pre sql's next version %s in the same trx",
+				conn.ConnectionId, conn.NextVersion)
+		}
+
 		if err != nil {
 			log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
 			return err
