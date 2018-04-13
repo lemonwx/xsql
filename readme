@@ -9,3 +9,4 @@ todo list:
 4. optimize: log
 5. benchmark
 6. xa trx test (zz)
+7. sharding support
