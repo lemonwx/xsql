@@ -111,14 +111,14 @@ func ReleaseVersion(version []byte) error {
 	}
 }
 
-func VersionsInUse() ([][]byte, error) {
+func VersionsInUse() (map[string]uint8, error) {
 	cli := pool.getConn()
 	if cli == nil {
 		return nil, GET_VERSION_CONN_FAILED
 	}
 	defer cli.Close()
 
-	var vInuse [][]byte
+	var vInuse map[string]uint8
 	err := cli.cli.Call("VSeq.VInUser", uint8(0), &vInuse)
 	if err != nil {
 		panic(err)

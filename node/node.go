@@ -14,7 +14,6 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
-	"utils"
 )
 
 type Node struct {
@@ -33,7 +32,7 @@ type Node struct {
 	charset      string
 	salt         []byte
 
-	VersionsInUse [][]byte
+	VersionsInUse map[string]uint8
 	NextVersion   uint64
 	NeedHide      bool
 }
@@ -350,7 +349,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	var err error
 	var data []byte
 	// pre row's version value
-	var preRowV []byte = nil
+	var preRowV string = ""
 
 	for {
 		data, err = node.pkt.ReadPacket()
@@ -366,15 +365,15 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			break
 		}
 		if node.NeedHide {
-			version := data[1 : data[0]+1]
-			if version == nil {
+			version := string(data[1 : data[0]+1])
+			if version == "" {
 				// version define is : version bigint unsigned not null default 0
 				retErr = errors.New("UNEXPECT VERSION IS NULL")
-			} else if bytes.Equal(version, preRowV) {
+			} else if version == preRowV {
 				// if pre row's version == version , then not need to judge BytesContains
 				// for sure this row data is not used by other session
 				// so xsql can parse sql and data more faster...
-			} else if utils.BytesContains(version, node.VersionsInUse) {
+			} else if _, ok := node.VersionsInUse[version]; ok {
 				retErr = errors.New("data in use by another session, pls try again later")
 			}
 			preRowV = version

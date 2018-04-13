@@ -33,7 +33,7 @@ type MidConn struct {
 	status        []uint16 // 0:trx status, 1:defaultStatus at trx begin
 	defaultStatus uint16
 
-	VersionsInUse [][]byte
+	VersionsInUse map[string]uint8
 	NextVersion   []byte
 
 	NodeIdxs []int // node that has exec sql in the trx
