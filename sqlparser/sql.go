@@ -2045,7 +2045,7 @@ yydefault:
 		yyDollar = yyS[yypt-1 : yypt+1]
 		//line sql.y:1058
 		{
-			yyVAL.updateExprs = UpdateExprs{yyDollar[1].updateExpr}
+			yyVAL.updateExprs = UpdateExprs{&UpdateExpr{Name: &ColName{Name: []byte("version")}}, yyDollar[1].updateExpr}
 		}
 	case 198:
 		yyDollar = yyS[yypt-3 : yypt+1]

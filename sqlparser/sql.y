@@ -1056,7 +1056,7 @@ on_dup_opt:
 update_list:
   update_expression
   {
-    $$ = UpdateExprs{$1}
+    $$ = UpdateExprs{&UpdateExpr{Name: &ColName{Name: []byte("version")}} , $1}
   }
 | update_list ',' update_expression
   {

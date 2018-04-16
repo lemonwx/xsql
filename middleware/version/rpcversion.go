@@ -7,7 +7,6 @@ package version
 
 import (
 	"errors"
-	"github.com/lemonwx/log"
 	"net/rpc"
 	"sync"
 )
@@ -92,7 +91,6 @@ func NextVersion() ([]byte, error) {
 }
 
 func ReleaseVersion(version []byte) error {
-	log.Debugf("release %v", version)
 	cli := pool.getConn()
 	if cli == nil {
 		return GET_VERSION_CONN_FAILED

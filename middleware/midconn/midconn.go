@@ -269,7 +269,6 @@ func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 	for idx, ret := range rets {
 		rs[idx] = ret.Resultset
 	}
-	log.Debugf("----%v-----", conn.status[0])
 	return conn.cli.WriteResultsets(conn.status[0], rs)
 
 	/*

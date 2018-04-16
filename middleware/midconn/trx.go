@@ -51,6 +51,7 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 		conn.status[1] = conn.defaultStatus
 
 		if conn.NextVersion != nil {
+			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
 			version.ReleaseVersion(conn.NextVersion)
 		}
 		conn.NextVersion = nil
@@ -70,7 +71,7 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 	case *sqlparser.Insert:
 		err = conn.handleInsert(v, sql)
 	case *sqlparser.Update:
-		err = conn.handleUpdate(v, sql)
+		err = conn.handleUpdate(v, "")
 	case *sqlparser.Delete:
 		err = conn.handleDelete(v, sql)
 	default:

@@ -17,35 +17,27 @@ import (
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	var err error
+	var tb string = sqlparser.String(stmt.Table)
+	var where string = sqlparser.String(stmt.Where)
 
-	tb := sqlparser.String(stmt.Table)
-	where := sqlparser.String(stmt.Where)
-	err = conn.handleSelectForUpdate(tb, where, nil)
-	if err != nil {
-		log.Warnf("[%d] select for update failed: %v", conn.ConnectionId, err)
+	if err = conn.handleSelectForUpdate(tb, where, nil); err != nil {
 		return err
 	}
 
-	if conn.NextVersion == nil {
-		conn.NextVersion, err = version.NextVersion()
-		if err != nil {
-			log.Errorf("[%d] request for next version failed: %v", conn.ConnectionId, err)
-			return err
-		}
+	if err = conn.getNextVersion(); err != nil {
+		return err
 	}
-	log.Debugf("[%d] get next version: %v", conn.ConnectionId, conn.NextVersion)
 
 	updateSql := fmt.Sprintf("update %s set version = %s %s", tb, conn.NextVersion, where)
-	log.Debugf("[%d] exec update sql : %s", conn.ConnectionId, updateSql)
-
-	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), nil)
-	if err != nil {
-		log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
-		return err
+	if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), nil); err != nil {
+		if err != nil {
+			log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
+			return err
+		}
+		log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
 	}
-	log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
-	log.Debugf("[%d] after convert sql: %s", conn.ConnectionId, sql)
 
+	log.Debugf("[%d] after convert sql: %s", conn.ConnectionId, sql)
 	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
 	if err != nil {
 		return err
@@ -66,7 +58,6 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	if err = conn.getNextVersion(); err != nil {
 		return err
 	}
-
 
 	// add extra col
 	vals := make(sqlparser.Values, len(stmt.Rows.(sqlparser.Values)))
@@ -90,31 +81,20 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 }
 
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
+
 	var err error
 
 	if err = conn.handleSelectForUpdate(
 		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where), nil); err != nil {
-		log.Debugf("[%d] row data in use by another session, update failed",
-			conn.ConnectionId)
 		return err
 	}
 
-	if conn.NextVersion == nil {
-		conn.NextVersion, err = version.NextVersion()
-		if err != nil {
-			log.Errorf("[%d] get nextversion failed: %v", conn.ConnectionId, err)
-			return err
-		}
+	if err = conn.getNextVersion(); err != nil {
+		return err
 	}
-	log.Debugf("[%d] get nextversion is: %d", conn.ConnectionId, conn.NextVersion)
 
-	expr := &sqlparser.UpdateExpr{
-		Name: &sqlparser.ColName{
-			Name: []byte(extraColName),
-		},
-		Expr: sqlparser.NumVal(conn.NextVersion),
-	}
-	stmt.Exprs = append(stmt.Exprs, expr)
+	// add extra col, get new sql
+	stmt.Exprs[0].Expr = sqlparser.NumVal(conn.NextVersion)
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
 
@@ -126,30 +106,26 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 }
 
 func (conn *MidConn) handleSelectForUpdate(table, where string, nodeIdx []int) error {
-	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
-	log.Debugf("[%d] select for update sql: %s",
-		conn.ConnectionId, selSql)
-
 	var err error
-	if conn.VersionsInUse == nil {
-		conn.VersionsInUse, err = version.VersionsInUse()
-		if err != nil {
-			log.Debugf("[%d] get v in user failed %v", conn.ConnectionId, err)
-			return err
-		}
+
+	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
+
+	if err = conn.getVInUse();err != nil {
+		return err
 	}
-	log.Debugf("[%d] get vInuse: %v", conn.ConnectionId, conn.VersionsInUse)
 
 	conn.setupNodeStatus(conn.VersionsInUse, true)
 	defer conn.setupNodeStatus(nil, false)
 
 	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(selSql), nodeIdx)
 	if err != nil {
+		log.Debugf("[%d] row data in use by another session, update failed: %v", conn.ConnectionId, err)
 		return err
 	}
 	log.Debugf("[%d] select for update success", conn.ConnectionId)
 	return nil
 }
+
 
 func (conn *MidConn)needGetNextV(nodeIdxs []int) bool {
 	// judge if this sql need to get next version or not
@@ -166,6 +142,7 @@ func (conn *MidConn)needGetNextV(nodeIdxs []int) bool {
 func (conn *MidConn) getNextVersion() error {
 	// get next version
 	var err error
+
 	if conn.NextVersion == nil {
 		conn.NextVersion, err = version.NextVersion()
 		if err != nil {
@@ -175,6 +152,23 @@ func (conn *MidConn) getNextVersion() error {
 		log.Debugf("[%d] conn next version is nil, get one: %v", conn.ConnectionId, conn.NextVersion)
 	} else {
 		log.Debugf("[%d] use next version get from pre sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
+	}
+	return nil
+}
+
+func (conn *MidConn) getVInUse() error {
+	// get v in use by other session
+	var err error
+
+	if conn.VersionsInUse == nil {
+		conn.VersionsInUse, err = version.VersionsInUse()
+		if err != nil {
+			log.Debugf("[%d] conn's vInuse in use is nil, but get v in user failed %v", conn.ConnectionId, err)
+			return err
+		}
+		log.Debugf("[%d] get vInuse: %v", conn.ConnectionId, conn.VersionsInUse)
+	} else {
+		log.Debugf("[%d] use vInuse get from pre sel sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
 	}
 	return nil
 }

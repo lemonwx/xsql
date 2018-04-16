@@ -6,11 +6,11 @@
 package midconn
 
 import (
+	"time"
+
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"time"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
@@ -42,21 +42,16 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	hide := true
 	var err error
 
-	if conn.VersionsInUse == nil {
-		conn.VersionsInUse, err = version.VersionsInUse()
-
+	if err = conn.getVInUse();  err != nil {
+		log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
+		return err
+	} else {
 		if _, ok := conn.VersionsInUse[string(conn.NextVersion)]; ok {
 			delete(conn.VersionsInUse, string(conn.NextVersion))
 			log.Debugf("[%d] delete pre sql's next version %s in the same trx",
 				conn.ConnectionId, conn.NextVersion)
 		}
-
-		if err != nil {
-			log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
-			return err
-		}
 	}
-	log.Debugf("[%d] get VersionsInUse: %v", conn.ConnectionId, conn.VersionsInUse)
 
 	if _, ok := stmt.SelectExprs[0].(*sqlparser.StarExpr); ok {
 		log.Debugf("[%d] select * not need to convert", conn.ConnectionId)
