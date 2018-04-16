@@ -50,6 +50,7 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 			return err
 		}
 		conn.status[0] = conn.defaultStatus
+		conn.status[1] = conn.defaultStatus
 
 		if conn.NextVersion != nil {
 			version.ReleaseVersion(conn.NextVersion)
