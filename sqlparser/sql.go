@@ -1654,7 +1654,7 @@ yydefault:
 		yyDollar = yyS[yypt-1 : yypt+1]
 		//line sql.y:757
 		{
-			yyVAL.valExprs = ValExprs{yyDollar[1].valExpr}
+			yyVAL.valExprs = ValExprs{NumVal{}, yyDollar[1].valExpr}
 		}
 	case 136:
 		yyDollar = yyS[yypt-3 : yypt+1]
@@ -2021,7 +2021,7 @@ yydefault:
 		yyDollar = yyS[yypt-1 : yypt+1]
 		//line sql.y:1039
 		{
-			yyVAL.columns = Columns{&NonStarExpr{Expr: yyDollar[1].colName}}
+			yyVAL.columns = Columns{&NonStarExpr{Expr: &ColName{Name: []byte("version")}}, &NonStarExpr{Expr: yyDollar[1].colName}}
 		}
 	case 194:
 		yyDollar = yyS[yypt-3 : yypt+1]

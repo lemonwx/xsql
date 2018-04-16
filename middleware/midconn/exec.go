@@ -67,16 +67,12 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 		return err
 	}
 
-	// add extra col
-	extraCol := &sqlparser.NonStarExpr{
-		Expr: &sqlparser.ColName{Name: []byte(extraColName)},
-	}
-	stmt.Columns = append(stmt.Columns, extraCol)
-	vals := make(sqlparser.Values, len(stmt.Rows.(sqlparser.Values)))
 
+	// add extra col
+	vals := make(sqlparser.Values, len(stmt.Rows.(sqlparser.Values)))
 	for idx, row := range stmt.Rows.(sqlparser.Values) {
 		t := row.(sqlparser.ValTuple)
-		t = append(t, sqlparser.NumVal(conn.NextVersion))
+		t[0] = sqlparser.NumVal(conn.NextVersion)
 		vals[idx] = t
 	}
 	stmt.Rows = vals

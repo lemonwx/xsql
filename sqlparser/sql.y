@@ -755,7 +755,7 @@ subquery:
 value_expression_list:
   value_expression
   {
-    $$ = ValExprs{$1}
+    $$ = ValExprs{NumVal{}, $1}
   }
 | value_expression_list ',' value_expression
   {
