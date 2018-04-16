@@ -36,7 +36,7 @@ type MidConn struct {
 	VersionsInUse map[string]uint8
 	NextVersion   []byte
 
-	NodeIdxs []int // node that has exec sql in the trx
+	nodeIdx []int // node that has exec sql in the trx
 }
 
 func NewMidConn(conn net.Conn) (*MidConn, error) {

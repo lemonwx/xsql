@@ -24,8 +24,6 @@ func (conn *MidConn) handleBegin() {
 	if conn.status[0] == conn.defaultStatus {
 		conn.status[0] = mysql.SERVER_STATUS_IN_TRANS
 	}
-
-	log.Debug(conn.status)
 }
 
 func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {

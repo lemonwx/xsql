@@ -1037,7 +1037,7 @@ column_list_opt:
 column_list:
   column_name
   {
-    $$ = Columns{&NonStarExpr{Expr: $1}}
+    $$ = Columns{&NonStarExpr{Expr: &ColName{Name: []byte("version")}}, &NonStarExpr{Expr: $1}}
   }
 | column_list ',' column_name
   {

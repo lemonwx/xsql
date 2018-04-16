@@ -12,6 +12,7 @@ import (
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
+	"github.com/lemonwx/xsql/middleware/router"
 )
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
@@ -54,18 +55,18 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 }
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
-
 	var err error
-	if conn.NextVersion == nil {
-		conn.NextVersion, err = version.NextVersion()
-		if err != nil {
-			log.Debugf("[%d] conn next version is nil, but get failed %v", conn.ConnectionId, conn.NextVersion)
-			return err
-		}
-		log.Debugf("[%d] conn next version is nil, get one: %v", conn.ConnectionId, conn.NextVersion)
-	} else {
-		log.Debugf("[%d] use next version get from pre sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
+
+	// router
+	if err = conn.getNodeIdxs(stmt); err != nil {
+		return err
 	}
+
+	// get next version
+	if err = conn.getNextVersion(); err != nil {
+		return err
+	}
+
 	// add extra col
 	extraCol := &sqlparser.NonStarExpr{
 		Expr: &sqlparser.ColName{Name: []byte(extraColName)},
@@ -83,7 +84,8 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d]: after convert sql: %s", conn.ConnectionId, newSql)
 
-	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil)
+	// exec
+	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 	if err != nil {
 		return err
 	} else {
@@ -150,5 +152,43 @@ func (conn *MidConn) handleSelectForUpdate(table, where string, nodeIdx []int) e
 		return err
 	}
 	log.Debugf("[%d] select for update success", conn.ConnectionId)
+	return nil
+}
+
+func (conn *MidConn)needGetNextV(nodeIdxs []int) bool {
+	// judge if this sql need to get next version or not
+	need := true
+
+	if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
+		conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT &&
+			len(nodeIdxs) == 1 {
+		need = false
+	}
+	return  need
+}
+
+func (conn *MidConn) getNextVersion() error {
+	// get next version
+	var err error
+	if conn.NextVersion == nil {
+		conn.NextVersion, err = version.NextVersion()
+		if err != nil {
+			log.Debugf("[%d] conn next version is nil, but get failed %v", conn.ConnectionId, conn.NextVersion)
+			return err
+		}
+		log.Debugf("[%d] conn next version is nil, get one: %v", conn.ConnectionId, conn.NextVersion)
+	} else {
+		log.Debugf("[%d] use next version get from pre sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
+	}
+	return nil
+}
+
+func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement) error {
+	var err error
+	conn.nodeIdx, err = router.GetNodeIdxs(stmt)
+	if err != nil {
+		return err
+	}
+	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId,  conn.nodeIdx)
 	return nil
 }

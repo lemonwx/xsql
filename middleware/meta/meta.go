@@ -24,7 +24,8 @@ type Meta struct {
 }
 
 func NewMeta(sql string) *Meta {
-	return &Meta{}
+	return &Meta{
+	}
 }
 
 const (
