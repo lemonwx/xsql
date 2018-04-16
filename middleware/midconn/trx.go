@@ -36,26 +36,31 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 		commit = true
 	case sql == "commit":
 		commit = true
+	case sql == "rollback":
+		commit = true
 	default:
 		commit = false
 	}
 
 	if commit {
 		log.Debugf("[%d] need commit", conn.ConnectionId)
-
-		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte("commit"), nil)
-		if err != nil {
-			return err
-		}
 		conn.status[0] = conn.defaultStatus
 		conn.status[1] = conn.defaultStatus
 
 		if conn.NextVersion != nil {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
-			version.ReleaseVersion(conn.NextVersion)
+			err := version.ReleaseVersion(conn.NextVersion)
+			if err != nil {
+				return err
+			}
 		}
 		conn.NextVersion = nil
 		conn.VersionsInUse = nil
+
+		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 
@@ -79,9 +84,10 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 	}
 
 	if err != nil {
-		log.Debugf("exec errr %v", err)
+		log.Debugf("exec err %v, this trx is in uncommited status", err)
+		conn.status[0] = mysql.SERVER_NOT_SERVE
 		return err
 	}
-	err = conn.handleCommit(nil, "")
-	return err
+
+	return conn.handleCommit(nil, "")
 }

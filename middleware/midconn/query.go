@@ -45,18 +45,12 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	if err = conn.getVInUse();  err != nil {
 		log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
 		return err
-	} else {
-		if _, ok := conn.VersionsInUse[string(conn.NextVersion)]; ok {
-			delete(conn.VersionsInUse, string(conn.NextVersion))
-			log.Debugf("[%d] delete pre sql's next version %s in the same trx",
-				conn.ConnectionId, conn.NextVersion)
-		}
 	}
 
+	// judge extra col hide or not
 	if _, ok := stmt.SelectExprs[0].(*sqlparser.StarExpr); ok {
 		log.Debugf("[%d] select * not need to convert", conn.ConnectionId)
 	}
-
 	if expr, ok := stmt.SelectExprs[0].(*sqlparser.NonStarExpr); ok {
 		colName := sqlparser.String(expr)
 		log.Debugf("[%d] select %s, expr, add extra col add first", conn.ConnectionId, colName)
@@ -73,14 +67,12 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 		}
 	}
 
-	newSql := sqlparser.String(stmt)
-	log.Debugf("[%d] convert sql to %s", conn.ConnectionId, newSql)
-
 	if hide {
 		conn.setupNodeStatus(conn.VersionsInUse, true)
 		defer conn.setupNodeStatus(nil, false)
 	}
 
+	newSql := sqlparser.String(stmt)
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil)
 	if err != nil {
 		return err

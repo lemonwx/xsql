@@ -32,6 +32,7 @@ const (
 	SERVER_STATUS_METADATA_CHANGED     uint16 = 0x0400
 	SERVER_QUERY_WAS_SLOW              uint16 = 0x0800
 	SERVER_PS_OUT_PARAMS               uint16 = 0x1000
+	SERVER_NOT_SERVE 				   uint16 = 0x1200
 )
 
 const (

@@ -16,6 +16,8 @@ type extraColType uint64
 
 var ROW_DATA_IN_USE_ERR error = errors.New("this row data inuse by another session, pls try again later")
 var UNEXPECT_MIDDLE_WARE_ERR error = errors.New("UNEXPECT MIDDLE WARE ERROR")
+var UNEXPECT_COMMIT_ERR error = errors.New("UNEXPECT COMMIT ERROR")
+var MUST_ROLLBACK_ERR error = errors.New("PLEASE ROLLBACK")
 
 // for all back node conn, autocommit = 0
 // mid conn status:

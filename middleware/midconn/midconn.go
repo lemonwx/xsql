@@ -113,7 +113,12 @@ func (conn *MidConn) Serve() {
 			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
 			break
 		}
-		if err = conn.dispatch(data); err != nil {
+		log.Debugf("[%d] status: %d, is rollback: %v", conn.status[0], string(data[1:]) == "rollback")
+		if conn.status[0] == mysql.SERVER_NOT_SERVE &&
+			string(data[1:]) != "rollback" {
+			conn.cli.WriteError(MUST_ROLLBACK_ERR)
+			conn.cli.SetPktSeq(0)
+		} else if err = conn.dispatch(data); err != nil {
 			conn.cli.WriteError(err)
 			conn.cli.SetPktSeq(0)
 		}

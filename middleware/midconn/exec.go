@@ -166,6 +166,11 @@ func (conn *MidConn) getVInUse() error {
 			log.Debugf("[%d] conn's vInuse in use is nil, but get v in user failed %v", conn.ConnectionId, err)
 			return err
 		}
+
+		if _, ok := conn.VersionsInUse[string(conn.NextVersion)]; ok {
+			delete(conn.VersionsInUse, string(conn.NextVersion))
+			log.Debugf("[%d] delete pre sql's next version %s in the same trx", conn.ConnectionId, conn.NextVersion)
+		}
 		log.Debugf("[%d] get vInuse: %v", conn.ConnectionId, conn.VersionsInUse)
 	} else {
 		log.Debugf("[%d] use vInuse get from pre sel sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
