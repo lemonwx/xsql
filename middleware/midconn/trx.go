@@ -34,6 +34,7 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 	case conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
 		conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT:
 		commit = true
+		sql = "commit"
 	case sql == "commit":
 		commit = true
 	case sql == "rollback":
@@ -85,7 +86,10 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 
 	if err != nil {
 		log.Debugf("exec err %v, this trx is in uncommited status", err)
-		conn.status[0] = mysql.SERVER_NOT_SERVE
+		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
+			conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
+			conn.status[0] = mysql.SERVER_NOT_SERVE
+		}
 		return err
 	}
 

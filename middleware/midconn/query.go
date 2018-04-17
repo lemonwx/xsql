@@ -43,7 +43,6 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	var err error
 
 	if err = conn.getVInUse();  err != nil {
-		log.Errorf("[%d] get VersionsInUse failed: %v", conn.ConnectionId, err)
 		return err
 	}
 
