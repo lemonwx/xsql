@@ -6,8 +6,6 @@
 package midconn
 
 import (
-	"time"
-
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
@@ -37,10 +35,12 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
-	ts := time.Now()
-
-	hide := true
+	var hide bool = true
 	var err error
+
+	if err = conn.getNodeIdxs(stmt); err != nil {
+		return err
+	}
 
 	if err = conn.getVInUse();  err != nil {
 		return err
@@ -72,14 +72,12 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	}
 
 	newSql := sqlparser.String(stmt)
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 	if err != nil {
 		return err
 	}
 
 	err = conn.HandleSelRets(rets)
-	log.Debugf("[%d] handle select cost: %v", conn.ConnectionId, time.Since(ts))
-
 	return err
 }
 

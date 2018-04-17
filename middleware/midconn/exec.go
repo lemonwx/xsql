@@ -17,10 +17,15 @@ import (
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	var err error
+
+	if err = conn.getNodeIdxs(stmt); err != nil {
+		return err
+	}
+
 	var tb string = sqlparser.String(stmt.Table)
 	var where string = sqlparser.String(stmt.Where)
 
-	if err = conn.handleSelectForUpdate(tb, where, nil); err != nil {
+	if err = conn.handleSelectForUpdate(tb, where); err != nil {
 		return err
 	}
 
@@ -29,7 +34,7 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	}
 
 	updateSql := fmt.Sprintf("update %s set version = %s %s", tb, conn.NextVersion, where)
-	if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), nil); err != nil {
+	if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), conn.nodeIdx); err != nil {
 		if err != nil {
 			log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
 			return err
@@ -38,7 +43,7 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	}
 
 	log.Debugf("[%d] after convert sql: %s", conn.ConnectionId, sql)
-	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.nodeIdx)
 	if err != nil {
 		return err
 	} else {
@@ -84,8 +89,12 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 
 	var err error
 
+	if err = conn.getNodeIdxs(stmt); err != nil {
+		return err
+	}
+
 	if err = conn.handleSelectForUpdate(
-		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where), nil); err != nil {
+		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where)); err != nil {
 		return err
 	}
 
@@ -98,14 +107,14 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
 
-	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), nil); err != nil {
+	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx); err != nil {
 		return err
 	} else {
 		return conn.HandleExecRets(rs)
 	}
 }
 
-func (conn *MidConn) handleSelectForUpdate(table, where string, nodeIdx []int) error {
+func (conn *MidConn) handleSelectForUpdate(table, where string) error {
 	var err error
 
 	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
@@ -117,7 +126,7 @@ func (conn *MidConn) handleSelectForUpdate(table, where string, nodeIdx []int) e
 	conn.setupNodeStatus(conn.VersionsInUse, true)
 	defer conn.setupNodeStatus(nil, false)
 
-	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(selSql), nodeIdx)
+	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(selSql), conn.nodeIdx)
 	if err != nil {
 		log.Debugf("[%d] row data in use by another session, update failed: %v", conn.ConnectionId, err)
 		return err
@@ -182,6 +191,7 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement) error {
 	var err error
 	conn.nodeIdx, err = router.GetNodeIdxs(stmt)
 	if err != nil {
+		log.Debugf("[%d] get node idxs failed: %v", conn.ConnectionId, err)
 		return err
 	}
 	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId,  conn.nodeIdx)
