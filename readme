@@ -9,4 +9,6 @@ todo list:
 4. optimize: log
 5. benchmark
 6. xa trx test (zz)
-7. sharding support
+7. sharding support (hash, range date)
+
+8. sql sharding support (where = , etc...)
