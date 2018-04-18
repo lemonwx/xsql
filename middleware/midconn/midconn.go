@@ -113,7 +113,7 @@ func (conn *MidConn) Serve() {
 			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
 			break
 		}
-		log.Debugf("[%d] status: %d, is rollback: %v", conn.ConnectionId, conn.status[0], strings.ToLower(string(data[1:])) != "rollback")
+		log.Debugf("generallog--[%d] %d:%s", conn.ConnectionId, data[0], data[1:])
 		if conn.status[0] == mysql.SERVER_NOT_SERVE &&
 			strings.ToLower(string(data[1:])) != "rollback" {
 			conn.cli.WriteError(MUST_ROLLBACK_ERR)

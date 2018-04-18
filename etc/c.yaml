@@ -6,7 +6,7 @@ nodelay: false
 XA: true
 
 VerSeqAddr: 192.168.1.2:1235
-ConnSize: 100
+ConnSize: 400
 
 nodes:
 -

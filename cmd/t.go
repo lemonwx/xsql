@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 	"strconv"
+	"rpcpool"
+	"net/rpc"
 )
 
 func main1() {
@@ -40,7 +42,7 @@ func main2() {
 
 }
 
-func main() {
+func main3 () {
 	count := 1
 	idx := 0
 	ts := time.Now()
@@ -83,4 +85,107 @@ func main() {
 	}
 
 
+}
+
+var addr string = "192.168.1.2:1235"
+
+var pool rpcpool.Pool
+
+func main4 () {
+	ts := time.Now()
+	rpc.DialHTTP("tcp", addr)
+	fmt.Println(time.Since(ts))
+
+
+	pool = rpcpool.Pool{
+		MaxIdle:     100,
+		MaxActive:   10000,
+		Dial: func() (rpcpool.Conn, error) {
+			return rpc.DialHTTP("tcp", addr)
+		},
+	}
+
+	allcount := 1000
+
+	for {
+		ch := make(chan time.Duration, allcount)
+		all_time := float64(0)
+		for idx := 0; idx < 1000; idx += 1 {
+			go t(idx,  ch)
+		}
+		max := float64(-1)
+		for idx := 0; idx < allcount; idx += 1 {
+			x := <-ch
+			tmp := x.Seconds()
+			if max < tmp {
+				max = tmp
+			}
+			all_time += x.Seconds()
+		}
+
+		fmt.Println(all_time, all_time/float64(allcount), max)
+		fmt.Println("--------------------------------", pool.ActiveCount(), pool.IdleCount())
+		time.Sleep(5 * time.Second)
+
+	}
+	fmt.Println("DONE.")
+
+	for {
+		time.Sleep(3 * time.Second)
+	}
+
+	defer pool.Close()
+
+}
+
+
+func t(idx int, ch chan time.Duration) {
+	ts := time.Now()
+	conn := pool.Get()
+	ch <- time.Since(ts)
+	defer conn.Close()
+	time.Sleep(time.Millisecond * 1)
+
+}
+
+func t1(idx int, ch chan time.Duration) {
+	ts := time.Now()
+	conn := pool.Get()
+	ch <- time.Since(ts)
+	defer conn.Close()
+	time.Sleep(time.Millisecond * 1)
+
+}
+
+func main() {
+	allcount := 1000
+	pSize := 10
+	clis := make([]*rpc.Client, pSize)
+	status := make(p[])
+
+	for idx:=0;idx<pSize;idx+=1 {
+		cli, _ := rpc.DialHTTP("tcp", addr)
+		clis[idx] = cli
+	}
+
+	fmt.Println("init pool done.")
+
+	ch := make(chan time.Duration, allcount)
+	all_time := float64(0)
+	for idx := 0; idx < 1000; idx += 1 {
+		go func(idx int,  ch chan time.Duration) {
+
+		}(idx, ch)
+	}
+	max := float64(-1)
+	for idx := 0; idx < allcount; idx += 1 {
+		x := <-ch
+		tmp := x.Seconds()
+		if max < tmp {
+			max = tmp
+		}
+		all_time += x.Seconds()
+	}
+
+	fmt.Println(all_time, all_time/float64(allcount), max)
 }

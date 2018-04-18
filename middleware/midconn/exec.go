@@ -106,6 +106,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 	stmt.Exprs[0].Expr = sqlparser.NumVal(conn.NextVersion)
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
+	log.Debugf("generallog--[%d] 3:%s", conn.ConnectionId, newSql)
 
 	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx); err != nil {
 		return err
