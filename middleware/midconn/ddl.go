@@ -26,7 +26,7 @@ func (conn *MidConn) handleDDL(stmt *sqlparser.DDL, sql string) error {
 }
 
 func (conn *MidConn) addExtraCol(sql string) string {
-	if strings.Contains(sql, "table") {
+	if strings.Contains(strings.ToLower(sql), "table") {
 		log.Debugf("[%d] create sql need to add extra col", conn.ConnectionId)
 		idx := strings.Index(sql, "(")
 		if idx != -1 {
