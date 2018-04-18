@@ -196,6 +196,10 @@ select_statement:
   {
     $$ = &SimpleSelect{Comments: Comments($2), Distinct: $3, SelectExprs: $4}
   }
+| SELECT comment_opt distinct_opt DATABASE '(' ')' limit_opt
+  {
+    $$ = &SimpleSelect{}
+  }
 | SELECT comment_opt distinct_opt select_expression_list FROM table_expression_list where_expression_opt group_by_opt having_opt order_by_opt limit_opt lock_opt
   {
     $$ = &Select{Comments: Comments($2), Distinct: $3, SelectExprs: $4, From: $6, Where: NewWhere(AST_WHERE, $7), GroupBy: GroupBy($8), Having: NewWhere(AST_HAVING, $9), OrderBy: $10, Limit: $11, Lock: $12}
@@ -353,7 +357,11 @@ rename_statement:
   }
 
 drop_statement:
-  DROP TABLE exists_opt ID
+  DROP DATABASE exists_opt ID
+  {
+    $$ = &DDL{Action: AST_DROP}
+  }
+| DROP TABLE exists_opt ID
   {
     $$ = &DDL{Action: AST_DROP, Table: $4}
   }
