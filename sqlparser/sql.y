@@ -357,7 +357,11 @@ rename_statement:
   }
 
 drop_statement:
-  DROP DATABASE exists_opt ID
+ DROP TABLE exists_opt ID '.' ID
+  {
+    $$ = &DDL{Action: AST_DROP}
+  }
+| DROP DATABASE exists_opt ID
   {
     $$ = &DDL{Action: AST_DROP}
   }
