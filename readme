@@ -12,3 +12,4 @@ todo list:
 7. sharding support (hash, range date)
 
 8. sql sharding support (where = , etc...)
+9. prepare support
