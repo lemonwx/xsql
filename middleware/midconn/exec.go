@@ -13,6 +13,7 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 	"github.com/lemonwx/xsql/middleware/router"
+	"strconv"
 )
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
@@ -68,7 +69,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	vals := make(sqlparser.Values, len(stmt.Rows.(sqlparser.Values)))
 	for idx, row := range stmt.Rows.(sqlparser.Values) {
 		t := row.(sqlparser.ValTuple)
-		t[0] = sqlparser.NumVal(conn.NextVersion)
+		t[0] = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
 		vals[idx] = t
 	}
 	stmt.Rows = vals
@@ -103,7 +104,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 	}
 
 	// add extra col, get new sql
-	stmt.Exprs[0].Expr = sqlparser.NumVal(conn.NextVersion)
+	stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
 	log.Debugf("generallog--[%d] 3:%s", conn.ConnectionId, newSql)
@@ -153,7 +154,7 @@ func (conn *MidConn) getNextVersion() error {
 	// get next version
 	var err error
 
-	if conn.NextVersion == nil {
+	if conn.NextVersion == 0 {
 		conn.NextVersion, err = version.NextVersion()
 		if err != nil {
 			log.Debugf("[%d] conn next version is nil, but get failed %v", conn.ConnectionId, conn.NextVersion)
@@ -177,8 +178,8 @@ func (conn *MidConn) getVInUse() error {
 			return err
 		}
 
-		if _, ok := conn.VersionsInUse[string(conn.NextVersion)]; ok {
-			delete(conn.VersionsInUse, string(conn.NextVersion))
+		if _, ok := conn.VersionsInUse[conn.NextVersion]; ok {
+			delete(conn.VersionsInUse, conn.NextVersion)
 			log.Debugf("[%d] delete pre sql's next version %s in the same trx", conn.ConnectionId, conn.NextVersion)
 		}
 		log.Debugf("[%d] get vInuse: %v", conn.ConnectionId, conn.VersionsInUse)

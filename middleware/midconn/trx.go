@@ -48,14 +48,14 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 		conn.status[0] = conn.defaultStatus
 		conn.status[1] = conn.defaultStatus
 
-		if conn.NextVersion != nil {
+		if conn.NextVersion != 0 {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
 			err := version.ReleaseVersion(conn.NextVersion)
 			if err != nil {
 				return err
 			}
 		}
-		conn.NextVersion = nil
+		conn.NextVersion = 0
 		conn.VersionsInUse = nil
 
 		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)

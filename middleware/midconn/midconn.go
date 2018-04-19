@@ -33,8 +33,8 @@ type MidConn struct {
 	status        []uint16 // 0:trx status, 1:defaultStatus at trx begin
 	defaultStatus uint16
 
-	VersionsInUse map[string]uint8
-	NextVersion   []byte
+	VersionsInUse map[uint64]uint8
+	NextVersion   uint64
 
 	nodeIdx []int // node that has exec sql in the trx
 }
@@ -100,7 +100,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	midConn.status = []uint16{midConn.defaultStatus, midConn.defaultStatus}
 
 	midConn.VersionsInUse = nil
-	midConn.NextVersion = nil
+	midConn.NextVersion = 0
 
 	return midConn, nil
 }

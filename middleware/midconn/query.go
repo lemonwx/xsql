@@ -81,7 +81,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	return err
 }
 
-func (conn *MidConn) setupNodeStatus(vInUse map[string]byte, hide bool) {
+func (conn *MidConn) setupNodeStatus(vInUse map[uint64]byte, hide bool) {
 	for _, node := range conn.nodes {
 		node.VersionsInUse = vInUse
 		node.NeedHide = hide

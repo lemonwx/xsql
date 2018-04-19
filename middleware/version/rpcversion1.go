@@ -92,23 +92,23 @@ func (p *Pool) Close() {
 	}
 }
 
-func NextVersion() ([]byte, error) {
+func NextVersion() (uint64, error) {
 	cli := pool.getConn()
 	if cli == nil {
-		return nil, GET_VERSION_CONN_FAILED
+		return 0, GET_VERSION_CONN_FAILED
 	}
 	defer cli.Close()
 
-	var nextVer []byte
+	var nextVer uint64
 	err := cli.cli.Call("VSeq.NextV", uint8(0), &nextVer)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	return nextVer, nil
 }
 
-func ReleaseVersion(version []byte) error {
+func ReleaseVersion(version uint64) error {
 	cli := pool.getConn()
 	if cli == nil {
 		return GET_VERSION_CONN_FAILED
@@ -127,14 +127,14 @@ func ReleaseVersion(version []byte) error {
 	}
 }
 
-func VersionsInUse() (map[string]uint8, error) {
+func VersionsInUse() (map[uint64]uint8, error) {
 	cli := pool.getConn()
 	if cli == nil {
 		return nil, GET_VERSION_CONN_FAILED
 	}
 	defer cli.Close()
 
-	var vInuse map[string]uint8
+	var vInuse map[uint64]uint8
 	err := cli.cli.Call("VSeq.VInUser", uint8(0), &vInuse)
 	if err != nil {
 		panic(err)

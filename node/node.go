@@ -14,6 +14,7 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
+	"strconv"
 )
 
 type Node struct {
@@ -32,7 +33,7 @@ type Node struct {
 	charset      string
 	salt         []byte
 
-	VersionsInUse map[string]uint8
+	VersionsInUse map[uint64]uint8
 	NextVersion   uint64
 	NeedHide      bool
 }
@@ -349,7 +350,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	var err error
 	var data []byte
 	// pre row's version value
-	var preRowV string = ""
+	var preRowV uint64 = 0
 
 	for {
 		data, err = node.pkt.ReadPacket()
@@ -365,8 +366,12 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			break
 		}
 		if node.NeedHide {
-			version := string(data[1 : data[0]+1])
-			if version == "" {
+			version, err := strconv.ParseUint(string(data[1: data[0] + 1]), 10, 64)
+			if err != nil {
+				version = 0
+				retErr = err
+			}
+			if version == 0 {
 				// version define is : version bigint unsigned not null default 0
 				retErr = errors.New("UNEXPECT VERSION IS NULL")
 			} else if version == preRowV {
