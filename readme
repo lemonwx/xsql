@@ -13,3 +13,4 @@ todo list:
 
 8. sql sharding support (where = , etc...)
 9. prepare support
+10. fix bug: mysql version gen
