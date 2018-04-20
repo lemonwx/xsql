@@ -5,6 +5,7 @@
 
 package version
 
+/*
 import (
 	"errors"
 	"net/rpc"
@@ -141,3 +142,5 @@ func VersionsInUse() (map[uint64]uint8, error) {
 	}
 	return vInuse, nil
 }
+
+*/
