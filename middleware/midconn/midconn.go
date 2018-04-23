@@ -15,10 +15,10 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/client"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/sqlparser"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 var baseConnId uint32 = 1000
@@ -57,11 +57,12 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 
 	// cli conn between mysqlCli and xsql, this cli has handshake with mysql cli
 	midConn.cli = cli
+	midConn.db = cli.Db
 
 	// init and connect to back mysql server
-	midConn.nodes = make([]*node.Node, len(meta.NodeAddrs))
+	midConn.nodes = make([]*node.Node, len(meta.GetNodeAddrs()))
 
-	for idx, nodeCfg := range meta.NodeAddrs {
+	for idx, nodeCfg := range meta.GetNodeAddrs() {
 		tmpNode := node.NewNode(nodeCfg.Host, nodeCfg.Port, nodeCfg.User, nodeCfg.Password,
 			cli.Db, midConn.ConnectionId)
 		midConn.nodes[idx] = tmpNode
@@ -222,7 +223,7 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 	if nodeIdxs == nil {
 		log.Debugf("[%d] nodeIdxs is nil. use meta.FullNodeIdxs to execute",
 			conn.ConnectionId)
-		nodeIdxs = meta.FullNodeIdxs
+		nodeIdxs = meta.GetFullNodeIdxs()
 	}
 
 	rets := make([]interface{}, len(nodeIdxs))
@@ -265,10 +266,6 @@ func (conn *MidConn) HandleExecRets(rets []*mysql.Result) error {
 }
 
 func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
-
-	if len(rets) == 0 {
-		return UNEXPECT_MIDDLE_WARE_ERR
-	}
 
 	rs := make([]*mysql.Resultset, len(rets))
 	for idx, ret := range rets {

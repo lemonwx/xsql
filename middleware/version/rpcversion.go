@@ -5,8 +5,6 @@
 
 package version
 
-
-/*
 import (
 	"errors"
 	"net/rpc"
@@ -25,43 +23,47 @@ var GET_VERSION_CONN_FAILED error = errors.New("GET VERSION CONN FAILED")
 var RELEASE_FAILED error = errors.New("RELEASE USED VERSION FAILED ")
 var lock sync.Mutex
 
-var pool rpcpool.Pool
+var pool *rpcpool.ConnPool
 
-func NewRpcPool(size int, addr string) {
-	pool = rpcpool.Pool{
-		MaxIdle:     100,
-		MaxActive:   10000,
-		Dial: func() (rpcpool.Conn, error) {
+func NewRpcPool(initSize, maxSize int, addr string) {
+	var err error
+	pool, err = rpcpool.NewConnPool(
+		func()(*rpc.Client, error){
 			return rpc.DialHTTP("tcp", addr)
 		},
+		initSize,
+		maxSize,
+	)
+	if err != nil {
+		panic(err)
 	}
 }
 
-func NextVersion() ([]byte, error) {
-	cli := pool.Get()
-	if cli == nil {
-		return nil, GET_VERSION_CONN_FAILED
-	}
-	defer cli.Close()
-
-	var nextVer []byte
-	err := cli.Call("VSeq.NextV", uint8(0), &nextVer)
+func NextVersion() (uint64, error) {
+	cli, err := pool.Get()
 	if err != nil {
-		return nil, err
+		return 0, GET_VERSION_CONN_FAILED
+	}
+	defer pool.Put(cli)
+
+	var nextVer uint64
+	err = cli.Call("VSeq.NextV", uint8(0), &nextVer)
+	if err != nil {
+		return 0, err
 	}
 
 	return nextVer, nil
 }
 
-func ReleaseVersion(version []byte) error {
-	cli := pool.Get()
-	if cli == nil {
+func ReleaseVersion(version uint64) error {
+	cli, err := pool.Get()
+	if err != nil {
 		return GET_VERSION_CONN_FAILED
 	}
-	defer cli.Close()
+	defer pool.Put(cli)
 
 	var ret bool
-	err := cli.Call("VSeq.Release", version, &ret)
+	err = cli.Call("VSeq.Release", version, &ret)
 	if err != nil {
 		return err
 	}
@@ -72,19 +74,19 @@ func ReleaseVersion(version []byte) error {
 	}
 }
 
-func VersionsInUse() (map[string]uint8, error) {
-	cli := pool.Get()
-	if cli == nil {
+func VersionsInUse() (map[uint64]uint8, error) {
+	cli, err := pool.Get()
+	if err != nil {
 		return nil, GET_VERSION_CONN_FAILED
 	}
 	defer cli.Close()
 
-	var vInuse map[string]uint8
-	err := cli.Call("VSeq.VInUser", uint8(0), &vInuse)
+	var vInuse map[uint64]uint8
+	err = cli.Call("VSeq.VInUser", uint8(0), &vInuse)
 	if err != nil {
 		panic(err)
 	}
 	return vInuse, nil
 }
 
-*/
+

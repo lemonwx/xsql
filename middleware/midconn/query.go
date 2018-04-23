@@ -42,15 +42,14 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 		return err
 	}
 
-	if err = conn.getVInUse();  err != nil {
+	if err = conn.getVInUse(); err != nil {
 		return err
 	}
 
 	// judge extra col hide or not
 	if _, ok := stmt.SelectExprs[0].(*sqlparser.StarExpr); ok {
 		log.Debugf("[%d] select * not need to convert", conn.ConnectionId)
-	}
-	if expr, ok := stmt.SelectExprs[0].(*sqlparser.NonStarExpr); ok {
+	} else if expr, ok := stmt.SelectExprs[0].(*sqlparser.NonStarExpr); ok {
 		colName := sqlparser.String(expr)
 		log.Debugf("[%d] select %s, expr, add extra col add first", conn.ConnectionId, colName)
 		if colName != extraColName {
@@ -72,13 +71,13 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	}
 
 	newSql := sqlparser.String(stmt)
+	log.Debug(newSql)
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 	if err != nil {
 		return err
 	}
 
-	err = conn.HandleSelRets(rets)
-	return err
+	return conn.HandleSelRets(rets)
 }
 
 func (conn *MidConn) setupNodeStatus(vInUse map[uint64]byte, hide bool) {

@@ -5,6 +5,7 @@
 
 package version
 
+/*
 import (
 	"database/sql"
 
@@ -20,11 +21,10 @@ var curV uint64
 var batchMax uint64
 var lock sync.RWMutex
 
-
 func NewRpcPool(size int, addr string) {
 	conn = "root:root@tcp(172.17.0.4:5518)/v"
 	db, _ = sql.Open("mysql", conn)
-	batch = 10
+	batch = 2000
 	curV = 0
 
 	batchMax = 0
@@ -34,7 +34,7 @@ func NewRpcPool(size int, addr string) {
 
 func NextVersion() (uint64, error) {
 	lock.Lock()
-	if curV + 1 <= batchMax {
+	if curV+1 <= batchMax {
 		curV += 1
 		defer lock.Unlock()
 		return curV, nil
@@ -66,7 +66,7 @@ func NextVersion() (uint64, error) {
 	if curId != 0 {
 		rs, err = trx.Exec("update v set id = ?", curId+batch)
 	} else {
-		rs, err = trx.Exec("insert into v(id) values (?)", curId + batch)
+		rs, err = trx.Exec("insert into v(id) values (?)", curId+batch)
 	}
 
 	if err != nil {
@@ -76,10 +76,9 @@ func NextVersion() (uint64, error) {
 	}
 
 	stmt, err := trx.Prepare("insert into v_in_use (id) values (?)")
-	for idx := curId + 1; idx <= curId + batch; idx += 1 {
+	for idx := curId + 1; idx <= curId+batch; idx += 1 {
 		stmt.Exec(idx)
 	}
-
 
 	if err != nil {
 		trx.Rollback()
@@ -122,3 +121,5 @@ func VersionsInUse() (map[uint64]uint8, error) {
 
 	return ret, nil
 }
+
+*/

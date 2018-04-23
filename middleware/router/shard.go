@@ -6,21 +6,10 @@ package router
 
 import (
 	"fmt"
+	"hack"
 	"hash/crc32"
 	"strconv"
-	"bytes"
-	"encoding/binary"
-	"hack"
 )
-
-type Uint64Key uint64
-
-func (i Uint64Key) String() string {
-	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, uint64(i))
-	return buf.String()
-}
-
 
 type KeyError string
 
@@ -41,7 +30,7 @@ func handleError(err *error) {
 func EncodeValue(value interface{}) string {
 	switch val := value.(type) {
 	case int:
-		return Uint64Key(val).String()
+		return Uint64Key(uint64(val)).String()
 	case uint64:
 		return Uint64Key(val).String()
 	case int64:
@@ -112,6 +101,52 @@ func (s *HashShard) FindForKey(key interface{}) int {
 	h := HashValue(key)
 
 	return int(h % uint64(s.ShardNum))
+}
+
+type NumRangeShard struct {
+	Shards []NumKeyRange
+}
+
+func (s *NumRangeShard) FindForKey(key interface{}) int {
+	v := NumValue(key)
+	for i, r := range s.Shards {
+		if r.Contains(v) {
+			return i
+		}
+	}
+	panic(NewKeyError("Unexpected key %v, not in range", key))
+}
+
+func (s *NumRangeShard) EqualStart(key interface{}, index int) bool {
+	v := NumValue(key)
+	return s.Shards[index].Start == v
+}
+func (s *NumRangeShard) EqualStop(key interface{}, index int) bool {
+	v := NumValue(key)
+	return s.Shards[index].End == v
+}
+
+type KeyRangeShard struct {
+	Shards []KeyRange
+}
+
+func (s *KeyRangeShard) FindForKey(key interface{}) int {
+	v := KeyspaceId(EncodeValue(key))
+	for i, r := range s.Shards {
+		if r.Contains(v) {
+			return i
+		}
+	}
+	panic(NewKeyError("Unexpected key %v, not in range", key))
+}
+
+func (s *KeyRangeShard) EqualStart(key interface{}, index int) bool {
+	v := KeyspaceId(EncodeValue(key))
+	return s.Shards[index].Start == v
+}
+func (s *KeyRangeShard) EqualStop(key interface{}, index int) bool {
+	v := KeyspaceId(EncodeValue(key))
+	return s.Shards[index].End == v
 }
 
 type DefaultShard struct {

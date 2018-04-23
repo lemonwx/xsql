@@ -18,6 +18,7 @@ var ROW_DATA_IN_USE_ERR error = errors.New("this row data inuse by another sessi
 var UNEXPECT_MIDDLE_WARE_ERR error = errors.New("UNEXPECT MIDDLE WARE ERROR")
 var UNEXPECT_COMMIT_ERR error = errors.New("UNEXPECT COMMIT ERROR")
 var MUST_ROLLBACK_ERR error = errors.New("PLEASE ROLLBACK")
+var NONE_DB_ERR error = errors.New("no db selected")
 
 // for all back node conn, autocommit = 0
 // mid conn status:

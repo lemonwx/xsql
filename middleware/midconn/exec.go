@@ -6,19 +6,18 @@
 package midconn
 
 import (
+	"strconv"
 	"fmt"
 
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/middleware/router"
-	"strconv"
+	"github.com/lemonwx/xsql/middleware/version"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	var err error
-
 	if err = conn.getNodeIdxs(stmt); err != nil {
 		return err
 	}
@@ -121,7 +120,7 @@ func (conn *MidConn) handleSelectForUpdate(table, where string) error {
 
 	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
 
-	if err = conn.getVInUse();err != nil {
+	if err = conn.getVInUse(); err != nil {
 		return err
 	}
 
@@ -137,17 +136,16 @@ func (conn *MidConn) handleSelectForUpdate(table, where string) error {
 	return nil
 }
 
-
-func (conn *MidConn)needGetNextV(nodeIdxs []int) bool {
+func (conn *MidConn) needGetNextV(nodeIdxs []int) bool {
 	// judge if this sql need to get next version or not
 	need := true
 
 	if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
 		conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT &&
-			len(nodeIdxs) == 1 {
+		len(nodeIdxs) == 1 {
 		need = false
 	}
-	return  need
+	return need
 }
 
 func (conn *MidConn) getNextVersion() error {
@@ -191,11 +189,16 @@ func (conn *MidConn) getVInUse() error {
 
 func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement) error {
 	var err error
-	conn.nodeIdx, err = router.GetNodeIdxs(stmt)
+	if conn.db == "" {
+		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+	}
+	conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(stmt, meta.GetRouter(conn.db), nil)
+	//conn.nodeIdx, err = router.GetNodeIdxs(stmt)
+
 	if err != nil {
 		log.Debugf("[%d] get node idxs failed: %v", conn.ConnectionId, err)
 		return err
 	}
-	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId,  conn.nodeIdx)
+	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId, conn.nodeIdx)
 	return nil
 }

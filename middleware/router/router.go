@@ -1,208 +1,108 @@
-/**
- *  author: lim
- *  data  : 18-4-16 下午7:45
- */
-
 package router
 
 import (
-	"errors"
-	"strconv"
-
-	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/middleware/meta"
+	"fmt"
+	"strings"
+	"github.com/lemonwx/log"
 )
 
-const (
-	EID_NODE = iota
-	VALUE_NODE
-	LIST_NODE
-	OTHER_NODE
-)
+type Rule struct {
+	DB    string
+	Table string
+	Key   string
 
-var UNSUPPORTED_SQL_ROUTER_ERR error = errors.New("UNSUPPORTED SQL ROUTER ERR")
-var SHARDDING_KEY_NOT_IN_COL_LIST_ERR error = errors.New("SHARDDING KEY NOT IN COL LIST ERR")
+	Type string
 
+	Nodes []string
+	Shard Shard
+}
 
+func (r *Rule) FindNode(key interface{}) string {
+	i := r.Shard.FindForKey(key)
+	return r.Nodes[i]
+}
 
-func GetNodeIdxs(stmt sqlparser.Statement) ([]int, error) {
+func (r *Rule) FindNodeIndex(key interface{}) int {
+	return r.Shard.FindForKey(key)
+}
 
-	rule := meta.Meta{
-		Db: "db",
-		Tb: "tt",
-		DisKey: "id",
-		DisType: meta.HASH,
-		DisNode: meta.FullNodeIdxs,
+func (r *Rule) String() string {
+	return fmt.Sprintf("%s.%s?key=%v&shard=%s&nodes=%s",
+		r.DB, r.Table, r.Key, r.Type, strings.Join(r.Nodes, ", "))
+}
+
+func NewDefaultRule(db string, node string) *Rule {
+	var r *Rule = &Rule{
+		DB:    db,
+		Type:  DefaultRuleType,
+		Nodes: []string{node},
+		Shard: new(DefaultShard),
+	}
+	return r
+}
+
+func (r *Router) GetRule(table string) *Rule {
+	rule := r.Rules[table]
+	log.Debug(rule, rule == nil, rule.Nodes)
+	if rule == nil {
+		return r.DefaultRule
+	} else {
+		return rule
+	}
+}
+
+type Router struct {
+	DB          string
+	Rules       map[string]*Rule //key is <table name>
+	DefaultRule *Rule
+	nodes       []string //just for human saw
+}
+
+/*
+func NewRouter(schemaConfig *config.SchemaConfig) (*Router, error) {
+
+	if !includeNode(schemaConfig.Nodes, schemaConfig.RulesConifg.Default) {
+		return nil, fmt.Errorf("default node[%s] not in the nodes list.",
+			schemaConfig.RulesConifg.Default)
 	}
 
-	switch v := stmt.(type) {
+	rt := new(Router)
+	rt.DB = schemaConfig.DB
+	rt.nodes = schemaConfig.Nodes
+	rt.Rules = make(map[string]*Rule, len(schemaConfig.RulesConifg.ShardRule))
+	rt.DefaultRule = NewDefaultRule(rt.DB, schemaConfig.RulesConifg.Default)
 
-	case *sqlparser.Insert:
-
-		if err := judgeSupport(v.Rows.(sqlparser.Values)); err != nil {
+	for _, shard := range schemaConfig.RulesConifg.ShardRule {
+		rc := &RuleConfig{shard}
+		for _, node := range shard.Nodes {
+			if !includeNode(rt.nodes, node) {
+				return nil, fmt.Errorf("shard table[%s] node[%s] not in the schema.nodes list:[%s].",
+					shard.Table, node, strings.Join(shard.Nodes, ","))
+			}
+		}
+		rule, err := rc.ParseRule(rt.DB)
+		if err != nil {
 			return nil, err
 		}
 
-		for idx, col := range v.Columns {
-			// find dis key
-			if sqlparser.String(col) == rule.DisKey {
-				retIdxs := []int{-1}
-				criteria := v.Rows.(sqlparser.Values)
-
-				// for every rows
-				for _, val := range criteria {
-					key := val.(sqlparser.ValTuple)[idx]
-					idx := sharding(&rule, key)
-					if retIdxs[0] == -1 {
-						retIdxs[0] = idx
-					} else if retIdxs[0] != idx {
-						return nil, UNSUPPORTED_SQL_ROUTER_ERR
-					}
-				}
-				return retIdxs, nil
+		if rule.Type == DefaultRuleType {
+			return nil, fmt.Errorf("[default-rule] duplicate, must only one.")
+		} else {
+			if _, ok := rt.Rules[rule.Table]; ok {
+				return nil, fmt.Errorf("table %s rule in %s duplicate", rule.Table, rule.DB)
 			}
-		}
-
-		return nil, SHARDDING_KEY_NOT_IN_COL_LIST_ERR
-
-	case *sqlparser.Select:
-		if v.Where == nil {
-			return rule.DisNode, nil
-		}
-
-		return shardByBoolean(v.Where.Expr, &rule)
-	case *sqlparser.Update:
-		if v.Where == nil {
-			return rule.DisNode, nil
-		}
-
-		return shardByBoolean(v.Where.Expr, &rule)
-	case *sqlparser.Delete:
-		if v.Where == nil {
-			return rule.DisNode, nil
-		}
-
-		return shardByBoolean(v.Where.Expr, &rule)
-	}
-
-	return nil, UNSUPPORTED_SQL_ROUTER_ERR
-}
-
-func shardByCriteria(criteria sqlparser.SQLNode) ([]int, error) {
-
-	switch criteria := criteria.(type) {
-	case sqlparser.Values:
-		index := shardByValues(criteria)
-		return []int{index}, nil
-	case sqlparser.BoolExpr:
-		return shardByBoolean(criteria.(sqlparser.BoolExpr), nil)
-	default:
-		return nil, nil
-	}
-}
-
-func shardByValues (vals sqlparser.Values) int {
-	index := -1
-	return index
-}
-
-func shardByBoolean (node sqlparser.BoolExpr, rule *meta.Meta) ([]int, error) {
-	switch expr := node.(type) {
-	case *sqlparser.ComparisonExpr :
-		if expr.Operator == "=" {
-			col, val := getColVal(expr)
-
-			if sqlparser.String(col) == rule.DisKey {
-				idx := sharding(rule, val)
-				return []int{idx}, nil
-			} else {
-				return rule.DisNode, nil
-			}
+			rt.Rules[rule.Table] = rule
 		}
 	}
-
-	return nil, UNSUPPORTED_SQL_ROUTER_ERR
+	return rt, nil
 }
 
-func getColVal(expr *sqlparser.ComparisonExpr) (sqlparser.ValExpr, sqlparser.ValExpr) {
-	l := routingAnalyzeValue(expr.Left)
-	r := routingAnalyzeValue(expr.Right)
-	var col, val sqlparser.ValExpr
-
-	if l == EID_NODE && r == VALUE_NODE {
-		col, val = expr.Left, expr.Right
-	} else if l == VALUE_NODE && r == EID_NODE {
-		col, val = expr.Right, expr.Left
-	}
-	return col, val
-}
-
-func judgeSupport(vals sqlparser.Values) error {
-	for i := 0; i < len(vals); i++ {
-		switch tuple := vals[i].(type) {
-		case sqlparser.ValTuple:
-			result := routingAnalyzeValue(tuple[0])
-			if result != VALUE_NODE {
-
-			}
-		default:
-			return UNSUPPORTED_SQL_ROUTER_ERR
+*/
+func includeNode(nodes []string, node string) bool {
+	for _, n := range nodes {
+		if n == node {
+			return true
 		}
 	}
-
-	return nil
-}
-
-func routingAnalyzeValue(valExpr sqlparser.ValExpr) int {
-	switch node := valExpr.(type) {
-	case *sqlparser.ColName:
-			return EID_NODE
-	case sqlparser.ValTuple:
-		for _, n := range node {
-			if routingAnalyzeValue(n) != VALUE_NODE {
-				return OTHER_NODE
-			}
-		}
-		return LIST_NODE
-	case sqlparser.StrVal, sqlparser.NumVal, sqlparser.ValArg:
-		return VALUE_NODE
-	}
-	return OTHER_NODE
-}
-
-func sharding(rule *meta.Meta, val sqlparser.ValExpr) int {
-	switch rule.DisType {
-	case meta.HASH:
-		shard := HashShard{ShardNum: len(rule.DisNode)}
-		return shard.FindForKey(getBoundValue(val))
-	case meta.RANGE:
-	case meta.DUP:
-	case meta.LIST:
-	}
-	return -1
-}
-
-
-func getBoundValue(valExpr sqlparser.ValExpr) interface{} {
-	switch node := valExpr.(type) {
-	case sqlparser.ValTuple:
-		if len(node) != 1 {
-			return errors.New("tuples not allowed as insert values")
-		}
-		// TODO: Change parser to create single value tuples into non-tuples.
-		return getBoundValue(node[0])
-	case sqlparser.StrVal:
-		return string(node)
-	case sqlparser.NumVal:
-		val, err := strconv.ParseInt(string(node), 10, 64)
-		if err != nil {
-			return err
-		}
-		return val
-		/*
-	case sqlparser.ValArg:
-		return plan.bindVars[string(node[1:])]
-		*/
-	}
-	return errors.New("Unexpected token")
+	return false
 }

@@ -7,15 +7,14 @@ package rpcpool
 
 import "net/rpc"
 
-type Conn interface {
-	Call(serviceMethod string, args interface{}, reply interface{}) error
-	Close() error
-}
-
-type Client struct {
+type Conn struct {
 	cli *rpc.Client
 }
 
-func (cli *Client) Call(serviceMethod string, args interface{}, reply interface{}) error {
-	return cli.Call(serviceMethod, args, reply)
+func (conn *Conn) Call(serviceMethod string, args interface{}, reply interface{}) error {
+	return conn.cli.Call(serviceMethod, args, reply)
+}
+
+func (conn *Conn) Close() error {
+	return conn.cli.Close()
 }
