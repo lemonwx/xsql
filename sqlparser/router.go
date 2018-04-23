@@ -90,6 +90,9 @@ func GetStmtShardListIndex(stmt Statement, r *router.Router, bindVars map[string
 
 	ns := plan.shardListFromPlan()
 
+	if ns == nil || len(ns) == 0 {
+		return nil, nil
+	}
 	return ns, nil
 }
 

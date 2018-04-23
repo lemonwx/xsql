@@ -40,6 +40,8 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
 	if err = conn.getNodeIdxs(stmt); err != nil {
 		return err
+	} else if conn.nodeIdx == nil {
+		return conn.writeResultset(conn.status[0], conn.newEmptyResultset(stmt))
 	}
 
 	if err = conn.getVInUse(); err != nil {
@@ -71,7 +73,6 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	}
 
 	newSql := sqlparser.String(stmt)
-	log.Debug(newSql)
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 	if err != nil {
 		return err

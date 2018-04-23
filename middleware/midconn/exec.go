@@ -20,6 +20,8 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	var err error
 	if err = conn.getNodeIdxs(stmt); err != nil {
 		return err
+	} else if conn.nodeIdx == nil {
+		return conn.cli.WriteOK(nil)
 	}
 
 	var tb string = sqlparser.String(stmt.Table)
@@ -57,6 +59,8 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	// router
 	if err = conn.getNodeIdxs(stmt); err != nil {
 		return err
+	} else if conn.nodeIdx == nil {
+		return conn.cli.WriteOK(nil)
 	}
 
 	// get next version
@@ -91,6 +95,8 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 
 	if err = conn.getNodeIdxs(stmt); err != nil {
 		return err
+	} else if conn.nodeIdx == nil {
+		return conn.cli.WriteOK(nil)
 	}
 
 	if err = conn.handleSelectForUpdate(
@@ -122,6 +128,8 @@ func (conn *MidConn) handleSelectForUpdate(table, where string) error {
 
 	if err = conn.getVInUse(); err != nil {
 		return err
+	} else if conn.nodeIdx == nil {
+		return conn.cli.WriteOK(nil)
 	}
 
 	conn.setupNodeStatus(conn.VersionsInUse, true)
