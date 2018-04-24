@@ -188,6 +188,12 @@ func (c *CliConn) ReadPacket() ([]byte, error) {
 	return c.pkt.ReadPacket()
 }
 
+func (c *CliConn) WritePacket(data []byte) error {
+	return c.pkt.WritePacket(data)
+}
+
+
+
 func (c *CliConn) WriteResultsets(status uint16, rs []*mysql.Resultset) error {
 	log.Debugf("[%d] send select rets [%v] to cli", c.connectionId, rs[0].FieldNames)
 
@@ -355,6 +361,10 @@ func (c *CliConn) writePacket(data []byte) error {
 
 func (c *CliConn) writePacketBatch(total, data []byte, direct bool) ([]byte, error) {
 	return c.pkt.WritePacketBatch(total, data, direct)
+}
+
+func (c *CliConn) WriteEOF(status uint16) error {
+	return c.writeEOF(status)
 }
 
 func (c *CliConn) writeEOF(status uint16) error {

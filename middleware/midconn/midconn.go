@@ -115,7 +115,7 @@ func (conn *MidConn) Serve() {
 			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
 			break
 		}
-		log.Debugf("generallog--[%d] %d:%s", conn.ConnectionId, data[0], data[1:])
+		log.Debugf("generallog--[%d] %d:%v", conn.ConnectionId, data[0], data[1:])
 		if conn.status[0] == mysql.SERVER_NOT_SERVE &&
 			strings.ToLower(string(data[1:])) != "rollback" {
 			conn.cli.WriteError(MUST_ROLLBACK_ERR)
@@ -129,7 +129,6 @@ func (conn *MidConn) Serve() {
 
 func (conn *MidConn) dispatch(sql []byte) error {
 	opt, sql := sql[0], sql[1:]
-	log.Debugf("[%d] recv [%d:%s] from cli", conn.ConnectionId, opt, sql)
 	switch opt {
 	case mysql.COM_QUERY:
 		return conn.handleQuery(string(sql))
@@ -138,6 +137,11 @@ func (conn *MidConn) dispatch(sql []byte) error {
 		return conn.handleFieldList(sql)
 	case mysql.COM_INIT_DB:
 		return conn.handleUse(sql)
+	case mysql.COM_STMT_PREPARE:
+		return conn.handlePrepare(sql)
+	case mysql.COM_STMT_EXECUTE:
+		//return conn.handleExecute(sql)
+		return UNEXPECT_MIDDLE_WARE_ERR
 	}
 
 	return nil
