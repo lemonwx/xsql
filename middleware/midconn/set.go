@@ -13,8 +13,8 @@ import (
 )
 
 func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
-	log.Debugf("[%d] handle set", conn.ConnectionId)
-	if len(stmt.Exprs) != 1 {
+	log.Debugf("[%d] handle set", conn.ConnectionId, stmt.Exprs)
+	if len(stmt.Exprs) != 2 {
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
 
