@@ -98,6 +98,31 @@ func (s *Server) parseSchemas(cfg *config.Conf) error {
 		DefaultRule :router.NewDefaultRule("db", ""),
 	}
 
+	rs["sbtest"] = &router.Router{
+		DB         :"sbtest",
+		Rules: map[string]*router.Rule{
+			"sbtest1":&router.Rule{
+				DB:    "sbtest",
+				Table: "sbtest1",
+				Key:   "id",
+				Type:  "hash",
+				Nodes: []string{"1", "2"},
+				Shard:  &router.HashShard{2},
+			},
+
+			"sbtest2":&router.Rule{
+				DB:    "sbtest",
+				Table: "sbtest2",
+				Key:   "id",
+				Type:  "hash",
+				Nodes: []string{"1", "2"},
+				Shard:  &router.HashShard{2},
+			},
+		},
+		DefaultRule :router.NewDefaultRule("db", ""),
+	}
+
+
 	meta.SetMetas(&meta.Meta{
 		NodeAddrs: nodeAddrs,
 		FullNodeIdxs:fullNodeIdx,

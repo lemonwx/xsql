@@ -27,6 +27,8 @@ type RoutingPlan struct {
 	fullList []int
 
 	bindVars map[string]interface{}
+
+	disKeyIdx int
 }
 
 /*
@@ -81,19 +83,19 @@ func GetStmtShardList(stmt Statement, r *router.Router, bindVars map[string]inte
 	return nodes, nil
 }
 
-func GetStmtShardListIndex(stmt Statement, r *router.Router, bindVars map[string]interface{}) (nodes []int, err error) {
+func GetStmtShardListIndex(stmt Statement, r *router.Router, bindVars map[string]interface{}) (ns []int, err error) {
 	defer handleError(&err)
 
 	plan := getRoutingPlan(stmt, r)
 
 	plan.bindVars = bindVars
 
-	ns := plan.shardListFromPlan()
+	ns = plan.shardListFromPlan()
 
 	if ns == nil || len(ns) == 0 {
-		return nil, nil
+		ns, err = nil, nil
 	}
-	return ns, nil
+	return
 }
 
 func (plan *RoutingPlan) notList(l []int) []int {
@@ -241,6 +243,18 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 			checkUpdateExprs(UpdateExprs(stmt.OnDup), plan.rule)
 		}
 
+		plan.disKeyIdx = -1
+		for idx, col := range stmt.Columns {
+			c := col.(*NonStarExpr).Expr.(*ColName)
+			if string(c.Name) == plan.rule.Key {
+				plan.disKeyIdx = idx
+				break
+			}
+		}
+		if plan.disKeyIdx == -1 {
+			panic(NewParserError("diskey not specify in insert cols"))
+		}
+
 		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))
 		plan.fullList = makeList(0, len(plan.rule.Nodes))
 		return plan
@@ -374,7 +388,9 @@ func (plan *RoutingPlan) findShardList(valExpr ValExpr) []int {
 func (plan *RoutingPlan) findInsertShard(vals Values) int {
 	index := -1
 	for i := 0; i < len(vals); i++ {
-		first_value_expression := vals[i].(ValTuple)[0]
+		log.Debug(vals[i].(ValTuple))
+		first_value_expression := vals[i].(ValTuple)[plan.disKeyIdx]
+		log.Debug(plan.disKeyIdx, first_value_expression)
 		newIndex := plan.findShard(first_value_expression)
 		if index == -1 {
 			index = newIndex
