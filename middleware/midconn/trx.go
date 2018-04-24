@@ -17,6 +17,7 @@ import (
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 func (conn *MidConn) handleBegin() {
@@ -58,7 +59,7 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 		conn.NextVersion = 0
 		conn.VersionsInUse = nil
 
-		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
 		if err != nil {
 			return err
 		}

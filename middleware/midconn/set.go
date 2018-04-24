@@ -9,6 +9,7 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
@@ -17,7 +18,7 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
 
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
 	if err != nil {
 		return err
 	}

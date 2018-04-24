@@ -207,7 +207,7 @@ func (conn *MidConn) handleUse(db []byte) error {
 	conn.cli.Db = tmp
 	// rets, errs := conn
 
-	rets, err := conn.ExecuteMultiNode(mysql.COM_INIT_DB, db, nil)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_INIT_DB, db, meta.GetFullNodeIdxs())
 	if err != nil {
 		return err
 	}

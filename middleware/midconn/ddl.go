@@ -10,6 +10,7 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 	"strings"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 func (conn *MidConn) handleDDL(stmt *sqlparser.DDL, sql string) error {
@@ -17,7 +18,7 @@ func (conn *MidConn) handleDDL(stmt *sqlparser.DDL, sql string) error {
 
 	log.Debugf("[%d]: recv ddl sql: %s", conn.ConnectionId, sql)
 	sql = conn.addExtraCol(sql)
-	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
 	if err != nil {
 		return err
 	} else {

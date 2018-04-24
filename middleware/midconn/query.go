@@ -9,6 +9,7 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
@@ -24,7 +25,7 @@ func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 }
 
 func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string) error {
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), nil)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
 	if err != nil {
 		log.Errorf("execute in multi node failed: %v", err)
 		return err
