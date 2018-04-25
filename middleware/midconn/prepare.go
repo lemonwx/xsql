@@ -92,6 +92,9 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 
 func (conn *MidConn) handlePrepare(sql string) error {
 	log.Debugf("[%d] handle prepare %s", conn.ConnectionId, sql)
+
+	var err error
+
 	if conn.db == "" {
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
@@ -99,8 +102,6 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	s := new(Stmt)
 
 	sql = strings.TrimRight(sql, ";")
-
-	var err error
 	s.s, err = sqlparser.Parse(sql)
 	if err != nil {
 		return fmt.Errorf(`parse sql "%s" error`, sql)
@@ -108,17 +109,25 @@ func (conn *MidConn) handlePrepare(sql string) error {
 
 	s.sql = sql
 
-	conn.nodes[0].ExecutePrepare([]byte(sql), &s.id, &s.columns, &s.params)
+	// send prepare to node[0]
+	if err = conn.prepare(s, 0); err != nil {
+		return err
+	}
 
+	// send prepare result to mysql cli
 	if err = conn.writePrepare(s); err != nil {
 		return err
 	}
 
 	s.ResetParams()
-
 	return nil
 }
 
+func (conn *MidConn) prepare(stmt *Stmt, idx int) error {
+	return conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.columns, &stmt.params)
+}
+
+/*
 func (conn *MidConn) handleStmtExecute(data []byte) error {
 	if len(data) < 9 {
 		return ErrMalformPacket
