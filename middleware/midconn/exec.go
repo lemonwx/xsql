@@ -35,7 +35,7 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 		return err
 	}
 
-	updateSql := fmt.Sprintf("update %s set version = %s %s", tb, conn.NextVersion, where)
+	updateSql := fmt.Sprintf("update %s set version = %d %s", tb, conn.NextVersion, where)
 	if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), conn.nodeIdx); err != nil {
 		if err != nil {
 			log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
