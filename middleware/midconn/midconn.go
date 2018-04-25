@@ -38,6 +38,8 @@ type MidConn struct {
 	NextVersion   uint64
 
 	nodeIdx []int // node that has exec sql in the trx
+
+	stmts map[uint32]*Stmt
 }
 
 func NewMidConn(conn net.Conn) (*MidConn, error) {
@@ -104,6 +106,8 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	midConn.VersionsInUse = nil
 	midConn.NextVersion = 0
 
+	midConn.stmts = make(map[uint32]*Stmt)
+
 	return midConn, nil
 }
 
@@ -141,7 +145,7 @@ func (conn *MidConn) dispatch(sql []byte) error {
 		return conn.handlePrepare(string(sql))
 	case mysql.COM_STMT_EXECUTE:
 		//return conn.handleExecute(sql)
-		return UNEXPECT_MIDDLE_WARE_ERR
+		return conn.handleStmtExecute(sql)
 	}
 
 	return nil

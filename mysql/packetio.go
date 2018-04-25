@@ -156,3 +156,26 @@ func (p *PacketIO) WritePacketBatch(total, data []byte, direct bool) ([]byte, er
 	}
 	return total, nil
 }
+
+func (p *PacketIO) ReadUntilEOF() (err error) {
+	var data []byte
+
+	for {
+		data, err = p.ReadPacket()
+
+		if err != nil {
+			return
+		}
+
+		// EOF Packet
+		if p.IsEOFPacket(data) {
+			return
+		}
+	}
+	return
+}
+
+
+func (p *PacketIO) IsEOFPacket(data []byte) bool {
+	return data[0] == EOF_HEADER && len(data) <= 5
+}

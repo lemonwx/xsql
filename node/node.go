@@ -245,6 +245,18 @@ func (node *Node) readPrepareResultPacket(id *uint32, columnCount *uint16, param
 		// Param count [16 bit uint]
 		*paramCount = int(binary.LittleEndian.Uint16(data[7:9]))
 
+		if *paramCount > 0 {
+			if err := node.pkt.ReadUntilEOF(); err != nil {
+				return err
+			}
+		}
+
+		if *columnCount > 0 {
+			if err := node.pkt.ReadUntilEOF(); err != nil {
+				return err
+			}
+		}
+
 		// Reserved [8 bit]
 
 		// Warning count [16 bit uint]
@@ -283,7 +295,7 @@ func (node *Node) executeSql(opt uint8, data []byte) error {
 	send[4] = opt
 	copy(send[5:], data)
 
-	log.Debugf("[%d] send [%s] to node [%s]", node.ConnectionId, data, node.addr)
+	log.Debugf("[%d] send [%s] to node [%s]", node.ConnectionId, send, node.addr)
 	return node.writePacket(send)
 }
 
@@ -304,6 +316,7 @@ func (node *Node) parseResult() (*mysql.Result, error) {
 	data, err := node.readPacket()
 	if err != nil {
 		log.Errorf("[%d] parse result from %v failed: %v", node.ConnectionId, node.addr, err)
+		return nil, err
 	}
 	log.Debugf("[%d] recv [%d]-[%s] from node %v", node.ConnectionId, data[0], data[1:], node.addr)
 
@@ -440,7 +453,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 }
 
 func (node *Node) isEOFPacket(data []byte) bool {
-	return data[0] == mysql.EOF_HEADER && len(data) <= 5
+	return node.pkt.IsEOFPacket(data)
 }
 
 func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
