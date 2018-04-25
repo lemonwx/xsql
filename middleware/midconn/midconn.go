@@ -138,7 +138,7 @@ func (conn *MidConn) dispatch(sql []byte) error {
 	case mysql.COM_INIT_DB:
 		return conn.handleUse(sql)
 	case mysql.COM_STMT_PREPARE:
-		return conn.handlePrepare(sql)
+		return conn.handlePrepare(string(sql))
 	case mysql.COM_STMT_EXECUTE:
 		//return conn.handleExecute(sql)
 		return UNEXPECT_MIDDLE_WARE_ERR

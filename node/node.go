@@ -228,6 +228,41 @@ func (node *Node) readOK() (*mysql.Result, error) {
 	}
 }
 
+func (node *Node) readPrepareResultPacket(id *uint32, columnCount *uint16, paramCount *int) error {
+	data, err := node.pkt.ReadPacket()
+	if err == nil {
+		// packet indicator [1 byte]
+		if data[0] != mysql.OK_HEADER {
+			return err
+		}
+
+		// statement id [4 bytes]
+		*id = binary.LittleEndian.Uint32(data[1:5])
+
+		// Column count [16 bit uint]
+		*columnCount = binary.LittleEndian.Uint16(data[5:7])
+
+		// Param count [16 bit uint]
+		*paramCount = int(binary.LittleEndian.Uint16(data[7:9]))
+
+		// Reserved [8 bit]
+
+		// Warning count [16 bit uint]
+
+		return nil
+	}
+	return err
+}
+
+
+func (node *Node) ExecutePrepare(data []byte, id *uint32, columntCount *uint16, paramCount *int) error {
+	if err := node.executeSql(mysql.COM_STMT_PREPARE, data); err != nil {
+		return err
+	} else {
+		return node.readPrepareResultPacket(id, columntCount, paramCount)
+	}
+}
+
 func (node *Node) Execute(opt uint8, data []byte) (*mysql.Result, error) {
 	if err := node.executeSql(opt, data); err != nil {
 		return nil, err
@@ -235,6 +270,10 @@ func (node *Node) Execute(opt uint8, data []byte) (*mysql.Result, error) {
 		return node.parseResult()
 	}
 
+}
+
+func (node *Node) ExecuteSql(opt uint8, data []byte) error {
+	return node.executeSql(opt, data)
 }
 
 func (node *Node) executeSql(opt uint8, data []byte) error {

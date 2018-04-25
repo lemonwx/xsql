@@ -11,23 +11,30 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"strings"
 	"fmt"
+	"encoding/binary"
+	"strconv"
 )
 
 
-var paramFieldData []byte
-var columnFieldData []byte
+var paramFieldData []byte = (&mysql.Field{}).Dump()
+var columnFieldData []byte = (&mysql.Field{}).Dump()
 
 type Stmt struct {
 	id uint32
 
 	params  int
-	columns int
+	columns uint16
 
 	args []interface{}
 
 	s sqlparser.Statement
 
 	sql string
+}
+
+
+func (s *Stmt) ResetParams() {
+	s.args = make([]interface{}, s.params)
 }
 
 func (conn *MidConn) writePrepare(s *Stmt) error {
@@ -53,7 +60,7 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 	if s.params > 0 {
 		for i := 0; i < s.params; i++ {
 			data = data[0:4]
-			data = append(data, []byte(paramFieldData)...)
+			data = append(data, paramFieldData...)
 
 			if err := conn.cli.WritePacket(data); err != nil {
 				return err
@@ -66,9 +73,9 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 	}
 
 	if s.columns > 0 {
-		for i := 0; i < s.columns; i++ {
+		for i := uint16(0); i < s.columns; i++ {
 			data = data[0:4]
-			data = append(data, []byte(columnFieldData)...)
+			data = append(data, columnFieldData...)
 
 			if err := conn.cli.WritePacket(data); err != nil {
 				return err
@@ -83,25 +90,192 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 	return nil
 }
 
-func (conn *MidConn) handlePrepare(sql []byte) error {
+func (conn *MidConn) handlePrepare(sql string) error {
 	log.Debugf("[%d] handle prepare %s", conn.ConnectionId, sql)
-	newSql := string(sql)
+	if conn.db == "" {
+		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+	}
 
 	s := new(Stmt)
 
-	newSql = strings.TrimRight(newSql, ";")
+	sql = strings.TrimRight(sql, ";")
 
 	var err error
-	s.s, err = sqlparser.Parse(newSql)
+	s.s, err = sqlparser.Parse(sql)
 	if err != nil {
 		return fmt.Errorf(`parse sql "%s" error`, sql)
 	}
 
-	s.sql = newSql
-	s.id = 1001
+	s.sql = sql
 
-	conn.writePrepare(s)
+	conn.nodes[0].ExecutePrepare([]byte(sql), &s.id, &s.columns, &s.params)
 
+	if err = conn.writePrepare(s); err != nil {
+		return err
+	}
+
+	s.ResetParams()
 
 	return nil
 }
+
+func (conn *MidConn) handleStmtExecute(data []byte) error {
+	if len(data) < 9 {
+		return ErrMalformPacket
+	}
+
+	pos := 0
+	id := binary.LittleEndian.Uint32(data[0:4])
+	pos += 4
+
+	s, ok := c.stmts[id]
+	if !ok {
+		return NewDefaultError(ER_UNKNOWN_STMT_HANDLER,
+			strconv.FormatUint(uint64(id), 10), "stmt_execute")
+	}
+
+	flag := data[pos]
+	pos++
+	//now we only support CURSOR_TYPE_NO_CURSOR flag
+	if flag != 0 {
+		return NewError(ER_UNKNOWN_ERROR, fmt.Sprintf("unsupported flag %d", flag))
+	}
+
+	//skip iteration-count, always 1
+	pos += 4
+
+	var nullBitmaps []byte
+	var paramTypes []byte
+	var paramValues []byte
+
+	paramNum := s.params
+
+	if paramNum > 0 {
+		nullBitmapLen := (s.params + 7) >> 3
+		if len(data) < (pos + nullBitmapLen + 1) {
+			return ErrMalformPacket
+		}
+		nullBitmaps = data[pos : pos+nullBitmapLen]
+		pos += nullBitmapLen
+
+		//new param bound flag
+		if data[pos] == 1 {
+			pos++
+			if len(data) < (pos + (paramNum << 1)) {
+				return ErrMalformPacket
+			}
+
+			paramTypes = data[pos : pos+(paramNum<<1)]
+			pos += (paramNum << 1)
+
+			paramValues = data[pos:]
+		}
+
+		if err := c.bindStmtArgs(s, nullBitmaps, paramTypes, paramValues); err != nil {
+			return err
+		}
+	}
+
+	var err error
+
+	switch stmt := s.s.(type) {
+	case *sqlparser.Select:
+		err = c.handleSelect(stmt, s.sql, s.args)
+	case *sqlparser.Insert:
+		err = c.handleExec(s.s, s.sql, s.args)
+	case *sqlparser.Update:
+		err = c.handleExec(s.s, s.sql, s.args)
+	case *sqlparser.Delete:
+		err = c.handleExec(s.s, s.sql, s.args)
+	case *sqlparser.Replace:
+		err = c.handleExec(s.s, s.sql, s.args)
+	default:
+		err = fmt.Errorf("command %T not supported now", stmt)
+	}
+
+	s.ResetParams()
+
+	return err
+	return nil
+}
+
+/*
+func (conn *MidConn) handleStmtExecute(data []byte) error {
+	if len(data) < 9 {
+		return UNEXPECT_MIDDLE_WARE_ERR
+	}
+
+	pos := 0
+	id := binary.LittleEndian.Uint32(data[0:4])
+	pos += 4
+
+	s, ok := conn.stmts[id]
+	if !ok {
+		return mysql.NewDefaultError(mysql.ER_UNKNOWN_STMT_HANDLER,
+			strconv.FormatUint(uint64(id), 10), "stmt_execute")
+	}
+
+	flag := data[pos]
+	pos++
+	//now we only support CURSOR_TYPE_NO_CURSOR flag
+	if flag != 0 {
+		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, fmt.Sprintf("unsupported flag %d", flag))
+	}
+
+	//skip iteration-count, always 1
+	pos += 4
+
+	var nullBitmaps []byte
+	var paramTypes []byte
+	var paramValues []byte
+
+	paramNum := s.params
+
+	if paramNum > 0 {
+		nullBitmapLen := (s.params + 7) >> 3
+		if len(data) < (pos + nullBitmapLen + 1) {
+			return mysql.ErrMalformPacket
+		}
+		nullBitmaps = data[pos : pos+nullBitmapLen]
+		pos += nullBitmapLen
+
+		//new param bound flag
+		if data[pos] == 1 {
+			pos++
+			if len(data) < (pos + (paramNum << 1)) {
+				return mysql.ErrMalformPacket
+			}
+
+			paramTypes = data[pos : pos+(paramNum<<1)]
+			pos += (paramNum << 1)
+
+			paramValues = data[pos:]
+		}
+
+		if err := conn.bindStmtArgs(s, nullBitmaps, paramTypes, paramValues); err != nil {
+			return err
+		}
+	}
+
+	var err error
+
+	switch stmt := s.s.(type) {
+	case *sqlparser.Select:
+		err = conn.handleSelect(stmt, s.sql, s.args)
+	case *sqlparser.Insert:
+		err = conn.handleExec(s.s, s.sql, s.args)
+	case *sqlparser.Update:
+		err = conn.handleExec(s.s, s.sql, s.args)
+	case *sqlparser.Delete:
+		err = conn.handleExec(s.s, s.sql, s.args)
+	case *sqlparser.Replace:
+		err = conn.handleExec(s.s, s.sql, s.args)
+	default:
+		err = fmt.Errorf("command %T not supported now", stmt)
+	}
+
+	s.ResetParams()
+
+	return err
+}
+*/
