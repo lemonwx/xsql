@@ -776,6 +776,14 @@ func (node Values) Format(buf *TrackedBuffer) {
 // GroupBy represents a GROUP BY clause.
 type GroupBy []ValExpr
 
+func NewGroupBy(vals []ValExpr) GroupBy{
+	if len(vals) == 0 {
+		return nil
+	}
+
+	return GroupBy(vals[1:])
+}
+
 func (node GroupBy) Format(buf *TrackedBuffer) {
 	prefix := " group by "
 	for _, n := range node {
