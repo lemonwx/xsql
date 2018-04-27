@@ -42,6 +42,10 @@ func NewDefaultRule(db string, node string) *Rule {
 }
 
 func (r *Router) GetRule(table string) *Rule {
+	idx := strings.Index(table, ".")
+	if idx != -1 {
+		table = table[idx+1:]
+	}
 	rule := r.Rules[table]
 	log.Debug(rule, rule == nil, rule.Nodes)
 	if rule == nil {
