@@ -657,11 +657,7 @@ boolean_expression:
   }
 
 condition:
-  value_expression compare '?'
-  {
-    $$ = &ComparisonExpr{Left: $1, Operator: $2, Right: ValArg("?")}
-  }
-| value_expression compare value_expression
+  value_expression compare value_expression
   {
     $$ = &ComparisonExpr{Left: $1, Operator: $2, Right: $3}
   }
@@ -771,7 +767,7 @@ subquery:
 value_expression_list:
   value_expression
   {
-    $$ = ValExprs{NumVal{}, $1}
+    $$ = NewValExprs($1)
   }
 | value_expression_list ',' value_expression
   {
@@ -950,6 +946,7 @@ value:
   {
     $$ = &NullVal{}
   }
+
 
 group_by_opt:
   {

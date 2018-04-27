@@ -681,6 +681,16 @@ func (node ValTuple) Format(buf *TrackedBuffer) {
 // It's not a valid expression because it's not parenthesized.
 type ValExprs []ValExpr
 
+func NewValExprs (expr ValExpr) ValExprs {
+	switch expr.(type) {
+	case ValArg:
+		return ValExprs{ValArg("?"), expr}
+	default:
+		return ValExprs{NumVal{}, expr}
+	}
+
+}
+
 func (node ValExprs) Format(buf *TrackedBuffer) {
 	var prefix string
 	for _, n := range node {

@@ -23,23 +23,27 @@ func main() {
 	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.7:1234)/db")
 	handleErr(err)
 
-	//stmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")
-	stmt, err := db.Prepare("select id, name from tb where id = ?")
+	stmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")
+	//stmt, err := db.Prepare("select id, name from tb where id = ?")
 	handleErr(err)
 	fmt.Println(stmt)
 
-	rs, err := stmt.Query(1)
+	af, err := stmt.Exec(100, 11)
 	handleErr(err)
 
-	var id int
-	var name string
-	var v uint64
-	fmt.Println("---------------")
-	for rs.Next() {
-		err = rs.Scan(&v, &id, &name)
-		fmt.Println(err)
-		fmt.Println("----", id, name)
-	}
+	fmt.Println(af.LastInsertId())
+
+	/*
+		var id int
+		var name string
+		var v uint64
+		fmt.Println("---------------")
+		for rs.Next() {
+			err = rs.Scan(&v, &id, &name)
+			fmt.Println(err)
+			fmt.Println("----", id, name)
+		}
+	*/
 
 	for {
 		time.Sleep(time.Second * 10)
