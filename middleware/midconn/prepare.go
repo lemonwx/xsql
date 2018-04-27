@@ -113,6 +113,7 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	if err != nil {
 		return fmt.Errorf(`parse sql "%s" error`, sql)
 	}
+	log.Debug(sqlparser.String(stmt.s))
 
 	stmt.sql = sql
 

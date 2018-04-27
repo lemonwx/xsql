@@ -36,7 +36,6 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
-	var hide bool = true
 	var err error
 
 	if err = conn.getNodeIdxs(stmt); err != nil {
@@ -49,29 +48,8 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 		return err
 	}
 
-	// judge extra col hide or not
-	if _, ok := stmt.SelectExprs[0].(*sqlparser.StarExpr); ok {
-		log.Debugf("[%d] select * not need to convert", conn.ConnectionId)
-	} else if expr, ok := stmt.SelectExprs[0].(*sqlparser.NonStarExpr); ok {
-		colName := sqlparser.String(expr)
-		log.Debugf("[%d] select %s, expr, add extra col add first", conn.ConnectionId, colName)
-		if colName != extraColName {
-			tmp := make(sqlparser.SelectExprs, len(stmt.SelectExprs)+1)
-			copy(tmp[1:], stmt.SelectExprs[:])
-			tmp[0] = &sqlparser.NonStarExpr{
-				Expr: &sqlparser.ColName{Name: []byte(extraColName)},
-			}
-			stmt.SelectExprs = tmp
-		} else {
-			log.Debugf("[%d] select contains extra col, set hide = false", conn.ConnectionId)
-			hide = false
-		}
-	}
-
-	if hide {
-		conn.setupNodeStatus(conn.VersionsInUse, true)
-		defer conn.setupNodeStatus(nil, false)
-	}
+	conn.setupNodeStatus(conn.VersionsInUse, true)
+	defer conn.setupNodeStatus(nil, false)
 
 	newSql := sqlparser.String(stmt)
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)

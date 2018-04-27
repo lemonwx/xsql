@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/lemonwx/xsql/sqltypes"
+	"github.com/lemonwx/log"
 )
 
 // Instructions for creating new types: If a type
@@ -226,6 +227,25 @@ func (node Comments) Format(buf *TrackedBuffer) {
 
 // SelectExprs represents SELECT expressions.
 type SelectExprs []SelectExpr
+
+func NewSelectExprs(sels []SelectExpr) SelectExprs {
+	if _, ok := sels[0].(*StarExpr); ok {
+		return sels
+	}
+
+	if fir, ok := sels[0].(*NonStarExpr); ok {
+		if String(fir.Expr) == "version" {
+			return sels
+		} else {
+			x := &NonStarExpr{
+				Expr: &ColName{Name: []byte("version")},
+			}
+			return append(SelectExprs{x}, sels...)
+		}
+	}
+	log.Debug("unexpect .....")
+	return nil
+}
 
 func (node SelectExprs) Format(buf *TrackedBuffer) {
 	var prefix string
