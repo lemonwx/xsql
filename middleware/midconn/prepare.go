@@ -113,9 +113,8 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	if err != nil {
 		return fmt.Errorf(`parse sql "%s" error`, sql)
 	}
-	log.Debug(sqlparser.String(stmt.s))
 
-	stmt.sql = sql
+	stmt.sql = sqlparser.String(stmt.s)
 
 	// send prepare to node[0]
 	if err = conn.prepare(stmt, 0); err != nil {
@@ -514,3 +513,15 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	return err
 }
 */
+
+
+
+func (conn *MidConn) makeBindVars(args []interface{}) map[string]interface{} {
+	bindVars := make(map[string]interface{}, len(args))
+
+	for i, v := range args {
+		bindVars[fmt.Sprintf("v%d", i)] = v
+	}
+
+	return bindVars
+}

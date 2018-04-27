@@ -43,7 +43,7 @@ type Conf struct {
 func ReadConf() *Conf {
 
 	c := &Conf{}
-	yamlF, err := ioutil.ReadFile("../etc/c.yaml")
+	yamlF, err := ioutil.ReadFile("/home/lim/space/src/github.com/lemonwx/xsql/etc/c.yaml")
 	if err != nil {
 		fmt.Println("read ../etc/c.yaml failed: %v", err)
 		os.Exit(-1)

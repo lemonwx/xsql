@@ -180,10 +180,13 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		case '=', ',', ';', '(', ')', '+', '*', '%', '&', '|', '^', '~':
 			return int(ch), nil
 		case '?':
+			/*
 			tkn.posVarIndex++
 			buf := new(bytes.Buffer)
 			fmt.Fprintf(buf, ":v%d", tkn.posVarIndex)
 			return VALUE_ARG, buf.Bytes()
+			*/
+			return int(ch), nil
 		case '.':
 			if isDigit(tkn.lastChar) {
 				return tkn.scanNumber(true)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/lemonwx/xsql/middleware/router"
 	"github.com/lemonwx/log"
+	"fmt"
 )
 
 const (
@@ -108,12 +109,21 @@ func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 	case *ComparisonExpr:
 		switch criteria.Operator {
 		case "=", "<=>":
+			var col, val ValExpr
 			if plan.routingAnalyzeValue(criteria.Left) == EID_NODE {
-				index = plan.findShard(criteria.Right)
+				col = criteria.Left
+				val = criteria.Right
 			} else {
-				index = plan.findShard(criteria.Left)
+				col = criteria.Right
+				val = criteria.Left
 			}
-			return []int{index}
+			if String(col) == plan.rule.Key {
+				plan.disKeyIdx = 0
+				index = plan.findShard(val)
+				return []int{index}
+			} else {
+				return makeList(index, len(plan.rule.Nodes))
+			}
 		case "<", "<=":
 			if plan.rule.Type == router.HashRuleType {
 				return plan.fullList
@@ -440,7 +450,8 @@ func (plan *RoutingPlan) getBoundValue(valExpr ValExpr) interface{} {
 		}
 		return val
 	case ValArg:
-		return plan.bindVars[string(node[1:])]
+		key := fmt.Sprintf("v%d", plan.disKeyIdx)
+		return plan.bindVars[key]
 	}
 	panic("Unexpected token")
 }

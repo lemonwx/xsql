@@ -23,7 +23,8 @@ func main() {
 	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.7:1234)/db")
 	handleErr(err)
 
-	stmt, err := db.Prepare("select id from tb where id = ?")
+	//stmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")
+	stmt, err := db.Prepare("select id, name from tb where id = ?")
 	handleErr(err)
 	fmt.Println(stmt)
 

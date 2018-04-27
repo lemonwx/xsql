@@ -109,7 +109,7 @@ func (buf *TrackedBuffer) Fprintf(format string, values ...interface{}) {
 // the ':' prefix. It also adds tracking info for future substitutions.
 func (buf *TrackedBuffer) WriteArg(arg string) {
 	buf.bindLocations = append(buf.bindLocations, BindLocation{buf.Len(), len(arg) + 1})
-	buf.WriteByte(':')
+	//buf.WriteByte(':')
 	buf.WriteString(arg)
 }
 

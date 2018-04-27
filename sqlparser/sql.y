@@ -657,7 +657,11 @@ boolean_expression:
   }
 
 condition:
-  value_expression compare value_expression
+  value_expression compare '?'
+  {
+    $$ = &ComparisonExpr{Left: $1, Operator: $2, Right: ValArg("?")}
+  }
+| value_expression compare value_expression
   {
     $$ = &ComparisonExpr{Left: $1, Operator: $2, Right: $3}
   }

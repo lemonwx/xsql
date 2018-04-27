@@ -210,14 +210,3 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement) error {
 	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId, conn.nodeIdx)
 	return nil
 }
-
-
-func (conn *MidConn) makeBindVars(args []interface{}) map[string]interface{} {
-	bindVars := make(map[string]interface{}, len(args))
-
-	for i, v := range args {
-		bindVars[fmt.Sprintf("v%d", i+1)] = v
-	}
-
-	return bindVars
-}
