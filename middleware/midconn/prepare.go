@@ -194,8 +194,6 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 		if err := conn.bindStmtArgs(s, nullBitmaps, paramTypes, paramValues); err != nil {
 			return err
 		}
-
-		log.Debug(paramTypes, paramValues, s.args)
 	}
 
 	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
