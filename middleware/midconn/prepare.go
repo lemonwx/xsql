@@ -17,6 +17,7 @@ import (
 	"io"
 	"github.com/lemonwx/xsql/middleware/meta"
 	"utils"
+	"time"
 )
 
 
@@ -124,14 +125,23 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	stmt.nodeIdx = []int{0}
 	stmt.ids = []uint32{stmt.id}
 	// send prepare result to mysql cli
+
+	if _, ok := stmt.s.(*sqlparser.Insert); ok {
+		//stmt.params -= 1
+	}
+
 	if err = conn.writePrepare(stmt); err != nil {
 		return err
 	}
 
-
 	conn.stmts[stmt.id] = stmt
 
 	stmt.ResetParams()
+
+	if _, ok := stmt.s.(*sqlparser.Insert); ok {
+		stmt.params -= 1
+	}
+
 	return nil
 }
 
@@ -153,6 +163,8 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 		return mysql.NewDefaultError(mysql.ER_UNKNOWN_STMT_HANDLER,
 			strconv.FormatUint(uint64(id), 10), "stmt_execute")
 	}
+	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, s, data)
+
 
 	flag := data[pos]
 	pos++
@@ -212,9 +224,237 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	switch s.s.(type) {
 	case *sqlparser.Select:
 		return conn.ExecuteSelect(data)
+	case *sqlparser.Insert:
+		log.Debug(data)
+		return conn.ExecuteInsert(s)
 	default:
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
+}
+
+func (conn *MidConn) makePkt(stmt *Stmt) []byte {
+	args := stmt.args
+
+	const minPktLen = 4 + 1 + 4 + 1 + 4
+	//mc := stmt.mc
+
+	// Determine threshould dynamically to avoid packet size shortage.
+	longDataSize := mysql.MaxPayloadLen / len(stmt.args) + 1
+	if longDataSize < 64 {
+		longDataSize = 64
+	}
+
+
+	// Reset packet-sequence
+	//mc.sequence = 0
+
+	var data []byte = make([]byte, minPktLen)
+
+	/*
+	if len(args) == 0 {
+		data = mc.buf.takeBuffer(minPktLen)
+	} else {
+		data = mc.buf.takeCompleteBuffer()
+		fmt.Println(data[:4])
+	}
+	if data == nil {
+		// can not take the buffer. Something must be wrong with the connection
+		errLog.Print(ErrBusyBuffer)
+		return errBadConnNoWrite
+	}
+
+	fmt.Println(data[:4])
+	*/
+
+	// command [1 byte]
+	data[4] = mysql.COM_STMT_EXECUTE
+
+	// statement_id [4 bytes]
+	data[5] = byte(stmt.id)
+	data[6] = byte(stmt.id >> 8)
+	data[7] = byte(stmt.id >> 16)
+	data[8] = byte(stmt.id >> 24)
+
+	// flags (0: CURSOR_TYPE_NO_CURSOR) [1 byte]
+	data[9] = 0x00
+
+	// iteration_count (uint32(1)) [4 bytes]
+	data[10] = 0x01
+	data[11] = 0x00
+	data[12] = 0x00
+	data[13] = 0x00
+
+	if len(args) > 0 {
+		pos := minPktLen
+
+		var nullMask []byte
+		if maskLen, typesLen := (len(args)+7)/8, 1+2*len(args); pos+maskLen+typesLen >= len(data) {
+			// buffer has to be extended but we don't know by how much so
+			// we depend on append after all data with known sizes fit.
+			// We stop at that because we deal with a lot of columns here
+			// which makes the required allocation size hard to guess.
+			tmp := make([]byte, pos+maskLen+typesLen)
+			copy(tmp[:pos], data[:pos])
+			data = tmp
+			nullMask = data[pos : pos+maskLen]
+			pos += maskLen
+		} else {
+			nullMask = data[pos : pos+maskLen]
+			for i := 0; i < maskLen; i++ {
+				nullMask[i] = 0
+			}
+			pos += maskLen
+		}
+
+		// newParameterBoundFlag 1 [1 byte]
+		data[pos] = 0x01
+		pos++
+
+		// type of each parameter [len(args)*2 bytes]
+		paramTypes := data[pos:]
+		pos += len(args) * 2
+
+		// value of each parameter [n bytes]
+		paramValues := data[pos:pos]
+		valuesCap := cap(paramValues)
+
+		for i, arg := range args {
+			// build NULL-bitmap
+			if arg == nil {
+				nullMask[i/8] |= 1 << (uint(i) & 7)
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_NULL)
+				paramTypes[i+i+1] = 0x00
+				continue
+			}
+
+			// cache types and values
+			switch v := arg.(type) {
+			case int64:
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_LONGLONG)
+				paramTypes[i+i+1] = 0x00
+
+				if cap(paramValues)-len(paramValues)-8 >= 0 {
+					paramValues = paramValues[:len(paramValues)+8]
+					binary.LittleEndian.PutUint64(
+						paramValues[len(paramValues)-8:],
+						uint64(v),
+					)
+				} else {
+					paramValues = append(paramValues,
+						utils.Uint64ToBytes(uint64(v))...,
+					)
+				}
+
+			case float64:
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_DOUBLE)
+				paramTypes[i+i+1] = 0x00
+
+				if cap(paramValues)-len(paramValues)-8 >= 0 {
+					paramValues = paramValues[:len(paramValues)+8]
+					binary.LittleEndian.PutUint64(
+						paramValues[len(paramValues)-8:],
+						math.Float64bits(v),
+					)
+				} else {
+					paramValues = append(paramValues,
+						utils.Uint64ToBytes(math.Float64bits(v))...,
+					)
+				}
+
+			case bool:
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_TINY)
+				paramTypes[i+i+1] = 0x00
+
+				if v {
+					paramValues = append(paramValues, 0x01)
+				} else {
+					paramValues = append(paramValues, 0x00)
+				}
+
+			case []byte:
+				// Common case (non-nil value) first
+				if v != nil {
+					paramTypes[i+i] = byte(mysql.MYSQL_TYPE_STRING)
+					paramTypes[i+i+1] = 0x00
+
+						paramValues = utils.AppendLengthEncodedInteger(paramValues,
+							uint64(len(v)),
+						)
+						paramValues = append(paramValues, v...)
+					continue
+				}
+
+				// Handle []byte(nil) as a NULL value
+				nullMask[i/8] |= 1 << (uint(i) & 7)
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_NULL)
+				paramTypes[i+i+1] = 0x00
+
+			case string:
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_STRING)
+				paramTypes[i+i+1] = 0x00
+
+					paramValues = utils.AppendLengthEncodedInteger(paramValues,
+						uint64(len(v)),
+					)
+					paramValues = append(paramValues, v...)
+
+
+			case time.Time:
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_STRING)
+				paramTypes[i+i+1] = 0x00
+
+				var a [64]byte
+				var b = a[:0]
+
+				if v.IsZero() {
+					b = append(b, "0000-00-00"...)
+				} else {
+					b = v.In(time.UTC).AppendFormat(b, mysql.TimeFormat)
+				}
+
+				paramValues = utils.AppendLengthEncodedInteger(paramValues,
+					uint64(len(b)),
+				)
+				paramValues = append(paramValues, b...)
+			}
+		}
+
+		// Check if param values exceeded the available buffer
+		// In that case we must build the data packet with the new values buffer
+		if valuesCap != cap(paramValues) {
+			data = append(data[:pos], paramValues...)
+			//mc.buf.buf = data
+		}
+
+		pos += len(paramValues)
+		data = data[:pos]
+	}
+
+	return data[5:]
+}
+
+func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {
+	//1 0 0 0 0 1 0 0 0 0 1 8 0 254 0 200 0 0 0 0 0 0 0 4 110 97 109 101
+	//1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 57 48 0 0 0 0 0 0 200 0 0 0 0 0 0 0 4 110 97 109 101
+	//1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 49 212 0 0 0 0 0 0 200 0 0 0 0 0 0 0 4 110 97 109 101
+
+
+	var err error
+	if err = conn.getVInUse(); err != nil {
+		return err
+	}
+
+	newData := conn.makePkt(stmt)
+	//log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 49 212 0 0 0 0 0 0 200 0 0 0 0 0 0 0 4 110 97 109 101]")
+	log.Debug(newData)
+
+	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, newData, conn.nodeIdx); err != nil {
+		return err
+	} else {
+		return conn.HandleExecRets(rets)
+	}
+
+	return nil
 }
 
 func (conn *MidConn) ExecuteSelect(data []byte) error {

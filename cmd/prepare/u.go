@@ -24,23 +24,21 @@ func main() {
 	handleErr(err)
 
 	//srvstmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")
-	stmt, err := db.Prepare("select id, name from tb where id = ?")
+	stmt, err := db.Prepare("insert into tb (id, name) values (?, ?)")
 	handleErr(err)
 	fmt.Println(stmt)
 
-	rs, err := stmt.Query(2)
+	rs, err := stmt.Exec( 54321,200, "name")
 	handleErr(err)
 
-	var id int
-	var name string
-	//var v uint64
 	fmt.Println("---------------")
-	for rs.Next() {
-		err = rs.Scan(&id, &name)
-		fmt.Println(err)
-		fmt.Println("----", id, name)
-	}
+	af, err := rs.RowsAffected()
+	handleErr(err)
+	id, err := rs.LastInsertId()
+	handleErr(err)
 
+	fmt.Println("---------------", af, id)
+	db.Exec("commit")
 	for {
 		time.Sleep(time.Second * 10)
 	}

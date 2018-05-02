@@ -39,3 +39,54 @@ func ContainsIntSlice(s []int, tgt int) bool {
 
 	return false
 }
+
+func Uint64ToBytes(n uint64) []byte {
+	return []byte{
+		byte(n),
+		byte(n >> 8),
+		byte(n >> 16),
+		byte(n >> 24),
+		byte(n >> 32),
+		byte(n >> 40),
+		byte(n >> 48),
+		byte(n >> 56),
+	}
+}
+
+func Uint64ToString(n uint64) []byte {
+	var a [20]byte
+	i := 20
+
+	// U+0030 = 0
+	// ...
+	// U+0039 = 9
+
+	var q uint64
+	for n >= 10 {
+		i--
+		q = n / 10
+		a[i] = uint8(n-q*10) + 0x30
+		n = q
+	}
+
+	i--
+	a[i] = uint8(n) + 0x30
+
+	return a[i:]
+}
+
+
+func AppendLengthEncodedInteger(b []byte, n uint64) []byte {
+	switch {
+	case n <= 250:
+		return append(b, byte(n))
+
+	case n <= 0xffff:
+		return append(b, 0xfc, byte(n), byte(n>>8))
+
+	case n <= 0xffffff:
+		return append(b, 0xfd, byte(n), byte(n>>8), byte(n>>16))
+	}
+	return append(b, 0xfe, byte(n), byte(n>>8), byte(n>>16), byte(n>>24),
+		byte(n>>32), byte(n>>40), byte(n>>48), byte(n>>56))
+}
