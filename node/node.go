@@ -11,10 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
-	"strconv"
 )
 
 type Node struct {
@@ -36,6 +36,7 @@ type Node struct {
 	VersionsInUse map[uint64]uint8
 	NextVersion   uint64
 	NeedHide      bool
+	IsStmt bool
 }
 
 func NewNode(host string, port int, user, password, db string, connid uint32) *Node {
@@ -402,7 +403,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	var err error
 	var data []byte
 	// pre row's version value
-	var preRowV uint64 = 0
+	//var preRowV uint64 = 0
 
 	for {
 		data, err = node.pkt.ReadPacket()
@@ -418,23 +419,12 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			break
 		}
 		if node.NeedHide {
-			version, err := strconv.ParseUint(string(data[1:data[0]+1]), 10, 64)
+			version, err := node.calcVersion(result, &data)
 			if err != nil {
-				version = 0
 				retErr = err
-			}
-			if version == 0 {
-				// version define is : version bigint unsigned not null default 0
-				retErr = errors.New("UNEXPECT VERSION IS NULL")
-			} else if version == preRowV {
-				// if pre row's version == version , then not need to judge BytesContains
-				// for sure this row data is not used by other session
-				// so xsql can parse sql and data more faster...
 			} else if _, ok := node.VersionsInUse[version]; ok {
 				retErr = errors.New("data in use by another session, pls try again later")
 			}
-			preRowV = version
-			data = data[data[0]+1:]
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}
@@ -450,6 +440,23 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 		}
 	*/
 	return retErr
+}
+
+func (node *Node) calcVersion(rs *mysql.Result, data *[]byte) (uint64, error) {
+	if node.IsStmt {
+		pos := 1 + (len(rs.Fields) + 1 +7+2)>>3
+		nullMask := (*data)[1:pos]
+		if ((nullMask[(0+2)>>3] >> uint((0+2)&7)) & 1) == 1 {
+			return 0, errors.New("UNEXPECT VERSION IS NULL")
+		}
+		*data = append((*data)[0:pos], (*data)[pos+8:]...)
+		return uint64(binary.LittleEndian.Uint64((*data)[pos : pos+8])), nil
+	} else {
+		*data = (*data)[(*data)[0]+1:]
+		return strconv.ParseUint(string((*data)[1:(*data)[0]+1]), 10, 64)
+
+	}
+
 }
 
 func (node *Node) isEOFPacket(data []byte) bool {

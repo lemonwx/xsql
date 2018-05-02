@@ -132,8 +132,8 @@ func (conn *MidConn) handleSelectForUpdate(table, where string) error {
 		return conn.cli.WriteOK(nil)
 	}
 
-	conn.setupNodeStatus(conn.VersionsInUse, true)
-	defer conn.setupNodeStatus(nil, false)
+	conn.setupNodeStatus(conn.VersionsInUse, true, false)
+	defer conn.setupNodeStatus(nil, false, false)
 
 	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(selSql), conn.nodeIdx)
 	if err != nil {

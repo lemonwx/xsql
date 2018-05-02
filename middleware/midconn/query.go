@@ -48,8 +48,8 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 		return err
 	}
 
-	conn.setupNodeStatus(conn.VersionsInUse, true)
-	defer conn.setupNodeStatus(nil, false)
+	conn.setupNodeStatus(conn.VersionsInUse, true, false)
+	defer conn.setupNodeStatus(nil, false, false)
 
 	newSql := sqlparser.String(stmt)
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
@@ -60,9 +60,10 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 	return conn.HandleSelRets(rets)
 }
 
-func (conn *MidConn) setupNodeStatus(vInUse map[uint64]byte, hide bool) {
+func (conn *MidConn) setupNodeStatus(vInUse map[uint64]byte, hide bool, isStmt bool) {
 	for _, node := range conn.nodes {
 		node.VersionsInUse = vInUse
 		node.NeedHide = hide
+		node.IsStmt = isStmt
 	}
 }

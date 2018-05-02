@@ -203,24 +203,36 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	}
 	log.Debugf("[%d] get nodeidx %v", conn.ConnectionId, conn.nodeIdx)
 
-	log.Debugf("[%d] prepare stmt: %v", conn.ConnectionId, s)
 	if err = conn.chkPrepare(s); err != nil {
 		return err
 	}
 
-	log.Debugf("[%d] prepare stmt: %v", conn.ConnectionId, s, data)
+	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, s, data)
 
+	switch s.s.(type) {
+	case *sqlparser.Select:
+		return conn.ExecuteSelect(data)
+	default:
+		return UNEXPECT_MIDDLE_WARE_ERR
+	}
+}
+
+func (conn *MidConn) ExecuteSelect(data []byte) error {
+	var err error
+	if err = conn.getVInUse(); err != nil {
+		return err
+	}
+
+	conn.setupNodeStatus(conn.VersionsInUse, true, true)
+	defer conn.setupNodeStatus(nil, false, false)
 
 	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, data, conn.nodeIdx); err != nil {
 		return err
 	} else {
-		if _, ok := s.s.(*sqlparser.Select); ok {
-			return conn.HandleSelRets(rets)
-		} else {
-			return conn.HandleExecRets(rets)
-		}
+		return conn.HandleSelRets(rets)
 	}
 }
+
 
 func (conn *MidConn) prepare(stmt *Stmt, idx int) error {
 	return conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.columns, &stmt.params)
