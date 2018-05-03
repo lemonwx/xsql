@@ -452,8 +452,9 @@ func (node *Node) calcVersion(rs *mysql.Result, data *[]byte) (uint64, error) {
 		*data = append((*data)[0:pos], (*data)[pos+8:]...)
 		return uint64(binary.LittleEndian.Uint64((*data)[pos : pos+8])), nil
 	} else {
+		res, err := strconv.ParseUint(string((*data)[1:(*data)[0]+1]), 10, 64)
 		*data = (*data)[(*data)[0]+1:]
-		return strconv.ParseUint(string((*data)[1:(*data)[0]+1]), 10, 64)
+		return res, err
 
 	}
 
