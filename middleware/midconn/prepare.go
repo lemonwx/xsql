@@ -28,10 +28,14 @@ type Stmt struct {
 	id uint32
 	ids []uint32
 
-	params  int
-	columns uint16
+	cliParams  int
+	nodeParams int
 
-	args []interface{}
+	cliColumns uint16
+	nodeColumns uint16
+
+	cliArgs []interface{}
+	nodeArgs []interface{}
 
 	s sqlparser.Statement
 
@@ -40,9 +44,18 @@ type Stmt struct {
 	nodeIdx []int
 }
 
+func (s *Stmt) InitParams() {
+	s.cliArgs = make([]interface{}, s.cliParams)
+	s.nodeArgs = make([]interface{}, s.nodeParams)
+}
 
-func (s *Stmt) ResetParams() {
-	s.args = make([]interface{}, s.params)
+func (s *Stmt) ResetParams(size int) {
+	for idx := 0; idx < s.cliParams; idx += 1 {
+		s.cliArgs[idx] = nil
+	}
+	for idx := 0; idx < s.nodeParams; idx += 1 {
+		s.nodeArgs[idx] = nil
+	}
 }
 
 func (conn *MidConn) writePrepare(s *Stmt) error {
@@ -53,9 +66,9 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 	//stmt id
 	data = append(data, mysql.Uint32ToBytes(s.id)...)
 	//number columns
-	data = append(data, mysql.Uint16ToBytes(uint16(s.columns))...)
+	data = append(data, mysql.Uint16ToBytes(uint16(s.cliColumns))...)
 	//number params
-	data = append(data, mysql.Uint16ToBytes(uint16(s.params))...)
+	data = append(data, mysql.Uint16ToBytes(uint16(s.cliParams))...)
 	//filter [00]
 	data = append(data, 0)
 	//warning count
@@ -65,8 +78,8 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 		return err
 	}
 
-	if s.params > 0 {
-		for i := 0; i < s.params; i++ {
+	if s.cliParams > 0 {
+		for i := 0; i < s.cliParams; i++ {
 			data = data[0:4]
 			data = append(data, paramFieldData...)
 
@@ -80,8 +93,8 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 		}
 	}
 
-	if s.columns > 0 {
-		for i := uint16(0); i < s.columns; i++ {
+	if s.cliColumns > 0 {
+		for i := uint16(0); i < s.cliColumns; i++ {
 			data = data[0:4]
 			data = append(data, columnFieldData...)
 
@@ -124,23 +137,22 @@ func (conn *MidConn) handlePrepare(sql string) error {
 
 	stmt.nodeIdx = []int{0}
 	stmt.ids = []uint32{stmt.id}
-	// send prepare result to mysql cli
 
-	if _, ok := stmt.s.(*sqlparser.Insert); ok {
-		//stmt.params -= 1
+	if _, ok := stmt.s.(*sqlparser.Select); ok {
+		stmt.cliParams = stmt.nodeParams
+		stmt.cliColumns = stmt.cliColumns - 1
+	} else {
+		stmt.cliParams = stmt.nodeParams - 1
 	}
 
+	// send prepare result to mysql cli
 	if err = conn.writePrepare(stmt); err != nil {
 		return err
 	}
 
 	conn.stmts[stmt.id] = stmt
-
-	stmt.ResetParams()
-
-	if _, ok := stmt.s.(*sqlparser.Insert); ok {
-		stmt.params -= 1
-	}
+	stmt.InitParams()
+	//stmt.ResetParams(stmt.cliParams)
 
 	return nil
 }
@@ -180,10 +192,10 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	var paramTypes []byte
 	var paramValues []byte
 
-	paramNum := s.params
+	paramNum := s.cliParams
 
 	if paramNum > 0 {
-		nullBitmapLen := (s.params + 7) >> 3
+		nullBitmapLen := (s.cliParams + 7) >> 3
 		if len(data) < (pos + nullBitmapLen + 1) {
 			return mysql.ErrMalformPacket
 		}
@@ -209,7 +221,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	}
 
 	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
-		s.s, meta.GetRouter(conn.db), conn.makeBindVars(s.args)); err != nil {
+		s.s, meta.GetRouter(conn.db), conn.makeBindVars(s.cliArgs)); err != nil {
 			log.Debugf("[%d] get nodeidx failed: %v", conn.ConnectionId, err)
 			return err
 	}
@@ -233,13 +245,13 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 }
 
 func (conn *MidConn) makePkt(stmt *Stmt) []byte {
-	args := stmt.args
+	args := stmt.nodeArgs
 
 	const minPktLen = 4 + 1 + 4 + 1 + 4
 	//mc := stmt.mc
 
 	// Determine threshould dynamically to avoid packet size shortage.
-	longDataSize := mysql.MaxPayloadLen / len(stmt.args) + 1
+	longDataSize := mysql.MaxPayloadLen / len(stmt.nodeArgs) + 1
 	if longDataSize < 64 {
 		longDataSize = 64
 	}
@@ -440,21 +452,25 @@ func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {
 
 
 	var err error
-	if err = conn.getVInUse(); err != nil {
+	if err = conn.getNextVersion(); err != nil {
 		return err
 	}
 
+	stmt.nodeArgs[0] = int64(conn.NextVersion)
+	copy(stmt.nodeArgs[1:], stmt.cliArgs)
+	log.Debug(stmt.nodeArgs)
+
 	newData := conn.makePkt(stmt)
-	//log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 49 212 0 0 0 0 0 0 200 0 0 0 0 0 0 0 4 110 97 109 101]")
+	log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 57 48 0 0 0 0 0 0 10 0 0 0 0 0 0 0 4 110 97 109 101]")
 	log.Debug(newData)
+	log.Debug(stmt)
+
 
 	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, newData, conn.nodeIdx); err != nil {
 		return err
 	} else {
 		return conn.HandleExecRets(rets)
 	}
-
-	return nil
 }
 
 func (conn *MidConn) ExecuteSelect(data []byte) error {
@@ -475,7 +491,7 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 
 
 func (conn *MidConn) prepare(stmt *Stmt, idx int) error {
-	return conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.columns, &stmt.params)
+	return conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.nodeColumns, &stmt.nodeParams)
 }
 
 func (conn *MidConn) chkPrepare(stmt *Stmt) error {
@@ -493,7 +509,7 @@ func (conn *MidConn) chkPrepare(stmt *Stmt) error {
 			if err := conn.prepare(tmpStmt, idx); err != nil {
 				return err
 			} else {
-				if tmpStmt.columns == stmt.columns && tmpStmt.params == tmpStmt.params {
+				if tmpStmt.nodeColumns == stmt.nodeColumns && tmpStmt.nodeParams == tmpStmt.nodeParams{
 					stmt.ids = append(stmt.ids, tmpStmt.id)
 					stmt.nodeIdx = append(stmt.nodeIdx, idx)
 				} else {
@@ -506,7 +522,7 @@ func (conn *MidConn) chkPrepare(stmt *Stmt) error {
 }
 
 func (conn *MidConn) bindStmtArgs(s *Stmt, nullBitmap, paramTypes, paramValues []byte) error {
-	args := s.args
+	args := s.cliArgs
 
 	pos := 0
 
@@ -515,7 +531,7 @@ func (conn *MidConn) bindStmtArgs(s *Stmt, nullBitmap, paramTypes, paramValues [
 	var isNull bool
 	var err error
 
-	for i := 0; i < s.params; i++ {
+	for i := 0; i < s.cliParams; i++ {
 		if nullBitmap[i>>3]&(1<<(uint(i)%8)) > 0 {
 			args[i] = nil
 			continue
