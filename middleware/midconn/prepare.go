@@ -41,6 +41,7 @@ type Stmt struct {
 	forUpdate *sqlparser.Select
 
 	sql string
+	originSql string
 
 	nodeIdx []int
 }
@@ -122,6 +123,7 @@ func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 		return nil, fmt.Errorf(`parse sql "%s" error`, sql)
 	}
 
+	stmt.originSql = sql
 	stmt.sql = sqlparser.String(stmt.s)
 
 	// send prepare to node[0]
@@ -465,19 +467,6 @@ func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 		return err
 	}
 
-	updateStmt := stmt.s.(*sqlparser.Update)
-	sstring := sqlparser.String
-
-	if forUpdateStmt, err := sqlparser.Parse(
-		fmt.Sprintf("select version from %s %s",
-			sstring(updateStmt.Table), sstring(updateStmt.Where)) );  err != nil {
-		log.Debugf("[%d] Parse select for update stmt failed: %v", conn.ConnectionId, err)
-	} else {
-		stmt.forUpdate = forUpdateStmt.(*sqlparser.Select)
-		log.Debug(stmt.forUpdate)
-	}
-
-
 	//stmt.nodeArgs[0] = int64(conn.NextVersion)
 	stmt.nodeArgs[0] = int64(conn.NextVersion)
 	copy(stmt.nodeArgs[1:], stmt.cliArgs)
@@ -536,14 +525,6 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 	}
 }
 
-
-func (conn *MidConn) prepare(stmt *Stmt, idx int) error {
-
-
-
-	return conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.nodeColumns, &stmt.nodeParams)
-}
-
 func (conn *MidConn) chkPrepare(stmt *Stmt) error {
 
 	if utils.CompareIntSlice(conn.nodeIdx, stmt.nodeIdx) {
@@ -552,14 +533,12 @@ func (conn *MidConn) chkPrepare(stmt *Stmt) error {
 
 	for _, idx := range conn.nodeIdx {
 		if ! utils.ContainsIntSlice(stmt.nodeIdx, idx) {
-			log.Debugf("[%d] node :%d need to prepare", conn.ConnectionId, idx )
-			tmpStmt := new(Stmt)
-			tmpStmt.s = stmt.s
-			tmpStmt.sql = stmt.sql
-			if err := conn.prepare(tmpStmt, idx); err != nil {
+			log.Debugf("[%d] node :%d need to prepare", conn.ConnectionId, idx)
+
+			if tmpStmt, err := conn.myPrepare(stmt.originSql, idx); err != nil {
 				return err
 			} else {
-				if tmpStmt.nodeColumns == stmt.nodeColumns && tmpStmt.nodeParams == tmpStmt.nodeParams{
+				if tmpStmt.nodeColumns == stmt.nodeColumns && tmpStmt.nodeParams == tmpStmt.nodeParams {
 					stmt.ids = append(stmt.ids, tmpStmt.id)
 					stmt.nodeIdx = append(stmt.nodeIdx, idx)
 				} else {
