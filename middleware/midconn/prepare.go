@@ -461,6 +461,19 @@ func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 		return err
 	}
 
+	updateStmt := stmt.s.(*sqlparser.Update)
+	sstring := sqlparser.String
+
+	if forUpdateStmt, err := sqlparser.Parse(
+		fmt.Sprintf("select version from %s %s",
+			sstring(updateStmt.Table), sstring(updateStmt.Where)) );  err != nil {
+		log.Debugf("[%d] Parse select for update stmt failed: %v", conn.ConnectionId, err)
+	} else {
+		stmt.forUpdate = forUpdateStmt.(*sqlparser.Select)
+		log.Debug(stmt.forUpdate)
+	}
+
+
 	//stmt.nodeArgs[0] = int64(conn.NextVersion)
 	stmt.nodeArgs[0] = int64(conn.NextVersion)
 	copy(stmt.nodeArgs[1:], stmt.cliArgs)

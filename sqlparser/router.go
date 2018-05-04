@@ -118,7 +118,6 @@ func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 				val = criteria.Left
 			}
 			if String(col) == plan.rule.Key {
-				plan.disKeyIdx = 0
 				index = plan.findShard(val)
 				return []int{index}
 			} else {
@@ -284,8 +283,9 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 	case *Update:
 		plan.rule = r.GetRule(String(stmt.Table))
 
+		// can not update sharding key
+		plan.disKeyIdx = len(stmt.Exprs)
 		checkUpdateExprs(stmt.Exprs, plan.rule)
-
 		where = stmt.Where
 	case *Delete:
 		plan.rule = r.GetRule(String(stmt.Table))
