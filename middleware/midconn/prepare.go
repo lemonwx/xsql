@@ -26,7 +26,10 @@ var columnFieldData []byte = (&mysql.Field{}).Dump()
 
 type Stmt struct {
 	id uint32
-	ids []uint32
+	idxs []uint32
+	forUpdateStmts []*Stmt
+	tmpForUpdateStmt *Stmt
+	forUpdateSql string
 
 	cliParams  int
 	nodeParams int
@@ -38,12 +41,13 @@ type Stmt struct {
 	nodeArgs []interface{}
 
 	s sqlparser.Statement
-	forUpdate *sqlparser.Select
 
 	sql string
 	originSql string
 
 	nodeIdx []int
+
+	stmtIdMeta map[int]uint32
 }
 
 func (s *Stmt) InitParams() {
@@ -126,13 +130,34 @@ func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 	stmt.originSql = sql
 	stmt.sql = sqlparser.String(stmt.s)
 
+
+	sstring := sqlparser.String
+
+
+	switch v := stmt.s.(type) {
+	case *sqlparser.Update:
+		log.Debug("update prepare")
+		if stmt.forUpdateSql == "" {
+			stmt.forUpdateSql = fmt.Sprintf("select version from %s %s for update", sstring(v.Table), sstring(v.Where))
+		}
+
+		forUpdateStmt, err := conn.myPrepare(stmt.forUpdateSql, idx)
+		log.Debug(forUpdateStmt)
+		if err != nil {
+			return nil, err
+		}
+		stmt.forUpdateStmts = []*Stmt{forUpdateStmt}
+	default:
+		break
+	}
+
 	// send prepare to node[0]
 	if err = conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.nodeColumns, &stmt.nodeParams); err != nil {
 		log.Debugf("[%d] send prepare sql to %d faild: %v", conn.ConnectionId, idx, err)
 		return nil, err
 	}
 	stmt.nodeIdx = []int{0}
-	stmt.ids = []uint32{stmt.id}
+	stmt.idxs = []uint32{stmt.id}
 
 	// handle cliparams and node params
 	if _, ok := stmt.s.(*sqlparser.Select); ok {
@@ -142,8 +167,13 @@ func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 		stmt.cliParams = stmt.nodeParams - 1
 	}
 
-	conn.stmts[stmt.id] = stmt
+	stmt.stmtIdMeta = map[int]uint32{
+		idx: stmt.id,
+	}
+
 	stmt.InitParams()
+
+	conn.stmts[stmt.id] = stmt
 
 	return stmt, nil
 }
@@ -184,11 +214,13 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	id := binary.LittleEndian.Uint32(data[0:4])
 	pos += 4
 
-	s, ok := conn.stmts[id]
+	_, ok := conn.stmts[id]
 	if !ok {
 		return mysql.NewDefaultError(mysql.ER_UNKNOWN_STMT_HANDLER,
 			strconv.FormatUint(uint64(id), 10), "stmt_execute")
 	}
+
+	log.Debug(conn.stmts[id].stmtIdMeta)
 
 	flag := data[pos]
 	pos++
@@ -204,10 +236,10 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	var paramTypes []byte
 	var paramValues []byte
 
-	paramNum := s.cliParams
+	paramNum := conn.stmts[id].cliParams
 
 	if paramNum > 0 {
-		nullBitmapLen := (s.cliParams + 7) >> 3
+		nullBitmapLen := (conn.stmts[id].cliParams + 7) >> 3
 		if len(data) < (pos + nullBitmapLen + 1) {
 			return mysql.ErrMalformPacket
 		}
@@ -227,47 +259,51 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 			paramValues = data[pos:]
 		}
 
-		if err := conn.bindStmtArgs(s, nullBitmaps, paramTypes, paramValues); err != nil {
+		if err := conn.bindStmtArgs(conn.stmts[id], nullBitmaps, paramTypes, paramValues); err != nil {
 			return err
 		}
 	}
 
-	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, s.cliArgs, data)
+	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id].cliArgs, data)
 
 	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
-		s.s, meta.GetRouter(conn.db), conn.makeBindVars(s.cliArgs)); err != nil {
+		conn.stmts[id].s, meta.GetRouter(conn.db), conn.makeBindVars(conn.stmts[id].cliArgs)); err != nil {
 			log.Debugf("[%d] get nodeidx failed: %v", conn.ConnectionId, err)
 			return err
 	}
 	log.Debugf("[%d] get nodeidx %v", conn.ConnectionId, conn.nodeIdx)
 
-	if err = conn.chkPrepare(s); err != nil {
+	if newStmt, err := conn.chkPrepare(conn.stmts[id]); err != nil {
 		return err
+	} else {
+		conn.stmts[id] = newStmt
 	}
 
-	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, s, data)
+	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id], data)
 
-	switch s.s.(type) {
+	switch conn.stmts[id].s.(type) {
 	case *sqlparser.Select:
 		return conn.ExecuteSelect(data)
 	case *sqlparser.Insert:
-		return conn.ExecuteInsert(s)
+		return conn.ExecuteInsert(conn.stmts[id])
 	case *sqlparser.Update:
 		log.Debug(data)
-		return conn.ExecuteUpdate(s)
+		return conn.ExecuteUpdate(conn.stmts[id])
 	default:
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
 }
 
-func (conn *MidConn) makePkt(stmt *Stmt) []byte {
-	args := stmt.nodeArgs
+// func (conn *MidConn) makePkt(stmt *Stmt) []byte {
+func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
+
+	//args := stmt.nodeArgs
 
 	const minPktLen = 4 + 1 + 4 + 1 + 4
 	//mc := stmt.mc
 
 	// Determine threshould dynamically to avoid packet size shortage.
-	longDataSize := mysql.MaxPayloadLen / len(stmt.nodeArgs) + 1
+	longDataSize := mysql.MaxPayloadLen / len(args) + 1
 	if longDataSize < 64 {
 		longDataSize = 64
 	}
@@ -298,10 +334,10 @@ func (conn *MidConn) makePkt(stmt *Stmt) []byte {
 	data[4] = mysql.COM_STMT_EXECUTE
 
 	// statement_id [4 bytes]
-	data[5] = byte(stmt.id)
-	data[6] = byte(stmt.id >> 8)
-	data[7] = byte(stmt.id >> 16)
-	data[8] = byte(stmt.id >> 24)
+	data[5] = byte(id)
+	data[6] = byte(id >> 8)
+	data[7] = byte(id >> 16)
+	data[8] = byte(id >> 24)
 
 	// flags (0: CURSOR_TYPE_NO_CURSOR) [1 byte]
 	data[9] = 0x00
@@ -461,19 +497,43 @@ func (conn *MidConn) makePkt(stmt *Stmt) []byte {
 	return data[5:]
 }
 
+func (conn *MidConn) forUpdate(stmt *Stmt) error {
+	var err error
+
+	if err = conn.getVInUse(); err != nil {
+		return err
+	}
+
+	conn.setupNodeStatus(conn.VersionsInUse, true, true)
+	defer conn.setupNodeStatus(nil, false, false)
+
+	stmt.forUpdateStmts[0].nodeArgs[0] = stmt.cliArgs[len(stmt.cliArgs) - 1]
+	log.Debug(stmt.forUpdateStmts[0].nodeArgs)
+
+	forUpdateData := conn.makePkt(stmt.forUpdateStmts[0].nodeArgs, stmt.forUpdateStmts[0].id)
+	_, err = conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, forUpdateData, conn.nodeIdx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 	var err error
+
+	if err = conn.forUpdate(stmt); err != nil {
+		return err
+	}
+
 	if err = conn.getNextVersion(); err != nil {
 		return err
 	}
 
-	//stmt.nodeArgs[0] = int64(conn.NextVersion)
 	stmt.nodeArgs[0] = int64(conn.NextVersion)
 	copy(stmt.nodeArgs[1:], stmt.cliArgs)
 	log.Debug(stmt.nodeArgs)
-	newData := conn.makePkt(stmt)
-	log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 254 0 8 0 123 0 0 0 0 0 0 0 28 108 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 80 0 0 0 0 0 0 0]")
-	log.Debug(newData)
+	newData := conn.makePkt(stmt.nodeArgs, stmt.id)
+
 
 	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, newData, conn.nodeIdx); err != nil {
 		return  err
@@ -497,13 +557,13 @@ func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {
 	copy(stmt.nodeArgs[1:], stmt.cliArgs)
 	log.Debug(stmt.nodeArgs)
 
-	newData := conn.makePkt(stmt)
+	newData := conn.makePkt(stmt.nodeArgs, stmt.id)
 	log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 57 48 0 0 0 0 0 0 10 0 0 0 0 0 0 0 4 110 97 109 101]")
 	log.Debug(newData)
 	log.Debug(stmt)
 
 
-	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, newData, conn.nodeIdx); err != nil {
+	if rets, err := conn.ExecuteMultiNodePrepare(stmt.nodeArgs, stmt.stmtIdMeta, conn.nodeIdx); err != nil {
 		return err
 	} else {
 		return conn.HandleExecRets(rets)
@@ -525,29 +585,33 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 	}
 }
 
-func (conn *MidConn) chkPrepare(stmt *Stmt) error {
+func (conn *MidConn) chkPrepare(stmt *Stmt) (*Stmt,error) {
 
 	if utils.CompareIntSlice(conn.nodeIdx, stmt.nodeIdx) {
-		return nil
+		return stmt, nil
 	}
 
 	for _, idx := range conn.nodeIdx {
 		if ! utils.ContainsIntSlice(stmt.nodeIdx, idx) {
 			log.Debugf("[%d] node :%d need to prepare", conn.ConnectionId, idx)
-
 			if tmpStmt, err := conn.myPrepare(stmt.originSql, idx); err != nil {
-				return err
+				return nil, err
 			} else {
 				if tmpStmt.nodeColumns == stmt.nodeColumns && tmpStmt.nodeParams == tmpStmt.nodeParams {
-					stmt.ids = append(stmt.ids, tmpStmt.id)
+					stmt.idxs = append(stmt.idxs, tmpStmt.id)
 					stmt.nodeIdx = append(stmt.nodeIdx, idx)
+					stmt.forUpdateStmts = append(stmt.forUpdateStmts, tmpStmt.forUpdateStmts...)
+					stmt.stmtIdMeta[idx] = tmpStmt.stmtIdMeta[idx]
+
+					return stmt, nil
+
 				} else {
-					return UNEXPECT_MIDDLE_WARE_ERR
+					return nil, UNEXPECT_MIDDLE_WARE_ERR
 				}
 			}
 		}
 	}
-	return nil
+	return stmt, nil
 }
 
 func (conn *MidConn) bindStmtArgs(s *Stmt, nullBitmap, paramTypes, paramValues []byte) error {

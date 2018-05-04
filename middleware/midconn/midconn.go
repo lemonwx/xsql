@@ -242,7 +242,36 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 			wg.Done()
 		}(idx)
 	}
+	wg.Wait()
 
+	rs := make([]*mysql.Result, 0, len(nodeIdxs))
+	for _, ret := range rets {
+		if err, ok := ret.(error); ok {
+			return nil, err
+		}
+		rs = append(rs, ret.(*mysql.Result))
+	}
+	return rs, nil
+}
+
+
+func (conn *MidConn) ExecuteMultiNodePrepare(args []interface{}, stmtMeta map[int]uint32, nodeIdxs []int) ([]*mysql.Result, error) {
+	rets := make([]interface{}, len(nodeIdxs))
+	wg := sync.WaitGroup{}
+	wg.Add(len(nodeIdxs))
+
+	for idx := 0; idx < len(nodeIdxs); idx += 1 {
+		go func(tmp int) {
+			nodeStmtId := stmtMeta[tmp]
+			execData := conn.makePkt(args, nodeStmtId)
+			if rs, err := conn.nodes[nodeIdxs[tmp]].Execute(mysql.COM_STMT_EXECUTE, execData); err != nil {
+				rets[tmp] = err
+			} else {
+				rets[tmp] = rs
+			}
+			wg.Done()
+		}(idx)
+	}
 	wg.Wait()
 
 	rs := make([]*mysql.Result, 0, len(nodeIdxs))
