@@ -39,6 +39,11 @@ type Node struct {
 	IsStmt bool
 }
 
+
+func (node *Node) String() string {
+	return node.addr
+}
+
 func NewNode(host string, port int, user, password, db string, connid uint32) *Node {
 
 	node := &Node{

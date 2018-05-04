@@ -79,7 +79,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 			if err = midConn.nodes[tmp].Connect(); err != nil {
 				log.Errorf("connected to backend mysqld %d failed: %v", tmp, err)
 			} else {
-				log.Debugf("[%d] connect to mysqld [%v] success",
+				log.Debugf("[%d] connect to mysqld [%s] success",
 					midConn.ConnectionId, midConn.nodes[tmp])
 			}
 			wg.Done()
