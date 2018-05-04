@@ -18,3 +18,6 @@ todo list:
 
 11. rpc version server, add map[sessionid]map[uint64]byte
     --- reduce lock use .. need benchmark
+
+
+12. 输入 流必须读取完？？
