@@ -688,8 +688,26 @@ func NewValExprs (expr ValExpr) ValExprs {
 	default:
 		return ValExprs{NumVal{}, expr}
 	}
-
 }
+
+func NewUpdateExprs(expr *UpdateExpr) UpdateExprs {
+	var vExpr *UpdateExpr
+	switch expr.Expr.(type) {
+	case ValArg:
+		vExpr = &UpdateExpr{
+			Name: &ColName{
+				Name: []byte("version"),
+			},
+			Expr: ValArg("?"),
+		}
+	default:
+		vExpr = &UpdateExpr{
+			Name: &ColName{Name: []byte("version")},
+			Expr: NumVal([]byte{48})}
+	}
+	return UpdateExprs{vExpr, expr}
+}
+
 
 func (node ValExprs) Format(buf *TrackedBuffer) {
 	var prefix string

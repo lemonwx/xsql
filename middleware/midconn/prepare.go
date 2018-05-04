@@ -138,6 +138,9 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	stmt.nodeIdx = []int{0}
 	stmt.ids = []uint32{stmt.id}
 
+	log.Debug(stmt.nodeParams, stmt.cliParams)
+	log.Debug(stmt.sql)
+
 	if _, ok := stmt.s.(*sqlparser.Select); ok {
 		stmt.cliParams = stmt.nodeParams
 		stmt.cliColumns = stmt.cliColumns - 1
@@ -239,6 +242,9 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	case *sqlparser.Insert:
 		log.Debug(data)
 		return conn.ExecuteInsert(s)
+	case *sqlparser.Update:
+		log.Debug(data)
+		return conn.ExecuteUpdate(s)
 	default:
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
@@ -443,6 +449,27 @@ func (conn *MidConn) makePkt(stmt *Stmt) []byte {
 	}
 
 	return data[5:]
+}
+
+func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
+	var err error
+	if err = conn.getNextVersion(); err != nil {
+		return err
+	}
+
+	//stmt.nodeArgs[0] = int64(conn.NextVersion)
+	stmt.nodeArgs[0] = int64(123)
+	copy(stmt.nodeArgs[1:], stmt.cliArgs)
+	log.Debug(stmt.nodeArgs)
+	newData := conn.makePkt(stmt)
+	log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 254 0 8 0 123 0 0 0 0 0 0 0 28 108 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 109 80 0 0 0 0 0 0 0]")
+	log.Debug(newData)
+
+	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, newData, conn.nodeIdx); err != nil {
+		return  err
+	} else {
+		return conn.HandleExecRets(rets)
+	}
 }
 
 func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {

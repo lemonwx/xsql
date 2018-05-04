@@ -1069,7 +1069,7 @@ on_dup_opt:
 update_list:
   update_expression
   {
-    $$ = UpdateExprs{&UpdateExpr{Name: &ColName{Name: []byte("version")}, Expr: NumVal([]byte{48})}, $1}
+    $$ = NewUpdateExprs($1)
   }
 | update_list ',' update_expression
   {
