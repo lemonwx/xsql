@@ -279,6 +279,7 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 
 	case *Select:
 		plan.rule = r.GetRule(String(stmt.From[0]))
+		plan.disKeyIdx = 1
 		where = stmt.Where
 	case *Update:
 		plan.rule = r.GetRule(String(stmt.Table))

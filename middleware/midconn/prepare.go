@@ -112,39 +112,27 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 	return nil
 }
 
-func (conn *MidConn) handlePrepare(sql string) error {
-	log.Debugf("[%d] handle prepare %s", conn.ConnectionId, sql)
-
+func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 	var err error
-
-	if conn.db == "" {
-		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
-	}
 
 	stmt := new(Stmt)
 
-
-
-
 	sql = strings.TrimRight(sql, ";")
-	stmt.s, err = sqlparser.Parse(sql)
-	if err != nil {
-		return fmt.Errorf(`parse sql "%s" error`, sql)
+	if stmt.s, err = sqlparser.Parse(sql); err != nil {
+		return nil, fmt.Errorf(`parse sql "%s" error`, sql)
 	}
 
 	stmt.sql = sqlparser.String(stmt.s)
 
 	// send prepare to node[0]
-	if err = conn.prepare(stmt, 0); err != nil {
-		return err
+	if err = conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.nodeColumns, &stmt.nodeParams); err != nil {
+		log.Debugf("[%d] send prepare sql to %d faild: %v", conn.ConnectionId, idx, err)
+		return nil, err
 	}
-
 	stmt.nodeIdx = []int{0}
 	stmt.ids = []uint32{stmt.id}
 
-	log.Debug(stmt.nodeParams, stmt.cliParams)
-	log.Debug(stmt.sql)
-
+	// handle cliparams and node params
 	if _, ok := stmt.s.(*sqlparser.Select); ok {
 		stmt.cliParams = stmt.nodeParams
 		stmt.cliColumns = stmt.cliColumns - 1
@@ -154,8 +142,24 @@ func (conn *MidConn) handlePrepare(sql string) error {
 
 	conn.stmts[stmt.id] = stmt
 	stmt.InitParams()
-	//stmt.ResetParams(stmt.cliParams)
 
+	return stmt, nil
+}
+
+
+func (conn *MidConn) handlePrepare(sql string) error {
+	log.Debugf("[%d] handle prepare %s", conn.ConnectionId, sql)
+
+	var err error
+
+	if conn.db == "" {
+		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+	}
+
+	stmt, err := conn.myPrepare(sql, 0)
+	if err != nil {
+		return err
+	}
 
 	// send prepare result to mysql cli
 	if err = conn.writePrepare(stmt); err != nil {
@@ -183,8 +187,6 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 		return mysql.NewDefaultError(mysql.ER_UNKNOWN_STMT_HANDLER,
 			strconv.FormatUint(uint64(id), 10), "stmt_execute")
 	}
-	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, s, data)
-
 
 	flag := data[pos]
 	pos++
@@ -227,6 +229,8 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 			return err
 		}
 	}
+
+	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, s.cliArgs, data)
 
 	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
 		s.s, meta.GetRouter(conn.db), conn.makeBindVars(s.cliArgs)); err != nil {
