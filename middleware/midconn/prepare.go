@@ -38,6 +38,7 @@ type Stmt struct {
 	nodeArgs []interface{}
 
 	s sqlparser.Statement
+	forUpdate *sqlparser.Select
 
 	sql string
 
@@ -122,6 +123,9 @@ func (conn *MidConn) handlePrepare(sql string) error {
 
 	stmt := new(Stmt)
 
+
+
+
 	sql = strings.TrimRight(sql, ";")
 	stmt.s, err = sqlparser.Parse(sql)
 	if err != nil {
@@ -148,14 +152,15 @@ func (conn *MidConn) handlePrepare(sql string) error {
 		stmt.cliParams = stmt.nodeParams - 1
 	}
 
+	conn.stmts[stmt.id] = stmt
+	stmt.InitParams()
+	//stmt.ResetParams(stmt.cliParams)
+
+
 	// send prepare result to mysql cli
 	if err = conn.writePrepare(stmt); err != nil {
 		return err
 	}
-
-	conn.stmts[stmt.id] = stmt
-	stmt.InitParams()
-	//stmt.ResetParams(stmt.cliParams)
 
 	return nil
 }
@@ -240,7 +245,6 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	case *sqlparser.Select:
 		return conn.ExecuteSelect(data)
 	case *sqlparser.Insert:
-		log.Debug(data)
 		return conn.ExecuteInsert(s)
 	case *sqlparser.Update:
 		log.Debug(data)
@@ -458,7 +462,7 @@ func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 	}
 
 	//stmt.nodeArgs[0] = int64(conn.NextVersion)
-	stmt.nodeArgs[0] = int64(123)
+	stmt.nodeArgs[0] = int64(conn.NextVersion)
 	copy(stmt.nodeArgs[1:], stmt.cliArgs)
 	log.Debug(stmt.nodeArgs)
 	newData := conn.makePkt(stmt)
@@ -505,7 +509,6 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 	if err = conn.getVInUse(); err != nil {
 		return err
 	}
-
 	conn.setupNodeStatus(conn.VersionsInUse, true, true)
 	defer conn.setupNodeStatus(nil, false, false)
 
@@ -518,6 +521,9 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 
 
 func (conn *MidConn) prepare(stmt *Stmt, idx int) error {
+
+
+
 	return conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.nodeColumns, &stmt.nodeParams)
 }
 
@@ -813,7 +819,7 @@ func (conn *MidConn) makeBindVars(args []interface{}) map[string]interface{} {
 	bindVars := make(map[string]interface{}, len(args))
 
 	for i, v := range args {
-		bindVars[fmt.Sprintf("v%d", i)] = v
+		bindVars[fmt.Sprintf("v%d", i+1)] = v
 	}
 
 	return bindVars
