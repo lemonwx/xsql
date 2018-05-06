@@ -26,10 +26,6 @@ var columnFieldData []byte = (&mysql.Field{}).Dump()
 
 type Stmt struct {
 	id uint32
-	idxs []uint32
-	forUpdateStmts []*Stmt
-	tmpForUpdateStmt *Stmt
-	forUpdateSql string
 
 	cliParams  int
 	nodeParams int
@@ -45,10 +41,19 @@ type Stmt struct {
 	sql string
 	originSql string
 
-	nodeIdx []int
-
 	stmtIdMeta map[int]uint32
+
+	forUpdateStmts []*Stmt
+	forUpdateSql string
 }
+
+func NewStmt() *Stmt {
+	stmt := new(Stmt)
+	stmt.stmtIdMeta = make(map[int]uint32)
+
+	return stmt
+}
+
 
 func (s *Stmt) InitParams() {
 	s.cliArgs = make([]interface{}, s.cliParams)
@@ -156,10 +161,8 @@ func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 		log.Debugf("[%d] send prepare sql to %d faild: %v", conn.ConnectionId, idx, err)
 		return nil, err
 	}
-	stmt.nodeIdx = []int{0}
-	stmt.idxs = []uint32{stmt.id}
 
-	// handle cliparams and node params
+	// handle cli params and node params
 	if _, ok := stmt.s.(*sqlparser.Select); ok {
 		stmt.cliParams = stmt.nodeParams
 		stmt.cliColumns = stmt.cliColumns - 1
@@ -177,7 +180,6 @@ func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 
 	return stmt, nil
 }
-
 
 func (conn *MidConn) handlePrepare(sql string) error {
 	log.Debugf("[%d] handle prepare %s", conn.ConnectionId, sql)
@@ -587,22 +589,17 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 
 func (conn *MidConn) chkPrepare(stmt *Stmt) (*Stmt,error) {
 
-	if utils.CompareIntSlice(conn.nodeIdx, stmt.nodeIdx) {
-		return stmt, nil
-	}
-
 	for _, idx := range conn.nodeIdx {
-		if ! utils.ContainsIntSlice(stmt.nodeIdx, idx) {
+		if _, ok := stmt.stmtIdMeta[idx]; ok {
+		} else {
 			log.Debugf("[%d] node :%d need to prepare", conn.ConnectionId, idx)
 			if tmpStmt, err := conn.myPrepare(stmt.originSql, idx); err != nil {
 				return nil, err
 			} else {
+				// confirm equal between mutil node's prepare result
 				if tmpStmt.nodeColumns == stmt.nodeColumns && tmpStmt.nodeParams == tmpStmt.nodeParams {
-					stmt.idxs = append(stmt.idxs, tmpStmt.id)
-					stmt.nodeIdx = append(stmt.nodeIdx, idx)
 					stmt.forUpdateStmts = append(stmt.forUpdateStmts, tmpStmt.forUpdateStmts...)
 					stmt.stmtIdMeta[idx] = tmpStmt.stmtIdMeta[idx]
-
 					return stmt, nil
 
 				} else {
@@ -611,6 +608,7 @@ func (conn *MidConn) chkPrepare(stmt *Stmt) (*Stmt,error) {
 			}
 		}
 	}
+
 	return stmt, nil
 }
 
@@ -790,90 +788,6 @@ func LengthEncodedInt(b []byte) (num uint64, isNull bool, n int) {
 	n = 1
 	return
 }
-
-
-/*
-func (conn *MidConn) handleStmtExecute(data []byte) error {
-	if len(data) < 9 {
-		return UNEXPECT_MIDDLE_WARE_ERR
-	}
-
-	pos := 0
-	id := binary.LittleEndian.Uint32(data[0:4])
-	pos += 4
-
-	s, ok := conn.stmts[id]
-	if !ok {
-		return mysql.NewDefaultError(mysql.ER_UNKNOWN_STMT_HANDLER,
-			strconv.FormatUint(uint64(id), 10), "stmt_execute")
-	}
-
-	flag := data[pos]
-	pos++
-	//now we only support CURSOR_TYPE_NO_CURSOR flag
-	if flag != 0 {
-		return mysql.NewError(mysql.ER_UNKNOWN_ERROR, fmt.Sprintf("unsupported flag %d", flag))
-	}
-
-	//skip iteration-count, always 1
-	pos += 4
-
-	var nullBitmaps []byte
-	var paramTypes []byte
-	var paramValues []byte
-
-	paramNum := s.params
-
-	if paramNum > 0 {
-		nullBitmapLen := (s.params + 7) >> 3
-		if len(data) < (pos + nullBitmapLen + 1) {
-			return mysql.ErrMalformPacket
-		}
-		nullBitmaps = data[pos : pos+nullBitmapLen]
-		pos += nullBitmapLen
-
-		//new param bound flag
-		if data[pos] == 1 {
-			pos++
-			if len(data) < (pos + (paramNum << 1)) {
-				return mysql.ErrMalformPacket
-			}
-
-			paramTypes = data[pos : pos+(paramNum<<1)]
-			pos += (paramNum << 1)
-
-			paramValues = data[pos:]
-		}
-
-		if err := conn.bindStmtArgs(s, nullBitmaps, paramTypes, paramValues); err != nil {
-			return err
-		}
-	}
-
-	var err error
-
-	switch stmt := s.s.(type) {
-	case *sqlparser.Select:
-		err = conn.handleSelect(stmt, s.sql, s.args)
-	case *sqlparser.Insert:
-		err = conn.handleExec(s.s, s.sql, s.args)
-	case *sqlparser.Update:
-		err = conn.handleExec(s.s, s.sql, s.args)
-	case *sqlparser.Delete:
-		err = conn.handleExec(s.s, s.sql, s.args)
-	case *sqlparser.Replace:
-		err = conn.handleExec(s.s, s.sql, s.args)
-	default:
-		err = fmt.Errorf("command %T not supported now", stmt)
-	}
-
-	s.ResetParams()
-
-	return err
-}
-*/
-
-
 
 func (conn *MidConn) makeBindVars(args []interface{}) map[string]interface{} {
 	bindVars := make(map[string]interface{}, len(args))
