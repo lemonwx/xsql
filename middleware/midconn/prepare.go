@@ -6,18 +6,19 @@
 package midconn
 
 import (
-	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/mysql"
 	"strings"
 	"fmt"
 	"encoding/binary"
 	"strconv"
 	"math"
 	"io"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"utils"
 	"time"
+
+	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/sqlparser"
+	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 
@@ -80,16 +81,17 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 
 func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 	var err error
-
-	sql = strings.TrimRight(sql, ";")
-	if stmt.s, err = sqlparser.Parse(sql); err != nil {
-		return fmt.Errorf(`parse sql "%s" error: %v`, sql, err)
-	}
-
-	stmt.originSql = sql
-	stmt.sql = sqlparser.String(stmt.s)
-
 	sstring := sqlparser.String
+
+	if stmt.firstPrepare {
+		sql = strings.TrimRight(sql, ";")
+		if stmt.s, err = sqlparser.Parse(sql); err != nil {
+			return fmt.Errorf(`parse sql "%s" error: %v`, sql, err)
+		}
+
+		stmt.originSql = sql
+		stmt.sql = sqlparser.String(stmt.s)
+	}
 
 	switch v := stmt.s.(type) {
 	case *sqlparser.Update:
@@ -105,37 +107,44 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 		}
 		stmt.forUpdateStmts[idx] = forUpdateStmt
 		stmt.forUpStmtIdMeta[idx] = forUpdateStmt.id
-		//stmt.forUpdateStmts = append(stmt.forUpdateStmts, forUpdateStmt)
 	default:
 		break
 	}
 
-	// send prepare to node[0]
+	// send prepare to node[idx]
+	var id uint32
 	var nodeParams int
 	var nodeColumns uint16
-
-	if err = conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &nodeColumns, &nodeParams); err != nil {
+	if err = conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &id, &nodeColumns, &nodeParams); err != nil {
 		log.Errorf("[%d] send prepare sql to %d faild: %v", conn.ConnectionId, idx, err)
 		return err
 	}
 
-	if err = stmt.ChkEqual(nodeParams, nodeColumns); err != nil {
-		return err
-	}
-
-	// handle cli params and node params
-	if _, ok := stmt.s.(*sqlparser.Select); ok {
-		stmt.cliParams = stmt.nodeParams
-		stmt.cliColumns = stmt.cliColumns - 1
+	if stmt.firstPrepare {
+		stmt.nodeColumns = nodeColumns
+		stmt.nodeParams = nodeParams
+		stmt.id = id
 	} else {
-		stmt.cliParams = stmt.nodeParams - 1
+		if err = stmt.ChkEqual(nodeParams, nodeColumns); err != nil {
+			return err
+		}
 	}
 
 	stmt.stmtIdMeta[idx] = stmt.id
 
-	stmt.InitParams()
-
-	conn.stmts[stmt.id] = stmt
+	if stmt.firstPrepare {
+		// handle cli params and node params
+		if _, ok := stmt.s.(*sqlparser.Select); ok {
+			stmt.cliParams = stmt.nodeParams
+			stmt.cliColumns = stmt.cliColumns - 1
+		} else {
+			stmt.cliParams = stmt.nodeParams - 1
+		}
+		stmt.InitParams()
+		// use node[0]'s stmt id as midconn's  stmt id
+		conn.stmts[stmt.id] = stmt
+		stmt.firstPrepare = false
+	}
 
 	return nil
 }
@@ -227,6 +236,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 
 	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id].cliArgs, data)
 
+	log.Debug(conn.stmts)
 	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
 		conn.stmts[id].s, meta.GetRouter(conn.db), conn.makeBindVars(conn.stmts[id].cliArgs)); err != nil {
 			log.Debugf("[%d] get nodeidx failed: %v", conn.ConnectionId, err)
@@ -234,11 +244,13 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	}
 	log.Debugf("[%d] get nodeidx %v", conn.ConnectionId, conn.nodeIdx)
 
-	if newStmt, err := conn.chkPrepare(conn.stmts[id]); err != nil {
+	if err = conn.chkPrepare(conn.stmts[id]); err != nil {
 		return err
-	} else {
-		conn.stmts[id] = newStmt
 	}
+
+	log.Debug(conn.stmts)
+
+	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id].cliArgs, data)
 
 	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id], data)
 
@@ -476,6 +488,8 @@ func (conn *MidConn) forUpdate(stmt *Stmt) error {
 	} else {
 		// delete use stmt node args[:]
 	}
+
+	log.Debug(stmt.nodeArgs[exprCount:], stmt.forUpStmtIdMeta, conn.nodeIdx)
 	_, err = conn.ExecuteMultiNodePrepare(stmt.nodeArgs[exprCount:], stmt.forUpStmtIdMeta, conn.nodeIdx)
 	if err != nil {
 		return err
@@ -487,6 +501,9 @@ func (conn *MidConn) forUpdate(stmt *Stmt) error {
 func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 	var err error
 
+	stmt.nodeArgs[0] = int64(conn.NextVersion)
+	copy(stmt.nodeArgs[1:], stmt.cliArgs)
+
 	if err = conn.forUpdate(stmt); err != nil {
 		return err
 	}
@@ -495,8 +512,6 @@ func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 		return err
 	}
 
-	stmt.nodeArgs[0] = int64(conn.NextVersion)
-	copy(stmt.nodeArgs[1:], stmt.cliArgs)
 	log.Debug(stmt.nodeArgs)
 	newData := conn.makePkt(stmt.nodeArgs, stmt.id)
 
@@ -551,18 +566,19 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 	}
 }
 
-func (conn *MidConn) chkPrepare(stmt *Stmt) (*Stmt,error) {
-
+func (conn *MidConn) chkPrepare(stmt *Stmt) error {
 	for _, idx := range conn.nodeIdx {
 		if _, ok := stmt.stmtIdMeta[idx]; !ok {
 			log.Debugf("[%d] node :%d need to prepare", conn.ConnectionId, idx)
+
 			if err := conn.myPrepare(stmt, stmt.originSql, idx); err != nil {
-				return nil, err
+				log.Debugf("[%d] re prepare at node: %d failed: %v", conn.ConnectionId, idx, err)
+				return err
 			}
 		}
 	}
 
-	return stmt, nil
+	return nil
 }
 
 func (conn *MidConn) bindStmtArgs(s *Stmt, nullBitmap, paramTypes, paramValues []byte) error {

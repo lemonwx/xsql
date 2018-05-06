@@ -262,7 +262,7 @@ func (conn *MidConn) ExecuteMultiNodePrepare(args []interface{}, stmtMeta map[in
 
 	for idx := 0; idx < len(nodeIdxs); idx += 1 {
 		go func(tmp int) {
-			nodeStmtId := stmtMeta[tmp]
+			nodeStmtId := stmtMeta[nodeIdxs[tmp]]
 			execData := conn.makePkt(args, nodeStmtId)
 			if rs, err := conn.nodes[nodeIdxs[tmp]].Execute(mysql.COM_STMT_EXECUTE, execData); err != nil {
 				rets[tmp] = err

@@ -36,6 +36,8 @@ type Stmt struct {
 	forUpdateStmts map[int]*Stmt
 	forUpStmtIdMeta map[int]uint32
 	forUpdateSql string
+
+	firstPrepare bool
 }
 
 func NewStmt() *Stmt {
@@ -44,7 +46,7 @@ func NewStmt() *Stmt {
 	stmt.forUpdateStmts = make(map[int]*Stmt)
 	stmt.forUpStmtIdMeta = make(map[int]uint32)
 
-	stmt.nodeParams = -1
+	stmt.firstPrepare = true
 
 	return stmt
 }
@@ -66,11 +68,8 @@ func (s *Stmt) ResetParams(size int) {
 
 
 func (s *Stmt) ChkEqual(params int, columns uint16) error {
-	if s.nodeParams == -1 {
-		// first prepare
-		s.nodeParams = params
-		s.nodeColumns = columns
-		return nil
+	if s.firstPrepare {
+		return fmt.Errorf("should not call ChkEqual at first prepare")
 	} else {
 		if s.nodeParams == params && s.nodeColumns == columns {
 			return nil
