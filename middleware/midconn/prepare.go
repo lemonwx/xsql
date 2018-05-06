@@ -24,50 +24,6 @@ import (
 var paramFieldData []byte = (&mysql.Field{}).Dump()
 var columnFieldData []byte = (&mysql.Field{}).Dump()
 
-type Stmt struct {
-	id uint32
-
-	cliParams  int
-	nodeParams int
-
-	cliColumns uint16
-	nodeColumns uint16
-
-	cliArgs []interface{}
-	nodeArgs []interface{}
-
-	s sqlparser.Statement
-
-	sql string
-	originSql string
-
-	stmtIdMeta map[int]uint32
-
-	forUpdateStmts []*Stmt
-	forUpdateSql string
-}
-
-func NewStmt() *Stmt {
-	stmt := new(Stmt)
-	stmt.stmtIdMeta = make(map[int]uint32)
-
-	return stmt
-}
-
-
-func (s *Stmt) InitParams() {
-	s.cliArgs = make([]interface{}, s.cliParams)
-	s.nodeArgs = make([]interface{}, s.nodeParams)
-}
-
-func (s *Stmt) ResetParams(size int) {
-	for idx := 0; idx < s.cliParams; idx += 1 {
-		s.cliArgs[idx] = nil
-	}
-	for idx := 0; idx < s.nodeParams; idx += 1 {
-		s.nodeArgs[idx] = nil
-	}
-}
 
 func (conn *MidConn) writePrepare(s *Stmt) error {
 	data := make([]byte, 4, 128)
@@ -122,22 +78,18 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 	return nil
 }
 
-func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
+func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 	var err error
-
-	stmt := new(Stmt)
 
 	sql = strings.TrimRight(sql, ";")
 	if stmt.s, err = sqlparser.Parse(sql); err != nil {
-		return nil, fmt.Errorf(`parse sql "%s" error`, sql)
+		return fmt.Errorf(`parse sql "%s" error: %v`, sql, err)
 	}
 
 	stmt.originSql = sql
 	stmt.sql = sqlparser.String(stmt.s)
 
-
 	sstring := sqlparser.String
-
 
 	switch v := stmt.s.(type) {
 	case *sqlparser.Update:
@@ -146,20 +98,29 @@ func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 			stmt.forUpdateSql = fmt.Sprintf("select version from %s %s for update", sstring(v.Table), sstring(v.Where))
 		}
 
-		forUpdateStmt, err := conn.myPrepare(stmt.forUpdateSql, idx)
-		log.Debug(forUpdateStmt)
+		forUpdateStmt := NewStmt()
+		err = conn.myPrepare(forUpdateStmt, stmt.forUpdateSql, idx)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		stmt.forUpdateStmts = []*Stmt{forUpdateStmt}
+		stmt.forUpdateStmts[idx] = forUpdateStmt
+		stmt.forUpStmtIdMeta[idx] = forUpdateStmt.id
+		//stmt.forUpdateStmts = append(stmt.forUpdateStmts, forUpdateStmt)
 	default:
 		break
 	}
 
 	// send prepare to node[0]
-	if err = conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &stmt.nodeColumns, &stmt.nodeParams); err != nil {
-		log.Debugf("[%d] send prepare sql to %d faild: %v", conn.ConnectionId, idx, err)
-		return nil, err
+	var nodeParams int
+	var nodeColumns uint16
+
+	if err = conn.nodes[idx].ExecutePrepare([]byte(stmt.sql), &stmt.id, &nodeColumns, &nodeParams); err != nil {
+		log.Errorf("[%d] send prepare sql to %d faild: %v", conn.ConnectionId, idx, err)
+		return err
+	}
+
+	if err = stmt.ChkEqual(nodeParams, nodeColumns); err != nil {
+		return err
 	}
 
 	// handle cli params and node params
@@ -170,15 +131,13 @@ func (conn *MidConn) myPrepare(sql string, idx int) (*Stmt, error) {
 		stmt.cliParams = stmt.nodeParams - 1
 	}
 
-	stmt.stmtIdMeta = map[int]uint32{
-		idx: stmt.id,
-	}
+	stmt.stmtIdMeta[idx] = stmt.id
 
 	stmt.InitParams()
 
 	conn.stmts[stmt.id] = stmt
 
-	return stmt, nil
+	return nil
 }
 
 func (conn *MidConn) handlePrepare(sql string) error {
@@ -190,8 +149,8 @@ func (conn *MidConn) handlePrepare(sql string) error {
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
 
-	stmt, err := conn.myPrepare(sql, 0)
-	if err != nil {
+	stmt := NewStmt()
+	if err = conn.myPrepare(stmt, sql, 0); err != nil {
 		return err
 	}
 
@@ -512,11 +471,11 @@ func (conn *MidConn) forUpdate(stmt *Stmt) error {
 	stmt.forUpdateStmts[0].nodeArgs[0] = stmt.cliArgs[len(stmt.cliArgs) - 1]
 	log.Debug(stmt.forUpdateStmts[0].nodeArgs)
 
-	forUpdateData := conn.makePkt(stmt.forUpdateStmts[0].nodeArgs, stmt.forUpdateStmts[0].id)
-	_, err = conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, forUpdateData, conn.nodeIdx)
+	_, err = conn.ExecuteMultiNodePrepare(stmt.cliArgs[len(stmt.cliArgs) - 1:], stmt.forUpStmtIdMeta, conn.nodeIdx)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -590,21 +549,10 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 func (conn *MidConn) chkPrepare(stmt *Stmt) (*Stmt,error) {
 
 	for _, idx := range conn.nodeIdx {
-		if _, ok := stmt.stmtIdMeta[idx]; ok {
-		} else {
+		if _, ok := stmt.stmtIdMeta[idx]; !ok {
 			log.Debugf("[%d] node :%d need to prepare", conn.ConnectionId, idx)
-			if tmpStmt, err := conn.myPrepare(stmt.originSql, idx); err != nil {
+			if err := conn.myPrepare(stmt, stmt.originSql, idx); err != nil {
 				return nil, err
-			} else {
-				// confirm equal between mutil node's prepare result
-				if tmpStmt.nodeColumns == stmt.nodeColumns && tmpStmt.nodeParams == tmpStmt.nodeParams {
-					stmt.forUpdateStmts = append(stmt.forUpdateStmts, tmpStmt.forUpdateStmts...)
-					stmt.stmtIdMeta[idx] = tmpStmt.stmtIdMeta[idx]
-					return stmt, nil
-
-				} else {
-					return nil, UNEXPECT_MIDDLE_WARE_ERR
-				}
 			}
 		}
 	}
