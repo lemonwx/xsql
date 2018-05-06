@@ -192,8 +192,6 @@ func (c *CliConn) WritePacket(data []byte) error {
 	return c.pkt.WritePacket(data)
 }
 
-
-
 func (c *CliConn) WriteResultsets(status uint16, rs []*mysql.Resultset) error {
 	log.Debugf("[%d] send select rets [%v] to cli", c.connectionId, rs[0].FieldNames)
 

@@ -6,25 +6,23 @@
 package midconn
 
 import (
-	"strings"
-	"fmt"
 	"encoding/binary"
-	"strconv"
-	"math"
+	"fmt"
 	"io"
-	"utils"
+	"math"
+	"strconv"
+	"strings"
 	"time"
+	"utils"
 
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/middleware/meta"
+	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/sqlparser"
 )
-
 
 var paramFieldData []byte = (&mysql.Field{}).Dump()
 var columnFieldData []byte = (&mysql.Field{}).Dump()
-
 
 func (conn *MidConn) writePrepare(s *Stmt) error {
 	data := make([]byte, 4, 128)
@@ -239,8 +237,8 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	log.Debug(conn.stmts)
 	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
 		conn.stmts[id].s, meta.GetRouter(conn.db), conn.makeBindVars(conn.stmts[id].cliArgs)); err != nil {
-			log.Debugf("[%d] get nodeidx failed: %v", conn.ConnectionId, err)
-			return err
+		log.Debugf("[%d] get nodeidx failed: %v", conn.ConnectionId, err)
+		return err
 	}
 	log.Debugf("[%d] get nodeidx %v", conn.ConnectionId, conn.nodeIdx)
 
@@ -276,11 +274,10 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 	//mc := stmt.mc
 
 	// Determine threshould dynamically to avoid packet size shortage.
-	longDataSize := mysql.MaxPayloadLen / len(args) + 1
+	longDataSize := mysql.MaxPayloadLen/len(args) + 1
 	if longDataSize < 64 {
 		longDataSize = 64
 	}
-
 
 	// Reset packet-sequence
 	//mc.sequence = 0
@@ -288,19 +285,19 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 	var data []byte = make([]byte, minPktLen)
 
 	/*
-	if len(args) == 0 {
-		data = mc.buf.takeBuffer(minPktLen)
-	} else {
-		data = mc.buf.takeCompleteBuffer()
-		fmt.Println(data[:4])
-	}
-	if data == nil {
-		// can not take the buffer. Something must be wrong with the connection
-		errLog.Print(ErrBusyBuffer)
-		return errBadConnNoWrite
-	}
+		if len(args) == 0 {
+			data = mc.buf.takeBuffer(minPktLen)
+		} else {
+			data = mc.buf.takeCompleteBuffer()
+			fmt.Println(data[:4])
+		}
+		if data == nil {
+			// can not take the buffer. Something must be wrong with the connection
+			errLog.Print(ErrBusyBuffer)
+			return errBadConnNoWrite
+		}
 
-	fmt.Println(data[:4])
+		fmt.Println(data[:4])
 	*/
 
 	// command [1 byte]
@@ -414,10 +411,10 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 					paramTypes[i+i] = byte(mysql.MYSQL_TYPE_STRING)
 					paramTypes[i+i+1] = 0x00
 
-						paramValues = utils.AppendLengthEncodedInteger(paramValues,
-							uint64(len(v)),
-						)
-						paramValues = append(paramValues, v...)
+					paramValues = utils.AppendLengthEncodedInteger(paramValues,
+						uint64(len(v)),
+					)
+					paramValues = append(paramValues, v...)
 					continue
 				}
 
@@ -430,11 +427,10 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_STRING)
 				paramTypes[i+i+1] = 0x00
 
-					paramValues = utils.AppendLengthEncodedInteger(paramValues,
-						uint64(len(v)),
-					)
-					paramValues = append(paramValues, v...)
-
+				paramValues = utils.AppendLengthEncodedInteger(paramValues,
+					uint64(len(v)),
+				)
+				paramValues = append(paramValues, v...)
 
 			case time.Time:
 				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_STRING)
@@ -515,9 +511,8 @@ func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 	log.Debug(stmt.nodeArgs)
 	newData := conn.makePkt(stmt.nodeArgs, stmt.id)
 
-
 	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, newData, conn.nodeIdx); err != nil {
-		return  err
+		return err
 	} else {
 		return conn.HandleExecRets(rets)
 	}
@@ -527,7 +522,6 @@ func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {
 	//1 0 0 0 0 1 0 0 0 0 1 8 0 254 0 200 0 0 0 0 0 0 0 4 110 97 109 101
 	//1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 57 48 0 0 0 0 0 0 200 0 0 0 0 0 0 0 4 110 97 109 101
 	//1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 49 212 0 0 0 0 0 0 200 0 0 0 0 0 0 0 4 110 97 109 101
-
 
 	var err error
 	if err = conn.getNextVersion(); err != nil {
@@ -542,7 +536,6 @@ func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {
 	log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 57 48 0 0 0 0 0 0 10 0 0 0 0 0 0 0 4 110 97 109 101]")
 	log.Debug(newData)
 	log.Debug(stmt)
-
 
 	if rets, err := conn.ExecuteMultiNodePrepare(stmt.nodeArgs, stmt.stmtIdMeta, conn.nodeIdx); err != nil {
 		return err

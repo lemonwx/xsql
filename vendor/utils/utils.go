@@ -75,7 +75,6 @@ func Uint64ToString(n uint64) []byte {
 	return a[i:]
 }
 
-
 func AppendLengthEncodedInteger(b []byte, n uint64) []byte {
 	switch {
 	case n <= 250:

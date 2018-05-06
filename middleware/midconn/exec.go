@@ -6,14 +6,14 @@
 package midconn
 
 import (
-	"strconv"
 	"fmt"
+	"strconv"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/middleware/meta"
+	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/middleware/version"
-	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {

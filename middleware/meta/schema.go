@@ -1,9 +1,9 @@
 package meta
 
 import (
+	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/middleware/router"
 	"github.com/lemonwx/xsql/node"
-	"github.com/lemonwx/xsql/config"
 )
 
 var m *Meta
@@ -17,10 +17,10 @@ func GetRouter(db string) *router.Router {
 }
 
 type Meta struct {
-	NodeAddrs []*config.Node
+	NodeAddrs    []*config.Node
 	FullNodeIdxs []int
-	nodes map[string]*node.Node
-	Routers map[string]*router.Router
+	nodes        map[string]*node.Node
+	Routers      map[string]*router.Router
 }
 
 func GetNodeAddrs() []*config.Node {

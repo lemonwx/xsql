@@ -44,7 +44,6 @@ func NewConnPool(factory Factory, initSize, maxSize int) (*ConnPool, error) {
 	return cp, nil
 }
 
-
 func (cp *ConnPool) Get() (*Conn, error) {
 	if cp.closed {
 		return nil, POOL_HAS_CLOSED_ERR

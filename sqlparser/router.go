@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/lemonwx/xsql/middleware/router"
-	"github.com/lemonwx/log"
 	"fmt"
+	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/middleware/router"
 )
 
 const (

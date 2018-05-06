@@ -7,9 +7,9 @@ package midconn
 
 import (
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {

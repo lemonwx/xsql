@@ -35,9 +35,9 @@ type Conf struct {
 	RedisCfg   RedisConf `yaml:"RedisCfg"`
 	Xa         bool      `yaml:"XA"`
 	VerSeqAddr string    `yaml:"VerSeqAddr"`
-	MaxSize   int       `yaml:"MaxSize"`
+	MaxSize    int       `yaml:"MaxSize"`
 	InitSize   int       `yaml:"InitSize"`
-	Batch     int       `yaml:"Batch"`
+	Batch      int       `yaml:"Batch"`
 }
 
 func ReadConf() *Conf {

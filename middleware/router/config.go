@@ -15,8 +15,8 @@ var (
 
 type RuleConfig struct {
 	Table string
-	Key string
-	Type string
+	Key   string
+	Type  string
 	Nodes []string
 }
 
@@ -100,14 +100,14 @@ func (c *RuleConfig) parseShard(r *Rule) error {
 		r.Shard = &HashShard{ShardNum: len(r.Nodes)}
 	} else if r.Type == RangeRuleType {
 		/*
-		rs, err := ParseNumShardingSpec(c.Range)
-		if err != nil {
-			return err
-		}
+			rs, err := ParseNumShardingSpec(c.Range)
+			if err != nil {
+				return err
+			}
 
-		if len(rs) != len(r.Nodes) {
-			return fmt.Errorf("range space %d not equal nodes %d", len(rs), len(r.Nodes))
-		}*/
+			if len(rs) != len(r.Nodes) {
+				return fmt.Errorf("range space %d not equal nodes %d", len(rs), len(r.Nodes))
+			}*/
 
 		//r.Shard = &NumRangeShard{Shards: rs}
 	} else {

@@ -15,10 +15,10 @@ var cfg *config.Conf
 func setupConfig() {
 	cfg = config.ReadConf()
 	/*
-	for idx, node := range cfg.Nodes {
-		meta.NodeAddrs = append(meta.NodeAddrs, node)
-		meta.FullNodeIdxs = append(meta.FullNodeIdxs, idx)
-	}
+		for idx, node := range cfg.Nodes {
+			meta.NodeAddrs = append(meta.NodeAddrs, node)
+			meta.FullNodeIdxs = append(meta.FullNodeIdxs, idx)
+		}
 	*/
 }
 

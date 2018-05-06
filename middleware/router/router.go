@@ -2,8 +2,8 @@ package router
 
 import (
 	"fmt"
-	"strings"
 	"github.com/lemonwx/log"
+	"strings"
 )
 
 type Rule struct {

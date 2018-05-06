@@ -36,9 +36,8 @@ type Node struct {
 	VersionsInUse map[uint64]uint8
 	NextVersion   uint64
 	NeedHide      bool
-	IsStmt bool
+	IsStmt        bool
 }
-
 
 func (node *Node) String() string {
 	return node.addr
@@ -272,7 +271,6 @@ func (node *Node) readPrepareResultPacket(id *uint32, columnCount *uint16, param
 	return err
 }
 
-
 func (node *Node) ExecutePrepare(data []byte, id *uint32, columntCount *uint16, paramCount *int) error {
 	if err := node.executeSql(mysql.COM_STMT_PREPARE, data); err != nil {
 		return err
@@ -449,7 +447,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 
 func (node *Node) calcVersion(rs *mysql.Result, data *[]byte) (uint64, error) {
 	if node.IsStmt {
-		pos := 1 + (len(rs.Fields) + 1 +7+2)>>3
+		pos := 1 + (len(rs.Fields)+1+7+2)>>3
 		nullMask := (*data)[1:pos]
 		if ((nullMask[(0+2)>>3] >> uint((0+2)&7)) & 1) == 1 {
 			return 0, errors.New("UNEXPECT VERSION IS NULL")

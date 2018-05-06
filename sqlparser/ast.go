@@ -7,8 +7,8 @@ package sqlparser
 import (
 	"errors"
 
-	"github.com/lemonwx/xsql/sqltypes"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/sqltypes"
 )
 
 // Instructions for creating new types: If a type
@@ -681,7 +681,7 @@ func (node ValTuple) Format(buf *TrackedBuffer) {
 // It's not a valid expression because it's not parenthesized.
 type ValExprs []ValExpr
 
-func NewValExprs (expr ValExpr) ValExprs {
+func NewValExprs(expr ValExpr) ValExprs {
 	switch expr.(type) {
 	case ValArg:
 		return ValExprs{ValArg("?"), expr}
@@ -707,7 +707,6 @@ func NewUpdateExprs(expr *UpdateExpr) UpdateExprs {
 	}
 	return UpdateExprs{vExpr, expr}
 }
-
 
 func (node ValExprs) Format(buf *TrackedBuffer) {
 	var prefix string
@@ -825,7 +824,7 @@ func (node Values) Format(buf *TrackedBuffer) {
 // GroupBy represents a GROUP BY clause.
 type GroupBy []ValExpr
 
-func NewGroupBy(vals []ValExpr) GroupBy{
+func NewGroupBy(vals []ValExpr) GroupBy {
 	if len(vals) == 0 {
 		return nil
 	}

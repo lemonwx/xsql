@@ -175,7 +175,6 @@ func (p *PacketIO) ReadUntilEOF() (err error) {
 	return
 }
 
-
 func (p *PacketIO) IsEOFPacket(data []byte) bool {
 	return data[0] == EOF_HEADER && len(data) <= 5
 }

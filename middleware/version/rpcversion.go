@@ -8,8 +8,8 @@ package version
 import (
 	"errors"
 	"net/rpc"
-	"sync"
 	"rpcpool"
+	"sync"
 )
 
 const (
@@ -28,7 +28,7 @@ var pool *rpcpool.ConnPool
 func NewRpcPool(initSize, maxSize int, addr string) {
 	var err error
 	pool, err = rpcpool.NewConnPool(
-		func()(*rpc.Client, error){
+		func() (*rpc.Client, error) {
 			return rpc.DialHTTP("tcp", addr)
 		},
 		initSize,
@@ -88,5 +88,3 @@ func VersionsInUse() (map[uint64]uint8, error) {
 	}
 	return vInuse, nil
 }
-
-

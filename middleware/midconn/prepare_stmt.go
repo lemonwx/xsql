@@ -5,13 +5,10 @@
 
 package midconn
 
-
 import (
-	"github.com/lemonwx/xsql/sqlparser"
 	"fmt"
+	"github.com/lemonwx/xsql/sqlparser"
 )
-
-
 
 type Stmt struct {
 	id uint32
@@ -19,23 +16,23 @@ type Stmt struct {
 	cliParams  int
 	nodeParams int
 
-	cliColumns uint16
+	cliColumns  uint16
 	nodeColumns uint16
 
-	cliArgs []interface{}
+	cliArgs  []interface{}
 	nodeArgs []interface{}
 
 	s sqlparser.Statement
 
-	sql string
+	sql       string
 	originSql string
 
 	stmtIdMeta map[int]uint32
 
 	//forUpdateStmts []*Stmt
-	forUpdateStmts map[int]*Stmt
+	forUpdateStmts  map[int]*Stmt
 	forUpStmtIdMeta map[int]uint32
-	forUpdateSql string
+	forUpdateSql    string
 
 	firstPrepare bool
 }
@@ -51,7 +48,6 @@ func NewStmt() *Stmt {
 	return stmt
 }
 
-
 func (s *Stmt) InitParams() {
 	s.cliArgs = make([]interface{}, s.cliParams)
 	s.nodeArgs = make([]interface{}, s.nodeParams)
@@ -65,7 +61,6 @@ func (s *Stmt) ResetParams(size int) {
 		s.nodeArgs[idx] = nil
 	}
 }
-
 
 func (s *Stmt) ChkEqual(params int, columns uint16) error {
 	if s.firstPrepare {

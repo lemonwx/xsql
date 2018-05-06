@@ -15,10 +15,10 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/client"
+	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/sqlparser"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"hack"
 )
 
@@ -254,7 +254,6 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 	return rs, nil
 }
 
-
 func (conn *MidConn) ExecuteMultiNodePrepare(args []interface{}, stmtMeta map[int]uint32, nodeIdxs []int) ([]*mysql.Result, error) {
 	rets := make([]interface{}, len(nodeIdxs))
 	wg := sync.WaitGroup{}
@@ -301,7 +300,6 @@ func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 	for idx, ret := range rets {
 		rs[idx] = ret.Resultset
 	}
-
 
 	return conn.cli.WriteResultsets(conn.status[0], rs)
 
@@ -370,7 +368,6 @@ func (conn *MidConn) Close() {
 		node.Close()
 	}
 }
-
 
 func (c *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset {
 	r := new(mysql.Resultset)
