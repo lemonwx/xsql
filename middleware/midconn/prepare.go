@@ -468,10 +468,15 @@ func (conn *MidConn) forUpdate(stmt *Stmt) error {
 	conn.setupNodeStatus(conn.VersionsInUse, true, true)
 	defer conn.setupNodeStatus(nil, false, false)
 
-	stmt.forUpdateStmts[0].nodeArgs[0] = stmt.cliArgs[len(stmt.cliArgs) - 1]
-	log.Debug(stmt.forUpdateStmts[0].nodeArgs)
+	log.Debug(stmt.nodeArgs, stmt.nodeArgs, stmt.s.(*sqlparser.Update).Exprs)
 
-	_, err = conn.ExecuteMultiNodePrepare(stmt.cliArgs[len(stmt.cliArgs) - 1:], stmt.forUpStmtIdMeta, conn.nodeIdx)
+	var exprCount int
+	if v, ok := stmt.s.(*sqlparser.Update); ok {
+		exprCount = len(v.Exprs)
+	} else {
+		// delete use stmt node args[:]
+	}
+	_, err = conn.ExecuteMultiNodePrepare(stmt.nodeArgs[exprCount:], stmt.forUpStmtIdMeta, conn.nodeIdx)
 	if err != nil {
 		return err
 	}
