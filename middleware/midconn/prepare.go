@@ -117,6 +117,10 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 		}
 		stmt.updateStmts[idx] = updateStmt
 		stmt.updateStmtIdMeta[idx] = updateStmt.id
+
+		stmt.forUpdateStmts[idx] = updateStmt.forUpdateStmts[idx]
+		stmt.forUpStmtIdMeta[idx] = updateStmt.forUpStmtIdMeta[idx]
+
 	default:
 		break
 	}
@@ -253,7 +257,6 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 
 	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id].cliArgs, data)
 
-	log.Debug(conn.stmts)
 	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
 		conn.stmts[id].s, meta.GetRouter(conn.db), conn.makeBindVars(conn.stmts[id].cliArgs)); err != nil {
 		log.Debugf("[%d] get nodeidx failed: %v", conn.ConnectionId, err)
@@ -265,11 +268,9 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 		return err
 	}
 
-	log.Debug(conn.stmts)
-
 	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id].cliArgs, data)
-
-	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id], data)
+	log.Debugf("[%d] prepare stmt: updateStmtMetaId: %v, forUpdateStmtMetaId: %v",
+		conn.ConnectionId, conn.stmts[id].updateStmtIdMeta, conn.stmts[id].forUpStmtIdMeta)
 
 	switch conn.stmts[id].s.(type) {
 	case *sqlparser.Select:
@@ -282,7 +283,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	case *sqlparser.Delete:
 		log.Debug(data)
 		log.Debug(conn.stmts[id])
-		return fmt.Errorf("un support stmt exec")
+		return conn.ExecuteDelete(conn.stmts[id])
 	default:
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
@@ -489,7 +490,39 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 	return data[5:]
 }
 
-func (conn *MidConn) forUpdate(stmt *Stmt) error {
+func (conn *MidConn) ExecuteDelete(stmt *Stmt) error {
+
+	var err error
+
+	log.Debug(stmt.cliArgs)
+
+	if err = conn.forUpdate(stmt, stmt.cliArgs); err != nil {
+		return err
+	}
+
+	if err = conn.getNextVersion(); err != nil {
+		return err
+	}
+
+	args := make([]interface{}, len(stmt.cliArgs)+1)
+	args[0] = int64(conn.NextVersion)
+	copy(args[1:], stmt.cliArgs)
+
+	log.Debug(args, stmt.cliArgs, conn.stmts[stmt.updateStmtIdMeta[1]])
+	if _, err = conn.ExecuteMultiNodePrepare(args, stmt.updateStmtIdMeta, conn.nodeIdx); err != nil {
+		log.Errorf("[%d] execute update version before delete failed: %v", conn.ConnectionId, err)
+		return err
+	}
+
+	if rets, err := conn.ExecuteMultiNodePrepare(stmt.cliArgs, stmt.stmtIdMeta, conn.nodeIdx); err != nil {
+		log.Errorf("[%d] exec delete failed: %v", conn.ConnectionId, err)
+		return err
+	} else {
+		return conn.HandleExecRets(rets)
+	}
+}
+
+func (conn *MidConn) forUpdate(stmt *Stmt, args []interface{}) error {
 	var err error
 
 	if err = conn.getVInUse(); err != nil {
@@ -499,8 +532,6 @@ func (conn *MidConn) forUpdate(stmt *Stmt) error {
 	conn.setupNodeStatus(conn.VersionsInUse, true, true)
 	defer conn.setupNodeStatus(nil, false, false)
 
-	log.Debug(stmt.nodeArgs, stmt.nodeArgs, stmt.s.(*sqlparser.Update).Exprs)
-
 	var exprCount int
 	if v, ok := stmt.s.(*sqlparser.Update); ok {
 		exprCount = len(v.Exprs)
@@ -508,8 +539,8 @@ func (conn *MidConn) forUpdate(stmt *Stmt) error {
 		// delete use stmt node args[:]
 	}
 
-	log.Debug(stmt.nodeArgs[exprCount:], stmt.forUpStmtIdMeta, conn.nodeIdx)
-	_, err = conn.ExecuteMultiNodePrepare(stmt.nodeArgs[exprCount:], stmt.forUpStmtIdMeta, conn.nodeIdx)
+	log.Debug(args[exprCount:], stmt.forUpStmtIdMeta, conn.nodeIdx)
+	_, err = conn.ExecuteMultiNodePrepare(args[exprCount:], stmt.forUpStmtIdMeta, conn.nodeIdx)
 	if err != nil {
 		return err
 	}
@@ -520,21 +551,20 @@ func (conn *MidConn) forUpdate(stmt *Stmt) error {
 func (conn *MidConn) ExecuteUpdate(stmt *Stmt) error {
 	var err error
 
-	stmt.nodeArgs[0] = int64(conn.NextVersion)
-	copy(stmt.nodeArgs[1:], stmt.cliArgs)
-
-	if err = conn.forUpdate(stmt); err != nil {
-		return err
-	}
-
 	if err = conn.getNextVersion(); err != nil {
 		return err
 	}
 
-	log.Debug(stmt.nodeArgs)
-	newData := conn.makePkt(stmt.nodeArgs, stmt.id)
+	stmt.nodeArgs[0] = int64(conn.NextVersion)
+	copy(stmt.nodeArgs[1:], stmt.cliArgs)
 
-	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, newData, conn.nodeIdx); err != nil {
+	if err = conn.forUpdate(stmt, stmt.nodeArgs); err != nil {
+		return err
+	}
+
+	log.Debug(stmt.nodeArgs)
+
+	if rets, err := conn.ExecuteMultiNodePrepare(stmt.nodeArgs, stmt.stmtIdMeta, conn.nodeIdx); err != nil {
 		return err
 	} else {
 		return conn.HandleExecRets(rets)

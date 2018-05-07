@@ -34,9 +34,9 @@ type Stmt struct {
 	forUpStmtIdMeta map[int]uint32
 	forUpdateSql    string
 
-	updateStmts map[int]*Stmt
+	updateStmts      map[int]*Stmt
 	updateStmtIdMeta map[int]uint32
-	updateSql string
+	updateSql        string
 
 	firstPrepare bool
 }
