@@ -93,7 +93,7 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 
 	switch v := stmt.s.(type) {
 	case *sqlparser.Update:
-		log.Debug("update prepare")
+		log.Debugf("[%d] update prepare", conn.ConnectionId)
 		if stmt.forUpdateSql == "" {
 			stmt.forUpdateSql = fmt.Sprintf("select version from %s %s for update", sstring(v.Table), sstring(v.Where))
 		}
@@ -105,6 +105,18 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 		}
 		stmt.forUpdateStmts[idx] = forUpdateStmt
 		stmt.forUpStmtIdMeta[idx] = forUpdateStmt.id
+	case *sqlparser.Delete:
+		log.Debugf("[%d] delete prepare", conn.ConnectionId)
+		if stmt.updateSql == "" {
+			stmt.updateSql = fmt.Sprintf("update %s set version = ? %s", sstring(v.Table), sstring(v.Where))
+		}
+		updateStmt := NewStmt()
+		err = conn.myPrepare(updateStmt, stmt.updateSql, idx)
+		if err != nil {
+			return err
+		}
+		stmt.updateStmts[idx] = updateStmt
+		stmt.updateStmtIdMeta[idx] = updateStmt.id
 	default:
 		break
 	}
@@ -132,12 +144,17 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 
 	if stmt.firstPrepare {
 		// handle cli params and node params
-		if _, ok := stmt.s.(*sqlparser.Select); ok {
+		switch stmt.s.(type) {
+		case *sqlparser.Select:
 			stmt.cliParams = stmt.nodeParams
 			stmt.cliColumns = stmt.cliColumns - 1
-		} else {
+		case *sqlparser.Update, *sqlparser.Insert:
 			stmt.cliParams = stmt.nodeParams - 1
+		case *sqlparser.Delete:
+			stmt.cliParams = stmt.nodeParams
+			stmt.cliColumns = stmt.nodeColumns
 		}
+
 		stmt.InitParams()
 		// use node[0]'s stmt id as midconn's  stmt id
 		conn.stmts[stmt.id] = stmt
@@ -160,6 +177,8 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	if err = conn.myPrepare(stmt, sql, 0); err != nil {
 		return err
 	}
+
+	log.Debug(stmt)
 
 	// send prepare result to mysql cli
 	if err = conn.writePrepare(stmt); err != nil {
@@ -260,6 +279,10 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	case *sqlparser.Update:
 		log.Debug(data)
 		return conn.ExecuteUpdate(conn.stmts[id])
+	case *sqlparser.Delete:
+		log.Debug(data)
+		log.Debug(conn.stmts[id])
+		return fmt.Errorf("un support stmt exec")
 	default:
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}

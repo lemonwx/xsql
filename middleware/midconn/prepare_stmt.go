@@ -34,14 +34,22 @@ type Stmt struct {
 	forUpStmtIdMeta map[int]uint32
 	forUpdateSql    string
 
+	updateStmts map[int]*Stmt
+	updateStmtIdMeta map[int]uint32
+	updateSql string
+
 	firstPrepare bool
 }
 
 func NewStmt() *Stmt {
 	stmt := new(Stmt)
 	stmt.stmtIdMeta = make(map[int]uint32)
+
 	stmt.forUpdateStmts = make(map[int]*Stmt)
 	stmt.forUpStmtIdMeta = make(map[int]uint32)
+
+	stmt.updateStmtIdMeta = make(map[int]uint32)
+	stmt.updateStmts = make(map[int]*Stmt)
 
 	stmt.firstPrepare = true
 
