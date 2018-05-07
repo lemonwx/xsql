@@ -691,6 +691,11 @@ func NewValExprs(expr ValExpr) ValExprs {
 }
 
 func NewUpdateExprs(expr *UpdateExpr) UpdateExprs {
+
+	if string(expr.Name.Name) == "version" {
+		return UpdateExprs{expr}
+	}
+
 	var vExpr *UpdateExpr
 	switch expr.Expr.(type) {
 	case ValArg:
