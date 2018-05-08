@@ -19,12 +19,21 @@ import (
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
-func (conn *MidConn) handleBegin() {
-
-	if conn.status[0] == conn.defaultStatus {
-		conn.status[0] = mysql.SERVER_STATUS_IN_TRANS
-		conn.executedIdx = make(map[int]uint8)
+func (conn *MidConn) handleBegin(isBegin bool) {
+	if isBegin {
+		// 显式 begin / start transaction
+		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
+			// current is in trx, so need commit first
+			conn.handleCommit("commit")
+		}
+		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
+	} else {
+		if conn.status[0] == conn.defaultStatus {
+			conn.status[0] = mysql.SERVER_STATUS_IN_TRANS
+		}
 	}
+
+	conn.executedIdx = make(map[int]uint8)
 }
 
 func (conn *MidConn) getExecutedNodeIdx() []int {
@@ -38,7 +47,7 @@ func (conn *MidConn) getExecutedNodeIdx() []int {
 	return ret
 }
 
-func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
+func (conn *MidConn) handleCommit(sql string) error {
 
 	commit := false
 
@@ -80,7 +89,7 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 }
 
 func (conn *MidConn) handleStmtTrx(data []byte) error {
-	conn.handleBegin()
+	conn.handleBegin(false)
 
 
 	err := conn.handleStmtExecute(data)
@@ -94,11 +103,11 @@ func (conn *MidConn) handleStmtTrx(data []byte) error {
 		return err
 	}
 
-	return conn.handleCommit(nil,  "")
+	return conn.handleCommit("")
 }
 
 func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
-	conn.handleBegin()
+	conn.handleBegin(false)
 	var err error
 
 	switch v := stmt.(type) {
@@ -123,5 +132,5 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 		return err
 	}
 
-	return conn.handleCommit(nil, "")
+	return conn.handleCommit("")
 }

@@ -138,6 +138,7 @@ func (conn *MidConn) dispatch(sql []byte) error {
 	case mysql.COM_QUERY:
 		return conn.handleQuery(string(sql))
 	case mysql.COM_QUIT:
+		conn.Close()
 	case mysql.COM_FIELD_LIST:
 		return conn.handleFieldList(sql)
 	case mysql.COM_INIT_DB:
@@ -166,10 +167,10 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Set:
 		return conn.handleSet(v, sql)
 	case *sqlparser.Begin:
-		conn.handleBegin()
+		conn.handleBegin(true)
 		return conn.cli.WriteOK(nil)
 	case *sqlparser.Commit, *sqlparser.Rollback:
-		err = conn.handleCommit(nil, sqlparser.String(v))
+		err = conn.handleCommit(sqlparser.String(v))
 		if err != nil {
 			return err
 		}
