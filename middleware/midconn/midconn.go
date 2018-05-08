@@ -38,6 +38,7 @@ type MidConn struct {
 	NextVersion   uint64
 
 	nodeIdx []int // node that has exec sql in the trx
+	executedIdx []int
 
 	stmts map[uint32]*Stmt
 }
@@ -141,10 +142,11 @@ func (conn *MidConn) dispatch(sql []byte) error {
 	case mysql.COM_INIT_DB:
 		return conn.handleUse(sql)
 	case mysql.COM_STMT_PREPARE:
-		return conn.handlePrepare(string(sql))
+		return conn.handlePrepare(hack.String(sql))
 	case mysql.COM_STMT_EXECUTE:
 		//return conn.handleExecute(sql)
-		return conn.handleStmtExecute(sql)
+		//return conn.handleStmtExecute(sql)
+		return conn.handleStmtTrx(sql)
 	}
 
 	return nil
@@ -163,10 +165,6 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Set:
 		return conn.handleSet(v, sql)
 	case *sqlparser.Begin:
-		/*
-			1. get next version
-			2. get versions in use
-		*/
 		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
 		return conn.cli.WriteOK(nil)
 	case *sqlparser.Commit, *sqlparser.Rollback:

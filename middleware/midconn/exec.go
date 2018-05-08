@@ -18,7 +18,7 @@ import (
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
 	var err error
-	if err = conn.getNodeIdxs(stmt); err != nil {
+	if err = conn.getNodeIdxs(stmt, nil); err != nil {
 		return err
 	} else if conn.nodeIdx == nil {
 		return conn.cli.WriteOK(nil)
@@ -57,7 +57,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	var err error
 
 	// router
-	if err = conn.getNodeIdxs(stmt); err != nil {
+	if err = conn.getNodeIdxs(stmt, nil); err != nil {
 		return err
 	} else if conn.nodeIdx == nil {
 		return conn.cli.WriteOK(nil)
@@ -93,7 +93,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 
 	var err error
 
-	if err = conn.getNodeIdxs(stmt); err != nil {
+	if err = conn.getNodeIdxs(stmt, nil); err != nil {
 		return err
 	} else if conn.nodeIdx == nil {
 		return conn.cli.WriteOK(nil)
@@ -195,12 +195,13 @@ func (conn *MidConn) getVInUse() error {
 	return nil
 }
 
-func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement) error {
+func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]interface{}) error {
 	var err error
 	if conn.db == "" {
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
-	conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(stmt, meta.GetRouter(conn.db), nil)
+
+	conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(stmt, meta.GetRouter(conn.db), bindVars)
 	//conn.nodeIdx, err = router.GetNodeIdxs(stmt)
 
 	if err != nil {

@@ -16,7 +16,6 @@ import (
 	"utils"
 
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 )
@@ -257,8 +256,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 
 	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id].cliArgs, data)
 
-	if conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(
-		conn.stmts[id].s, meta.GetRouter(conn.db), conn.makeBindVars(conn.stmts[id].cliArgs)); err != nil {
+	if err = conn.getNodeIdxs(conn.stmts[id].s, conn.makeBindVars(conn.stmts[id].cliArgs)); err != nil {
 		log.Debugf("[%d] get nodeidx failed: %v", conn.ConnectionId, err)
 		return err
 	}

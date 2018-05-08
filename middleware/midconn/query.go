@@ -38,7 +38,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) error {
 
 	var err error
 
-	if err = conn.getNodeIdxs(stmt); err != nil {
+	if err = conn.getNodeIdxs(stmt, nil); err != nil {
 		return err
 	} else if conn.nodeIdx == nil {
 		return conn.writeResultset(conn.status[0], conn.newEmptyResultset(stmt))
