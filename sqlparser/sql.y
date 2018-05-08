@@ -85,7 +85,7 @@ var (
 %left <empty> END
 
 // Transaction Tokens
-%token <empty> BEGIN COMMIT ROLLBACK AUTOCOMMIT
+%token <empty> BEGIN COMMIT ROLLBACK AUTOCOMMIT START TRANSACTION
 
 // Charset Tokens
 %token <empty> NAMES 
@@ -271,7 +271,9 @@ begin_statement:
   {
     $$ = &Begin{}
   }
-
+  | START TRANSACTION {
+    $$ = &Begin{}
+  }
 commit_statement:
   COMMIT
   {
