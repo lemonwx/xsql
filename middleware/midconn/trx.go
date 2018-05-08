@@ -14,7 +14,6 @@ package midconn
 
 import (
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
@@ -24,7 +23,19 @@ func (conn *MidConn) handleBegin() {
 
 	if conn.status[0] == conn.defaultStatus {
 		conn.status[0] = mysql.SERVER_STATUS_IN_TRANS
+		conn.executedIdx = make(map[int]uint8)
 	}
+}
+
+func (conn *MidConn) getExecutedNodeIdx() []int {
+	ret := make([]int, 0, len(conn.executedIdx))
+	for k, _ := range conn.executedIdx {
+		ret = append(ret, k)
+	}
+
+	log.Debug(conn.executedIdx, ret)
+
+	return ret
 }
 
 func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
@@ -59,13 +70,31 @@ func (conn *MidConn) handleCommit(nodeIdx []int, sql string) error {
 		conn.NextVersion = 0
 		conn.VersionsInUse = nil
 
-		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
+		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.getExecutedNodeIdx())
 		if err != nil {
 			return err
 		}
 	}
 	return nil
 
+}
+
+func (conn *MidConn) handleStmtTrx(data []byte) error {
+	conn.handleBegin()
+
+
+	err := conn.handleStmtExecute(data)
+
+	if err != nil {
+		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
+			conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
+				conn.status[0] = mysql.SERVER_NOT_SERVE
+		}
+
+		return err
+	}
+
+	return conn.handleCommit(nil,  "")
 }
 
 func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {

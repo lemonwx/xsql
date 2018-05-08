@@ -38,7 +38,7 @@ type MidConn struct {
 	NextVersion   uint64
 
 	nodeIdx []int // node that has exec sql in the trx
-	executedIdx []int
+	executedIdx map[int]uint8
 
 	stmts map[uint32]*Stmt
 }
@@ -108,6 +108,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	midConn.NextVersion = 0
 
 	midConn.stmts = make(map[uint32]*Stmt)
+	midConn.executedIdx = make(map[int]uint8)
 
 	return midConn, nil
 }
@@ -165,7 +166,7 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Set:
 		return conn.handleSet(v, sql)
 	case *sqlparser.Begin:
-		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
+		conn.handleBegin()
 		return conn.cli.WriteOK(nil)
 	case *sqlparser.Commit, *sqlparser.Rollback:
 		err = conn.handleCommit(nil, sqlparser.String(v))

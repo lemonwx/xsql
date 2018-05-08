@@ -316,6 +316,10 @@ func (node *Node) writeCommandStrStr(command byte, arg1 string, arg2 string) err
 	return node.writePacket(data)
 }
 
+func (node *Node) ParseResult() (*mysql.Result, error) {
+	return node.parseResult()
+}
+
 func (node *Node) parseResult() (*mysql.Result, error) {
 	data, err := node.readPacket()
 	if err != nil {
@@ -536,6 +540,10 @@ func (node *Node) FieldList(table string, wildcard string) ([]*mysql.Field, erro
 		}
 	}
 	return nil, fmt.Errorf("field list error")
+}
+
+func (node *Node) WritePacket(data []byte) error {
+	return node.pkt.WritePacket(data)
 }
 
 func (node *Node) writePacket(data []byte) error {
