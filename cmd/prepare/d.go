@@ -1,6 +1,6 @@
 /**
  *  author: lim
- *  data  : 18-4-24 下午9:52
+ *  data  : 18-5-4 下午12:23
  */
 
 package main
@@ -19,18 +19,19 @@ func handleErr(err error) {
 }
 
 func main() {
-	//db, err := sql.Open("mysql", "root:root@tcp(172.17.0.3:5518)/db")
+	//db, err := sql.Open("mysql", "root:root@tcp(172.17.0.2:5518)/db")
 	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.6:1234)/db")
 	handleErr(err)
 
 	//srvstmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")
-	stmt, err := db.Prepare("insert into tb (id, name) values (?, ?)")
+	stmt, err := db.Prepare("delete from tb where id = ?")
 	handleErr(err)
 	fmt.Println(stmt)
 
-	x := 1
+	x := 0
 	for idx := x; idx < x+20; idx += 1 {
-		rs, err := stmt.Exec(idx, "name")
+		rs, err := stmt.Exec(idx)
+
 		handleErr(err)
 
 		fmt.Println("---------------", idx)

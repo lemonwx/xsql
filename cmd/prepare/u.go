@@ -20,7 +20,7 @@ func handleErr(err error) {
 
 func main() {
 	//db, err := sql.Open("mysql", "root:root@tcp(172.17.0.2:5518)/db")
-	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.2:1234)/db")
+	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.6:1234)/db")
 	handleErr(err)
 
 	//srvstmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")
@@ -28,9 +28,10 @@ func main() {
 	handleErr(err)
 	fmt.Println(stmt)
 
-	x := 80
-	for idx := x; idx < x + 20; idx += 1{
-		rs, err := stmt.Exec("lmmmmmmmmmmmmmmmmmmmmmmmmmmm", idx)
+	x := 1
+	for idx := x; idx < x+2; idx += 1 {
+		rs, err := stmt.Exec("111111", idx)
+
 		handleErr(err)
 
 		fmt.Println("---------------", idx)
@@ -40,11 +41,11 @@ func main() {
 		handleErr(err)
 
 		fmt.Println("---------------", af, id, idx)
-		db.Exec("commit")
 	}
 
 	for {
 		time.Sleep(time.Second * 10)
 	}
 
+	defer db.Close()
 }
