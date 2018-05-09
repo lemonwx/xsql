@@ -210,7 +210,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 			strconv.FormatUint(uint64(id), 10), "stmt_execute")
 	}
 
-	log.Debug(conn.stmts[id].stmtIdMeta)
+	//log.Debug(conn.stmts[id].stmtIdMeta)
 
 	flag := data[pos]
 	pos++
@@ -253,7 +253,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 			return err
 		}
 	}
-
+	log.Debugf("[%d] prepare sql: %s", conn.ConnectionId, conn.stmts[id].originSql)
 	log.Debugf("[%d] prepare stmt: %v, exec: %v", conn.ConnectionId, conn.stmts[id].cliArgs, data)
 
 	if err = conn.getNodeIdxs(conn.stmts[id].s, conn.makeBindVars(conn.stmts[id].cliArgs)); err != nil {
@@ -385,6 +385,23 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 
 			// cache types and values
 			switch v := arg.(type) {
+			case int32:
+				v1 := int64(v)
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_LONGLONG)
+				paramTypes[i+i+1] = 0x00
+
+				if cap(paramValues)-len(paramValues)-8 >= 0 {
+					paramValues = paramValues[:len(paramValues)+8]
+					binary.LittleEndian.PutUint64(
+						paramValues[len(paramValues)-8:],
+						uint64(v1),
+					)
+				} else {
+					paramValues = append(paramValues,
+						utils.Uint64ToBytes(uint64(v1))...,
+					)
+				}
+
 			case int64:
 				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_LONGLONG)
 				paramTypes[i+i+1] = 0x00
@@ -401,6 +418,22 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 					)
 				}
 
+			case float32:
+				v1 := float64(v)
+				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_DOUBLE)
+				paramTypes[i+i+1] = 0x00
+
+				if cap(paramValues)-len(paramValues)-8 >= 0 {
+					paramValues = paramValues[:len(paramValues)+8]
+					binary.LittleEndian.PutUint64(
+						paramValues[len(paramValues)-8:],
+						math.Float64bits(v1),
+					)
+				} else {
+					paramValues = append(paramValues,
+						utils.Uint64ToBytes(math.Float64bits(v1))...,
+					)
+				}
 			case float64:
 				paramTypes[i+i] = byte(mysql.MYSQL_TYPE_DOUBLE)
 				paramTypes[i+i+1] = 0x00
@@ -581,12 +614,6 @@ func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {
 
 	stmt.nodeArgs[0] = int64(conn.NextVersion)
 	copy(stmt.nodeArgs[1:], stmt.cliArgs)
-	log.Debug(stmt.nodeArgs)
-
-	newData := conn.makePkt(stmt.nodeArgs, stmt.id)
-	log.Debug("[1 0 0 0 0 1 0 0 0 0 1 8 0 8 0 254 0 57 48 0 0 0 0 0 0 10 0 0 0 0 0 0 0 4 110 97 109 101]")
-	log.Debug(newData)
-	log.Debug(stmt)
 
 	if rets, err := conn.ExecuteMultiNodePrepare(stmt.nodeArgs, stmt.stmtIdMeta, conn.nodeIdx); err != nil {
 		return err
