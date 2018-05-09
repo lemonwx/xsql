@@ -261,7 +261,9 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 			}
 		}
 		if plan.disKeyIdx == -1 {
-			panic(NewParserError("diskey not specify in insert cols"))
+			plan.disKeyIdx = 1
+			log.Errorf("diskey not specify in insert cols")
+			//panic(NewParserError("diskey not specify in insert cols"))
 		}
 
 		plan.criteria = plan.routingAnalyzeValues(stmt.Rows.(Values))

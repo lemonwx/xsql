@@ -120,6 +120,20 @@ func (s *Server) parseSchemas(cfg *config.Conf) error {
 		DefaultRule: router.NewDefaultRule("db", ""),
 	}
 
+	rs["tpcctest"] = &router.Router{
+		DB: "tpcctest",
+		Rules: map[string]*router.Rule {
+			"item": &router.Rule{
+				DB:    "tpcctest",
+				Table: "item",
+				Key:   "i_id",
+				Type:  "hash",
+				Nodes: []string{"1", "2"},
+				Shard: &router.HashShard{2},
+			},
+		},
+	}
+
 	meta.SetMetas(&meta.Meta{
 		NodeAddrs:    nodeAddrs,
 		FullNodeIdxs: fullNodeIdx,
