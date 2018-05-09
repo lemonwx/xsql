@@ -27,13 +27,13 @@ func (conn *MidConn) handleBegin(isBegin bool) {
 			conn.handleCommit("commit")
 		}
 		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
+		conn.executedIdx = make(map[int]uint8)
 	} else {
 		if conn.status[0] == conn.defaultStatus {
 			conn.status[0] = mysql.SERVER_STATUS_IN_TRANS
+			conn.executedIdx = make(map[int]uint8)
 		}
 	}
-
-	conn.executedIdx = make(map[int]uint8)
 }
 
 func (conn *MidConn) getExecutedNodeIdx() []int {
@@ -83,6 +83,7 @@ func (conn *MidConn) handleCommit(sql string) error {
 		if err != nil {
 			return err
 		}
+		conn.executedIdx = make(map[int]uint8)
 	}
 	return nil
 
