@@ -10,6 +10,7 @@ import (
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
+	"strings"
 )
 
 func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
@@ -18,13 +19,17 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
 
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
-	if err != nil {
-		return err
+	if ! strings.Contains(strings.ToLower(sql), "autocommit") {
+
+		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
+		if err != nil {
+			return err
+		}
+		return conn.HandleExecRets(rets)
 	}
 
-	return conn.HandleExecRets(rets)
 
+	/*
 	expr := stmt.Exprs[0]
 
 	if v, ok := expr.Expr.(sqlparser.NumVal); ok {
@@ -34,6 +39,7 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 	if v, ok := expr.Expr.(sqlparser.StrVal); ok {
 		log.Debugf("[%d], set str d g%v", conn.ConnectionId, v)
 	}
+	*/
 
 	/*
 		if on :
@@ -43,5 +49,6 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 	*/
 
 	return conn.cli.WriteOK(nil)
+
 
 }
