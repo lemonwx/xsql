@@ -47,6 +47,8 @@ func HashValue(value interface{}) uint64 {
 	switch val := value.(type) {
 	case int:
 		return uint64(val)
+	case int32:
+		return uint64(val)
 	case uint64:
 		return uint64(val)
 	case int64:
