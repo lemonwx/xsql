@@ -28,6 +28,8 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 		return conn.HandleExecRets(rets)
 	} else {
 		if sqlparser.String(stmt.Exprs[1].Expr) == "0" {
+			conn.defaultStatus = ^mysql.SERVER_STATUS_AUTOCOMMIT
+			conn.status[1] = conn.defaultStatus
 			conn.handleBegin(true)
 		}
 	}
