@@ -143,7 +143,7 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 		}
 	}
 
-	stmt.stmtIdMeta[idx] = stmt.id
+	stmt.stmtIdMeta[idx] = id
 
 	if stmt.firstPrepare {
 		// handle cli params and node params
