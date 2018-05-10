@@ -201,8 +201,13 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]i
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
 
-	conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(stmt, meta.GetRouter(conn.db), bindVars)
-	//conn.nodeIdx, err = router.GetNodeIdxs(stmt)
+	r, err := meta.GetRouter(conn.db)
+	if err != nil {
+		log.Errorf("[%d] get router faild: %v", err)
+		return err
+	}
+
+	conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(stmt, r, bindVars)
 
 	if err != nil {
 		log.Debugf("[%d] get node idxs failed: %v", conn.ConnectionId, err)

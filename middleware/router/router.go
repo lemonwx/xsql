@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-	"github.com/lemonwx/log"
 	"strings"
 )
 
@@ -46,8 +45,11 @@ func (r *Router) GetRule(table string) *Rule {
 	if idx != -1 {
 		table = table[idx+1:]
 	}
-	rule := r.Rules[table]
-	log.Debug(rule, rule == nil, rule.Nodes)
+	rule, ok := r.Rules[table]
+	if !ok {
+		panic(fmt.Errorf("can't find Rule for this tb: %v", table))
+	}
+
 	if rule == nil {
 		return r.DefaultRule
 	} else {
