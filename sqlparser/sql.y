@@ -317,6 +317,10 @@ show_statement:
   {
     $$ = &Show{Section: "proxy", Key: string($3), From: $4, LikeOrWhere: $5}
   }
+| SHOW CREATE TABLE ID
+  {
+    $$ = &Show{Section: "show create table"}
+  }
 
 create_statement:
   CREATE DATABASE not_exists_opt ID force_eof
