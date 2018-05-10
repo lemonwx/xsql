@@ -237,6 +237,13 @@ func (node *Node) readPrepareResultPacket(id *uint32, columnCount *uint16, param
 	data, err := node.pkt.ReadPacket()
 	if err == nil {
 		// packet indicator [1 byte]
+
+		if data[0] == mysql.ERR_HEADER {
+			return node.parseErrPkt(data)
+		} else if data[0] != mysql.OK_HEADER {
+			return mysql.ErrMalformPacket
+		}
+
 		if data[0] != mysql.OK_HEADER {
 			return err
 		}
