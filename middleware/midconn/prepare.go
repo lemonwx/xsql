@@ -504,6 +504,8 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 					uint64(len(b)),
 				)
 				paramValues = append(paramValues, b...)
+			default:
+				log.Errorf("[%d] unsuuport type: %v preapre execute", conn.ConnectionId, v)
 			}
 		}
 
