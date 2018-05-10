@@ -120,11 +120,11 @@ func (s *Server) parseSchemas(cfg *config.Conf) error {
 		DefaultRule: router.NewDefaultRule("db", ""),
 	}
 
-	rs["tpcctest"] = &router.Router{
-		DB: "tpcctest",
+	rs["tpccmysql"] = &router.Router{
+		DB: "tpccmysql",
 		Rules: map[string]*router.Rule {
 			"item": &router.Rule{
-				DB:    "tpcctest",
+				DB:    "tpccmysql",
 				Table: "item",
 				Key:   "i_id",
 				Type:  "hash",
