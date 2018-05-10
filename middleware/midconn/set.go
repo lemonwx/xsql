@@ -27,7 +27,9 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 		}
 		return conn.HandleExecRets(rets)
 	} else {
-		conn.handleBegin(true)
+		if sqlparser.String(stmt.Exprs[1].Expr) == "0" {
+			conn.handleBegin(true)
+		}
 	}
 
 
