@@ -26,6 +26,8 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 			return err
 		}
 		return conn.HandleExecRets(rets)
+	} else {
+		conn.handleBegin(true)
 	}
 
 
