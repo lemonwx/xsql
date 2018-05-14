@@ -16,56 +16,51 @@ import (
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
-func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) error {
+func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
 	var err error
 	if err = conn.getNodeIdxs(stmt, nil); err != nil {
-		return err
+		return nil, err
 	} else if conn.nodeIdx == nil {
-		return conn.cli.WriteOK(nil)
+		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
 
 	var tb string = sqlparser.String(stmt.Table)
 	var where string = sqlparser.String(stmt.Where)
 
 	if err = conn.handleSelectForUpdate(tb, where); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err = conn.getNextVersion(); err != nil {
-		return err
+		return nil, err
 	}
 
 	updateSql := fmt.Sprintf("update %s set version = %d %s", tb, conn.NextVersion, where)
 	if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), conn.nodeIdx); err != nil {
 		if err != nil {
 			log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
-			return err
+			return nil, err
 		}
 		log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
 	}
 
 	log.Debugf("[%d] after convert sql: %s", conn.ConnectionId, sql)
-	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.nodeIdx)
-	if err != nil {
-		return err
-	} else {
-		return conn.HandleExecRets(rs)
-	}
+	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.nodeIdx)
 }
 
-func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
+func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.Result, error) {
 	var err error
 
 	// router
 	if err = conn.getNodeIdxs(stmt, nil); err != nil {
-		return err
+		return nil, err
 	} else if conn.nodeIdx == nil {
-		return conn.cli.WriteOK(nil)
+		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
 
 	// get next version
 	if err = conn.getNextVersion(); err != nil {
-		return err
+		return nil, err
 	}
 
 	// add extra col
@@ -81,31 +76,26 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) error {
 	log.Debugf("[%d]: after convert sql: %s", conn.ConnectionId, newSql)
 
 	// exec
-	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
-	if err != nil {
-		return err
-	} else {
-		return conn.HandleExecRets(rs)
-	}
+	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 }
 
-func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
+func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.Result, error) {
 
 	var err error
 
 	if err = conn.getNodeIdxs(stmt, nil); err != nil {
-		return err
+		return nil, err
 	} else if conn.nodeIdx == nil {
-		return conn.cli.WriteOK(nil)
+		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
 
 	if err = conn.handleSelectForUpdate(
 		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where)); err != nil {
-		return err
+		return nil, err
 	}
 
 	if err = conn.getNextVersion(); err != nil {
-		return err
+		return nil, err
 	}
 
 	// add extra col, get new sql
@@ -114,11 +104,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) error {
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
 	log.Debugf("generallog--[%d] 3:%s", conn.ConnectionId, newSql)
 
-	if rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx); err != nil {
-		return err
-	} else {
-		return conn.HandleExecRets(rs)
-	}
+	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 }
 
 func (conn *MidConn) handleSelectForUpdate(table, where string) error {
