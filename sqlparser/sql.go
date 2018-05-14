@@ -1566,13 +1566,13 @@ yydefault:
 		yyDollar = yyS[yypt-3 : yypt+1]
 		//line sql.y:671
 		{
-			yyVAL.boolExpr = &ComparisonExpr{Left: yyDollar[1].valExpr, Operator: AST_IN, Right: yyDollar[3].tuple}
+			yyVAL.boolExpr = &ComparisonExpr{Left: yyDollar[1].valExpr, Operator: AST_IN, Right: NewConditionRight(yyDollar[3].tuple)}
 		}
 	case 118:
 		yyDollar = yyS[yypt-4 : yypt+1]
 		//line sql.y:675
 		{
-			yyVAL.boolExpr = &ComparisonExpr{Left: yyDollar[1].valExpr, Operator: AST_NOT_IN, Right: yyDollar[4].tuple}
+			yyVAL.boolExpr = &ComparisonExpr{Left: yyDollar[1].valExpr, Operator: AST_NOT_IN, Right: NewConditionRight(yyDollar[4].tuple)}
 		}
 	case 119:
 		yyDollar = yyS[yypt-3 : yypt+1]

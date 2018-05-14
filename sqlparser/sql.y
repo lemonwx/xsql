@@ -669,11 +669,11 @@ condition:
   }
 | value_expression IN tuple
   {
-    $$ = &ComparisonExpr{Left: $1, Operator: AST_IN, Right: $3}
+    $$ = &ComparisonExpr{Left: $1, Operator: AST_IN, Right: NewConditionRight($3)}
   }
 | value_expression NOT IN tuple
   {
-    $$ = &ComparisonExpr{Left: $1, Operator: AST_NOT_IN, Right: $4}
+    $$ = &ComparisonExpr{Left: $1, Operator: AST_NOT_IN, Right: NewConditionRight($4)}
   }
 | value_expression LIKE value_expression
   {

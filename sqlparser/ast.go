@@ -441,6 +441,10 @@ func NewWhere(typ string, expr BoolExpr) *Where {
 	return &Where{Type: typ, Expr: expr}
 }
 
+func NewConditionRight(t Tuple) ValExpr {
+	return t.(ValTuple)[1:]
+}
+
 func (node *Where) Format(buf *TrackedBuffer) {
 	if node == nil {
 		return

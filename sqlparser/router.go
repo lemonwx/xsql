@@ -88,10 +88,11 @@ func GetStmtShardListIndex(stmt Statement, r *router.Router, bindVars map[string
 	defer handleError(&err)
 
 	plan := getRoutingPlan(stmt, r)
-
+	log.Debugf("ge routing plan done.")
 	plan.bindVars = bindVars
 
 	ns = plan.shardListFromPlan()
+	log.Debugf("shard list from plan done.")
 
 	if ns == nil || len(ns) == 0 {
 		ns, err = nil, nil
@@ -155,6 +156,7 @@ func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 				}
 				return makeList(0, index+1)
 			}
+		/*
 		case "in":
 			return plan.findShardList(criteria.Right)
 		case "not in":
@@ -164,6 +166,7 @@ func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 
 			l := plan.findShardList(criteria.Right)
 			return plan.notList(l)
+		*/
 		}
 	case *RangeCond:
 		if plan.rule.Type == router.HashRuleType {
@@ -342,10 +345,15 @@ func (plan *RoutingPlan) routingAnalyzeBoolean(node BoolExpr) []int {
 				return plan.findConditionShard(node)
 			}
 		case StringIn(node.Operator, "in", "not in"):
+			//judge node.Left is col and dis key
 			left := plan.routingAnalyzeValue(node.Left)
 			right := plan.routingAnalyzeValue(node.Right)
 			if left == EID_NODE && right == LIST_NODE {
-				return plan.findConditionShard(node)
+				if node.Operator == "in" {
+					return plan.findShardList(node.Right)
+				} else {
+					return plan.fullList
+				}
 			}
 		}
 	case *RangeCond:
