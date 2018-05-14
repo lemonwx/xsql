@@ -121,10 +121,8 @@ func (conn *MidConn) Serve() {
 			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
 			break
 		}
-		if conn.status[0] == mysql.SERVER_NOT_SERVE &&
-			strings.ToLower(string(data[1:])) != "rollback" {
-			conn.cli.WriteError(MUST_ROLLBACK_ERR)
-			conn.cli.SetPktSeq(0)
+		if conn.status[0] == mysql.SERVER_NOT_SERVE {
+			conn.handleServerNotServe(data)
 		} else if err = conn.dispatch(data); err != nil {
 			conn.cli.WriteError(err)
 			conn.cli.SetPktSeq(0)
@@ -172,6 +170,9 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Commit, *sqlparser.Rollback:
 		err = conn.handleCommit(sqlparser.String(v))
 		if err != nil {
+			if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
+				conn.status[0] = mysql.SERVER_NOT_SERVE
+			}
 			return err
 		}
 		return conn.cli.WriteOK(nil)

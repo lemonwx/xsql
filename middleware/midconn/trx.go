@@ -13,11 +13,40 @@
 package midconn
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
+	"hack"
 )
+
+func (conn *MidConn) handleServerNotServe(data []byte) {
+	log.Debugf("[%d] midconn is under not serve status, and recv is %s", conn.ConnectionId, string(data[1:]))
+	if sqlparser.StringIn(strings.ToLower(hack.String(data[1:])), "rollback", "commit") {
+		err := conn.handleCommit(hack.String(data[1:]))
+		if err != nil {
+			log.Errorf("[%d] handle commit faild: %v", conn.ConnectionId, err)
+			if err := conn.cli.WriteError(err); err != nil {
+				log.Errorf("[%d] send err to cli failed: %v", conn.ConnectionId, err)
+			}
+			conn.cli.SetPktSeq(0)
+		} else {
+			log.Debugf("[%d] handle commit successed", conn.ConnectionId)
+			if err := conn.cli.WriteOK(nil); err != nil {
+				log.Errorf("[%d] send ok to cli failed: %v", conn.ConnectionId, err)
+			}
+			conn.cli.SetPktSeq(0)
+		}
+	} else {
+		if err := conn.cli.WriteError(MUST_ROLLBACK_OR_COMMIT_ERR); err != nil {
+			log.Errorf("[%d] send err to cli failed: %v", conn.ConnectionId, err)
+		}
+		conn.cli.SetPktSeq(0)
+	}
+}
 
 func (conn *MidConn) handleBegin(isBegin bool) {
 	if isBegin {
@@ -66,8 +95,6 @@ func (conn *MidConn) handleCommit(sql string) error {
 
 	if commit {
 		log.Debugf("[%d] need commit", conn.ConnectionId)
-		conn.status[0] = conn.defaultStatus
-		conn.status[1] = conn.defaultStatus
 
 		if conn.NextVersion != 0 {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
@@ -83,10 +110,13 @@ func (conn *MidConn) handleCommit(sql string) error {
 		if err != nil {
 			return err
 		}
-		conn.executedIdx = make(map[int]uint8)
+		for idx, _ := range conn.executedIdx {
+			delete(conn.executedIdx, idx)
+		}
+		conn.status[0] = conn.defaultStatus
+		conn.status[1] = conn.defaultStatus
 	}
 	return nil
-
 }
 
 func (conn *MidConn) handleStmtTrx(data []byte) error {
@@ -96,8 +126,7 @@ func (conn *MidConn) handleStmtTrx(data []byte) error {
 	err := conn.handleStmtExecute(data)
 
 	if err != nil {
-		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
-			conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
+		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
 				conn.status[0] = mysql.SERVER_NOT_SERVE
 		}
 
@@ -109,29 +138,61 @@ func (conn *MidConn) handleStmtTrx(data []byte) error {
 
 func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 	conn.handleBegin(false)
-	var err error
+	var execErr error
+	var handleCommitErr error
+
+	var rets []*mysql.Result
+	var isSelect bool
 
 	switch v := stmt.(type) {
 	case *sqlparser.Select:
-		err = conn.handleSelect(v, sql)
+		isSelect = true
+		rets, execErr = conn.handleSelect(v, sql)
 	case *sqlparser.Insert:
-		err = conn.handleInsert(v, sql)
+		isSelect = false
+		rets, execErr = conn.handleInsert(v, sql)
 	case *sqlparser.Update:
-		err = conn.handleUpdate(v, "")
+		isSelect = false
+		rets, execErr = conn.handleUpdate(v, "")
 	case *sqlparser.Delete:
-		err = conn.handleDelete(v, sql)
+		isSelect = false
+		rets, execErr = conn.handleDelete(v, sql)
 	default:
-		err = UNEXPECT_MIDDLE_WARE_ERR
+		isSelect = false
+		execErr = UNEXPECT_MIDDLE_WARE_ERR
 	}
 
+	handleCommitErr = conn.handleCommit("")
+
+	err := conn.myHandleErr(execErr, handleCommitErr)
 	if err != nil {
-		log.Debugf("exec err %v, this trx is in uncommited status", err)
-		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
-			conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
+		return err
+	} else {
+		if isSelect {
+			return conn.HandleSelRets(rets)
+		} else {
+			return conn.HandleExecRets(rets)
+		}
+	}
+}
+
+func (conn *MidConn) myHandleErr (execErr, handleCommitErr error) error {
+	switch {
+	case execErr == nil && handleCommitErr == nil:
+		return nil
+	case execErr == nil && handleCommitErr != nil:
+		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS && conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
 			conn.status[0] = mysql.SERVER_NOT_SERVE
 		}
-		return err
+		return handleCommitErr
+	case execErr != nil && handleCommitErr == nil:
+		return execErr
+	case execErr != nil && handleCommitErr != nil:
+		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS && conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
+			conn.status[0] = mysql.SERVER_NOT_SERVE
+		}
+		return fmt.Errorf("%v -- %v", execErr, handleCommitErr)
+	default:
+		return UNEXPECT_MIDDLE_WARE_ERR
 	}
-
-	return conn.handleCommit("")
 }
