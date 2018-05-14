@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/router"
+	"github.com/lemonwx/xsql/middleware/meta"
 )
 
 const (
@@ -21,6 +22,9 @@ const (
 )
 
 type RoutingPlan struct {
+
+	ExecPlan map[string][]int
+
 	rule *router.Rule
 
 	criteria SQLNode
@@ -363,7 +367,29 @@ func (plan *RoutingPlan) routingAnalyzeBoolean(node BoolExpr) []int {
 		if left == EID_NODE && from == VALUE_NODE && to == VALUE_NODE {
 			return plan.findConditionShard(node)
 		}
+	case *ExistsExpr:
+		switch v := node.Subquery.Select.(type) {
+		case *SimpleSelect:
+			plan.ExecPlan = make(map[string][]int)
+			plan.ExecPlan[String(node.Subquery.Select)] = plan.fullList
+			return plan.fullList
+		case *Select:
+			router, err := meta.GetRouter(plan.rule.DB)
+			if err != nil {
+				panic(err)
+			}
+			r := router.GetRule(String(v.From[0]))
+			if r.Key == plan.rule.Key {
+				return plan.fullList
+			} else {
+				panic(fmt.Errorf("unsupported sharding type"))
+			}
+
+		default:
+			panic(fmt.Errorf("unsupported sharding type"))
+		}
 	}
+
 	return plan.fullList
 }
 
