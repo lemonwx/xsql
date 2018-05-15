@@ -9,11 +9,24 @@ type Rule struct {
 	DB    string
 	Table string
 	Key   string
+	KeyType string
 
 	Type string
 
 	Nodes []string
 	Shard Shard
+}
+
+func (r *Rule) Equal(r1 *Rule) bool {
+	if r.DB != r1.DB {
+		panic(fmt.Errorf("trans under multi db err"))
+	}
+
+	if r.Type == r1.Type &&
+		r.KeyType == r1.KeyType {
+		return true
+	}
+	return false
 }
 
 func (r *Rule) FindNode(key interface{}) string {
