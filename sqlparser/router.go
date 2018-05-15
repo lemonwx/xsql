@@ -7,10 +7,11 @@ package sqlparser
 import (
 	"sort"
 	"strconv"
-
 	"fmt"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/router"
+	"hack"
 )
 
 const (
@@ -21,8 +22,9 @@ const (
 )
 
 type RoutingPlan struct {
-
 	ExecPlan map[string][]int
+
+	Hide bool
 
 	rule *router.Rule
 
@@ -159,17 +161,17 @@ func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 				}
 				return makeList(0, index+1)
 			}
-		/*
-		case "in":
-			return plan.findShardList(criteria.Right)
-		case "not in":
-			if plan.rule.Type == router.RangeRuleType {
-				return plan.fullList
-			}
+			/*
+				case "in":
+					return plan.findShardList(criteria.Right)
+				case "not in":
+					if plan.rule.Type == router.RangeRuleType {
+						return plan.fullList
+					}
 
-			l := plan.findShardList(criteria.Right)
-			return plan.notList(l)
-		*/
+					l := plan.findShardList(criteria.Right)
+					return plan.notList(l)
+			*/
 		}
 	case *RangeCond:
 		if plan.rule.Type == router.HashRuleType {
@@ -205,6 +207,12 @@ func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 }
 
 func (plan *RoutingPlan) shardListFromPlan() (shardList []int) {
+	if plan.rule == nil {
+		return []int{0}
+	}
+
+	plan.fullList = makeList(0, len(plan.rule.Nodes))
+
 	if plan.criteria == nil {
 		return plan.fullList
 	}
@@ -285,9 +293,8 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 		return plan
 
 	case *Select:
-		plan.rule = r.GetRule(String(stmt.From[0]))
+		where = plan.shardForSelect(stmt, r)
 		plan.disKeyIdx = 1
-		where = stmt.Where
 	case *Update:
 		plan.rule = r.GetRule(String(stmt.Table))
 
@@ -306,9 +313,40 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 	} /* else {
 		plan.rule = r.DefaultRule
 	} */
-	plan.fullList = makeList(0, len(plan.rule.Nodes))
 
 	return plan
+}
+
+func (plan *RoutingPlan) shardForSelect(stmt *Select, r *router.Router) *Where {
+	switch {
+	case len(stmt.From) == 1:
+		switch v := stmt.From[0].(type) {
+		case *AliasedTableExpr:
+			switch node := v.Expr.(type) {
+			case *TableName:
+				plan.rule = r.GetRule(hack.String(node.Name))
+				return stmt.Where
+			case *Subquery:
+				log.Debug("subquery", v.Expr.(*Subquery).Select, v.As)
+				switch sel := node.Select.(type) {
+				case *SimpleSelect:
+					// simple select no extra col to hide
+					plan.Hide = false
+					plan.rule = nil
+				case *Select:
+					return plan.shardForSelect(sel, r)
+				case *Union:
+					panic(fmt.Errorf("unsuported now"))
+				}
+			}
+		case *JoinTableExpr:
+			log.Debug(String(v.LeftExpr), String(v.RightExpr), v.On, v.Join)
+		case *ParenTableExpr:
+		}
+	default:
+	}
+
+	return stmt.Where
 }
 
 func (plan *RoutingPlan) routingAnalyzeValues(vals Values) Values {
