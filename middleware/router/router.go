@@ -6,6 +6,7 @@ import (
 )
 
 type R interface {
+
 	ISR()
 	GetKey() string
 	GetKeyType() string
@@ -15,6 +16,7 @@ type R interface {
 	Equal(r R) bool
 	GetRule() *Rule
 	KeyEqual(col string) bool
+	SetAs(as string)
 }
 
 type Rule struct {
@@ -47,7 +49,7 @@ func (r *Rule) KeyEqual(col string) bool {
 func (r *JoinRule) KeyEqual(col string) bool {
 	if r.GetKey() == col {return true}
 	if strings.Contains(col, ".") {
-		if fmt.Sprintf("%s.%s", r.GetTB(), r.GetKey()) == col {
+		if fmt.Sprintf("%s.%s", r.GetAs(), r.GetKey()) == col {
 			return true
 		}
 	}
@@ -74,8 +76,20 @@ func (r *Rule) GetTB() string {
 	return r.Table
 }
 
+func (r *Rule) SetAs(as string){
+	r.As = as
+}
+
 func (r *JoinRule) GetTB() string {
 	return r.Lr.GetTB()
+}
+
+func (r *JoinRule) GetAs() string {
+	return r.As
+}
+
+func (r *JoinRule) SetAs(as string){
+	r.As = as
 }
 
 func (r *JoinRule) GetRule() *Rule {
@@ -98,6 +112,7 @@ func (r *Rule) ISR() {}
 
 type JoinRule struct {
 	Lr, Rr R
+	As string
 }
 
 func (r *JoinRule) ISR() {}

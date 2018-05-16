@@ -339,7 +339,9 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 				case *SimpleSelect:
 					return nil
 				case *Select:
-					return plan.getRule(r, sel.From...)
+					rule := plan.getRule(r, sel.From...)
+					rule.SetAs(hack.String(v.As))
+					return rule
 				case *Union:
 					panic(err)
 				}
