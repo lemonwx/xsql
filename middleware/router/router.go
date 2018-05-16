@@ -5,9 +5,22 @@ import (
 	"strings"
 )
 
+type R interface {
+	ISR()
+	GetKey() string
+	GetKeyType() string
+	GetShardType() string
+	GetTB() string
+	// 判断两个 rule 是否等价
+	Equal(r R) bool
+	GetRule() *Rule
+	KeyEqual(col string) bool
+}
+
 type Rule struct {
 	DB    string
 	Table string
+	As    string
 	Key   string
 	KeyType string
 
@@ -17,13 +30,87 @@ type Rule struct {
 	Shard Shard
 }
 
-func (r *Rule) Equal(r1 *Rule) bool {
-	if r.DB != r1.DB {
-		panic(fmt.Errorf("trans under multi db err"))
+func (r *Rule) KeyEqual(col string) bool {
+	if r.Key == col {return true}
+	if strings.Contains(col, ".") {
+		if fmt.Sprintf("%s.%s", r.Table, r.Key) == col {
+			return true
+		}
 	}
+	return false
+}
 
-	if r.Type == r1.Type &&
-		r.KeyType == r1.KeyType {
+func (r *JoinRule) KeyEqual(col string) bool {
+	if r.GetKey() == col {return true}
+	if strings.Contains(col, ".") {
+		if fmt.Sprintf("%s.%s", r.GetTB(), r.GetKey()) == col {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Rule) GetRule() *Rule {
+	return r
+}
+
+func (r *Rule) GetKey() string {
+	return r.Key
+}
+
+func (r *Rule) GetKeyType() string {
+	return r.KeyType
+}
+
+func (r *Rule) GetShardType() string {
+	return r.Type
+}
+
+func (r *Rule) GetTB() string {
+	return r.Table
+}
+
+func (r *JoinRule) GetTB() string {
+	return r.Lr.GetTB()
+}
+
+func (r *JoinRule) GetRule() *Rule {
+	return r.Lr.GetRule()
+}
+
+func (r *JoinRule) GetKey() string {
+	return r.Lr.GetKey()
+}
+
+func (r *JoinRule) GetKeyType() string {
+	return r.Lr.GetKeyType()
+}
+
+func (r *JoinRule) GetShardType() string {
+	return r.Lr.GetShardType()
+}
+
+func (r *Rule) ISR() {}
+
+type JoinRule struct {
+	Lr, Rr R
+}
+
+func (r *JoinRule) ISR() {}
+
+
+func (r *JoinRule) Equal(r1 R) bool {
+	if r.GetShardType() == r1.GetShardType() &&
+		r.GetKeyType() == r.GetKeyType() {
+			return true
+	}
+	return false
+}
+
+func (r *Rule) Equal(r1 R) bool {
+
+	if r.Type == r1.GetShardType() &&
+		r.KeyType == r1.GetKeyType() {
 		return true
 	}
 	return false

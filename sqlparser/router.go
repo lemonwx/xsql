@@ -21,6 +21,10 @@ const (
 	OTHER_NODE
 )
 
+const (
+	NEED_WHERE = iota
+)
+
 type RoutingPlan struct {
 	ExecPlan map[string][]int
 
@@ -35,6 +39,8 @@ type RoutingPlan struct {
 	bindVars map[string]interface{}
 
 	disKeyIdx int
+
+	Next int
 }
 
 /*
@@ -317,35 +323,91 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 	return plan
 }
 
-func (plan *RoutingPlan) shardForSelect(stmt *Select, r *router.Router) *Where {
-	switch {
-	case len(stmt.From) == 1:
-		switch v := stmt.From[0].(type) {
+func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
+	err := fmt.Errorf("unsupported sharding type")
+
+	if len(tbs) == 1 {
+		switch v := tbs[0].(type) {
 		case *AliasedTableExpr:
 			switch node := v.Expr.(type) {
 			case *TableName:
-				plan.rule = r.GetRule(hack.String(node.Name))
-				return stmt.Where
+				rule := r.GetRule(hack.String(node.Name))
+				rule.As = hack.String(v.As)
+				return rule
 			case *Subquery:
-				log.Debug("subquery", v.Expr.(*Subquery).Select, v.As)
 				switch sel := node.Select.(type) {
 				case *SimpleSelect:
-					// simple select no extra col to hide
-					plan.Hide = false
-					plan.rule = nil
+					return nil
 				case *Select:
-					return plan.shardForSelect(sel, r)
+					return plan.getRule(r, sel.From...)
 				case *Union:
-					panic(fmt.Errorf("unsuported now"))
+					panic(err)
 				}
 			}
 		case *JoinTableExpr:
-			log.Debug(String(v.LeftExpr), String(v.RightExpr), v.On, v.Join)
+			lr := plan.getRule(r, v.LeftExpr)
+			rr := plan.getRule(r, v.RightExpr)
+
+			if ! lr.Equal(rr) {
+				panic(err)
+			}
+
+			switch b := v.On.(type) {
+			case *ComparisonExpr:
+				if b.Operator != "=" {
+					panic(err)
+				}
+
+				l := plan.AnalyzeValue(b.Left)
+				r := plan.AnalyzeValue(b.Right)
+
+				if l == r && l == EID_NODE {
+					// only support left and rigth all col
+					// if l.colname == key and
+					log.Debug(lr.GetKey(), String(b.Left))
+					log.Debug(rr.GetKey(), String(b.Right))
+
+					if lr.KeyEqual(String(b.Left)) && rr.KeyEqual(String(b.Right)) {
+						return &router.JoinRule{
+							Lr: lr,
+							Rr: rr,
+						}
+					}
+
+					if lr.KeyEqual(String(b.Right)) && rr.KeyEqual(String(b.Left)) {
+						return &router.JoinRule{
+							Lr: lr,
+							Rr: rr,
+						}
+					}
+
+				} else {
+					panic(err)
+				}
+			case nil:
+				plan.Next = NEED_WHERE
+				panic(err)
+			default:
+				panic(err)
+			}
 		case *ParenTableExpr:
+			panic(err)
+		default:
+			panic(err)
 		}
-	default:
+	} else {
+		panic(err)
 	}
 
+	return nil
+}
+
+func (plan *RoutingPlan) shardForSelect(stmt *Select, r *router.Router) *Where {
+
+	rule := plan.getRule(r, stmt.From...)
+	log.Debug(1)
+	plan.rule = rule.GetRule()
+	log.Debug(plan.rule,)
 	return stmt.Where
 }
 
@@ -414,6 +476,16 @@ func (plan *RoutingPlan) routingAnalyzeBoolean(node BoolExpr) []int {
 	}
 
 	return plan.fullList
+}
+
+func (plan *RoutingPlan) AnalyzeValue(valExpr ValExpr) int {
+	switch valExpr.(type) {
+	case *ColName:
+		return EID_NODE
+	default:
+		return ^EID_NODE
+	}
+
 }
 
 func (plan *RoutingPlan) routingAnalyzeValue(valExpr ValExpr) int {
