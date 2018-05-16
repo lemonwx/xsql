@@ -129,7 +129,7 @@ func (plan *RoutingPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 				col = criteria.Right
 				val = criteria.Left
 			}
-			if String(col) == plan.rule.Key {
+			if plan.rule.KeyEqual(String(col)) {
 				index = plan.findShard(val)
 				return []int{index}
 			} else {
@@ -380,7 +380,6 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 							Rr: rr,
 						}
 					}
-
 				} else {
 					panic(err)
 				}
@@ -491,7 +490,7 @@ func (plan *RoutingPlan) AnalyzeValue(valExpr ValExpr) int {
 func (plan *RoutingPlan) routingAnalyzeValue(valExpr ValExpr) int {
 	switch node := valExpr.(type) {
 	case *ColName:
-		if string(node.Name) == plan.rule.Key {
+		if plan.rule.KeyEqual(String(node)) {
 			return EID_NODE
 		}
 	case ValTuple:

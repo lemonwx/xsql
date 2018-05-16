@@ -36,6 +36,10 @@ func (r *Rule) KeyEqual(col string) bool {
 		if fmt.Sprintf("%s.%s", r.Table, r.Key) == col {
 			return true
 		}
+
+		if fmt.Sprintf("%s.%s", r.As, r.Key) == col {
+			return true
+		}
 	}
 	return false
 }
