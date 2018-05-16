@@ -405,9 +405,9 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 func (plan *RoutingPlan) shardForSelect(stmt *Select, r *router.Router) *Where {
 
 	rule := plan.getRule(r, stmt.From...)
-	log.Debug(1)
-	plan.rule = rule.GetRule()
-	log.Debug(plan.rule,)
+	if rule != nil {
+		plan.rule = rule.GetRule()
+	}
 	return stmt.Where
 }
 
