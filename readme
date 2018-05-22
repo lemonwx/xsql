@@ -22,3 +22,8 @@ todo list:
 
 12. 输入 流必须读取完？？
 13. where shard support
+
+14. exec plan
+    1. exec plan's shard list for every layer
+15. a join b where a.id = b.id and ... || or ... || in ... || ... support
+    1. if select from (select * from tb) as t1 join (select * frm tt) as t2 on t1.id = t2.id; need to judge t1.shard == t2.shard

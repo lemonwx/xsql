@@ -453,6 +453,13 @@ func (plan *RoutingPlan) getRule(r *router.Router, preWhere *Where, tbs ...Table
 }
 
 func (plan *RoutingPlan) shardForSelect(stmt *Select, r *router.Router) *Where {
+	for _, expr := range stmt.SelectExprs {
+		switch expr.(type) {
+		case *StarExpr, NonStarExpr:
+		case *SelectExpr:
+		case *SimpleSelect:
+		}
+	}
 
 	rule := plan.getRule(r, stmt.Where, stmt.From...)
 	if rule != nil {
