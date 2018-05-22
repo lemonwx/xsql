@@ -12,11 +12,13 @@ type R interface {
 	GetKeyType() string
 	GetShardType() string
 	GetTB() string
+
 	// 判断两个 rule 是否等价
 	Equal(r R) bool
 	GetRule() *Rule
 	KeyEqual(col string) bool
 	SetAs(as string)
+	GetShard() *Shard
 }
 
 type Rule struct {
@@ -30,6 +32,15 @@ type Rule struct {
 
 	Nodes []string
 	Shard Shard
+	ShardList []int
+}
+
+func (r *Rule) GetKey() string {
+	return r.Key
+}
+
+func (r *Rule) GetKeyType() string {
+	return r.KeyType
 }
 
 func (r *Rule) KeyEqual(col string) bool {
@@ -46,6 +57,26 @@ func (r *Rule) KeyEqual(col string) bool {
 	return false
 }
 
+func (r *Rule) GetRule() *Rule {
+	return r
+}
+
+func (r *Rule) GetShard() *Shard {
+	return &r.Shard
+}
+
+func (r *Rule) GetTB() string {
+	return r.Table
+}
+
+func (r *Rule) SetAs(as string){
+	r.As = as
+}
+
+func (r *Rule) GetShardType() string {
+	return r.Type
+}
+
 func (r *JoinRule) KeyEqual(col string) bool {
 	if r.GetKey() == col {return true}
 	if strings.Contains(col, ".") {
@@ -56,28 +87,8 @@ func (r *JoinRule) KeyEqual(col string) bool {
 	return false
 }
 
-func (r *Rule) GetRule() *Rule {
-	return r
-}
-
-func (r *Rule) GetKey() string {
-	return r.Key
-}
-
-func (r *Rule) GetKeyType() string {
-	return r.KeyType
-}
-
-func (r *Rule) GetShardType() string {
-	return r.Type
-}
-
-func (r *Rule) GetTB() string {
-	return r.Table
-}
-
-func (r *Rule) SetAs(as string){
-	r.As = as
+func (r *JoinRule) GetShard() *Shard {
+	return r.Lr.GetShard()
 }
 
 func (r *JoinRule) GetTB() string {
@@ -113,24 +124,24 @@ func (r *Rule) ISR() {}
 type JoinRule struct {
 	Lr, Rr R
 	As string
+	ShardList []int
 }
 
 func (r *JoinRule) ISR() {}
 
 
 func (r *JoinRule) Equal(r1 R) bool {
-	if r.GetShardType() == r1.GetShardType() &&
-		r.GetKeyType() == r.GetKeyType() {
+	if r.GetKeyType() == r.GetKeyType() && // 分发键的类型一致
+		ShardEqual(r.GetShard(), r1.GetShard()) { // 分发类型一致
 			return true
 	}
 	return false
 }
 
 func (r *Rule) Equal(r1 R) bool {
-
-	if r.Type == r1.GetShardType() &&
-		r.KeyType == r1.GetKeyType() {
-		return true
+	if r.KeyType == r1.GetKeyType() &&
+		ShardEqual(r.GetShard(), r1.GetShard()) {
+			return true
 	}
 	return false
 }

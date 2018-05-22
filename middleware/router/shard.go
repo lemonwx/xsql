@@ -9,6 +9,8 @@ import (
 	"hack"
 	"hash/crc32"
 	"strconv"
+
+	"github.com/lemonwx/log"
 )
 
 type KeyError string
@@ -87,6 +89,18 @@ func NumValue(value interface{}) int64 {
 
 type Shard interface {
 	FindForKey(key interface{}) int
+}
+
+func ShardEqual(s1 *Shard, s2 *Shard) bool {
+	switch t1 := (*s1).(type) {
+	case *HashShard:
+		if t2, ok := (*s2).(*HashShard); ok {
+			return t1.ShardNum == t2.ShardNum
+		}
+	default:
+		log.Errorf("unsupported shard equal type: %v", t1)
+	}
+	return false
 }
 
 type RangeShard interface {

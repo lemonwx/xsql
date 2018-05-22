@@ -323,7 +323,7 @@ func getRoutingPlan(statement Statement, r *router.Router) (plan *RoutingPlan) {
 	return plan
 }
 
-func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
+func (plan *RoutingPlan) getRule(r *router.Router, preWhere *Where, tbs ...TableExpr) router.R {
 	err := fmt.Errorf("unsupported sharding type")
 
 	if len(tbs) == 1 {
@@ -339,7 +339,7 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 				case *SimpleSelect:
 					return nil
 				case *Select:
-					rule := plan.getRule(r, sel.From...)
+					rule := plan.getRule(r, sel.Where, sel.From...)
 					rule.SetAs(hack.String(v.As))
 					return rule
 				case *Union:
@@ -347,15 +347,17 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 				}
 			}
 		case *JoinTableExpr:
-			lr := plan.getRule(r, v.LeftExpr)
-			rr := plan.getRule(r, v.RightExpr)
+			lr := plan.getRule(r, nil, v.LeftExpr)
+			rr := plan.getRule(r, nil, v.RightExpr)
 
 			if ! lr.Equal(rr) {
 				panic(err)
 			}
 
-			switch b := v.On.(type) {
-			case *ComparisonExpr:
+			var retR *router.JoinRule
+
+			// judge  ... join ... on k1 = k2
+			if b, ok := v.On.(*ComparisonExpr); ok {
 				if b.Operator != "=" {
 					panic(err)
 				}
@@ -366,18 +368,16 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 				if l == r && l == EID_NODE {
 					// only support left and rigth all col
 					// if l.colname == key and
-					log.Debug(lr.GetKey(), String(b.Left))
-					log.Debug(rr.GetKey(), String(b.Right))
 
 					if lr.KeyEqual(String(b.Left)) && rr.KeyEqual(String(b.Right)) {
-						return &router.JoinRule{
+						retR = &router.JoinRule{
 							Lr: lr,
 							Rr: rr,
 						}
 					}
 
 					if lr.KeyEqual(String(b.Right)) && rr.KeyEqual(String(b.Left)) {
-						return &router.JoinRule{
+						retR =  &router.JoinRule{
 							Lr: lr,
 							Rr: rr,
 						}
@@ -385,12 +385,61 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 				} else {
 					panic(err)
 				}
-			case nil:
-				plan.Next = NEED_WHERE
-				panic(err)
-			default:
+			}
+
+			if preWhere == nil {
+				if retR == nil {
+					panic(err)
+				}else {
+					return retR
+				}
+			}
+
+			b, ok := preWhere.Expr.(*ComparisonExpr)
+
+			if (!ok) && retR == nil {
 				panic(err)
 			}
+
+			if b.Operator == "=" {
+
+				l := plan.AnalyzeValue(b.Left)
+				r := plan.AnalyzeValue(b.Right)
+
+				if retR == nil {
+					// 通过 on 没能确定 join 是否可以合并下压, 需要继续通过 join 后面的 where 来判断
+					if l == r && l == EID_NODE {
+
+						if lr.KeyEqual(String(b.Left)) && rr.KeyEqual(String(b.Right)) {
+							retR = &router.JoinRule{
+								Lr: lr,
+								Rr: rr,
+							}
+						}
+
+						if lr.KeyEqual(String(b.Right)) && rr.KeyEqual(String(b.Left)) {
+							retR = &router.JoinRule{
+								Lr: lr,
+								Rr: rr,
+							}
+						}
+					}
+				} else {
+					// on 确定 可以合并下压, where 则用来判断 分发信息
+					if (l == EID_NODE && r == VALUE_NODE) || (l == VALUE_NODE && r == EID_NODE) {
+						tmpList := plan.findConditionShard(b)
+						log.Debug(tmpList)
+					}
+				}
+			} else {
+				panic(err)
+			}
+
+			if retR == nil {
+				panic(err)
+			}
+			return retR
+
 		case *ParenTableExpr:
 			panic(err)
 		default:
@@ -405,7 +454,7 @@ func (plan *RoutingPlan) getRule(r *router.Router, tbs ...TableExpr) router.R {
 
 func (plan *RoutingPlan) shardForSelect(stmt *Select, r *router.Router) *Where {
 
-	rule := plan.getRule(r, stmt.From...)
+	rule := plan.getRule(r, stmt.Where, stmt.From...)
 	if rule != nil {
 		plan.rule = rule.GetRule()
 	}
@@ -686,3 +735,4 @@ func differentList(l1 []int, l2 []int) []int {
 
 	return l3
 }
+

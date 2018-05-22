@@ -92,6 +92,14 @@ func (s *Server) parseSchemas(cfg *config.Conf) error {
 				Nodes: []string{"1", "2"},
 				Shard: &router.HashShard{2},
 			},
+			"ttt": &router.Rule{
+				DB:    "db",
+				Table: "ttt",
+				Key:   "id",
+				Type:  "hash",
+				Nodes: []string{"1", "2"},
+				Shard: &router.HashShard{2},
+			},
 		},
 		DefaultRule: router.NewDefaultRule("db", ""),
 	}
