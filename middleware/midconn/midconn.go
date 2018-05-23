@@ -396,3 +396,24 @@ func (c *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset {
 
 	return r
 }
+
+func (conn *MidConn) getPlan(stmt *sqlparser.Select) (*sqlparser.SelectPlan, error) {
+	var err error
+	if conn.db == "" {
+		return nil, mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+	}
+
+	r, err := meta.GetRouter(conn.db)
+	if err != nil {
+		log.Errorf("[%d] get router failed: %v", conn.ConnectionId, err)
+		return nil, err
+	}
+
+	p, err := sqlparser.GeneralPlanForSelect(r, stmt)
+	if err != nil {
+		log.Errorf("[%d] get plan failed: %v", conn.ConnectionId, err)
+		return nil, err
+	}
+
+	return p, err
+}

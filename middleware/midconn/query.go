@@ -39,13 +39,13 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 
 	var err error
 
-	if err = conn.getNodeIdxs(stmt, nil); err != nil {
-		return nil, err
-	} else if conn.nodeIdx == nil {
-		return nil, UNEXPECT_MIDDLE_WARE_ERR
-		// return nil, conn.writeResultset(conn.status[0], conn.newEmptyResultset(stmt))
-	}
 
+	if p, err := conn.getPlan(stmt); err != nil {
+		return nil, err
+	} else {
+		conn.nodeIdx = p.ShardList
+	}
+	
 	if err = conn.getVInUse(); err != nil {
 		return nil, err
 	}
