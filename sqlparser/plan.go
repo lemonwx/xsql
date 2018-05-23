@@ -144,7 +144,13 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 				case *SimpleSelect:
 					return nil, nil
 				case *Select:
-					return GeneralPlanForSelect(r, sel)
+					plan, err := GeneralPlanForSelect(r, sel)
+					if err != nil {
+						panic(err)
+					}
+					p.rule = plan.rule
+					p.ShardList = plan.ShardList
+					p.fullList = plan.fullList
 				case *Union:
 					panic(UNSUPPORTED_SHARD_ERR)
 				}
