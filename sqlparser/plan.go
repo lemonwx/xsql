@@ -149,7 +149,8 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 					if err != nil {
 						panic(err)
 					}
-
+					
+					plan.rule.As = hack.String(v.As)
 					p.rule = plan.rule
 					p.ShardList = plan.ShardList
 					p.fullList = plan.fullList
