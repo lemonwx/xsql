@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"strconv"
 	"sort"
+	"github.com/lemonwx/log"
 )
 
 var UNSUPPORTED_SHARD_ERR = errors.New("unsupported shard for this sql")
@@ -148,6 +149,7 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 					if err != nil {
 						panic(err)
 					}
+
 					p.rule = plan.rule
 					p.ShardList = plan.ShardList
 					p.fullList = plan.fullList
@@ -155,6 +157,101 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 					panic(UNSUPPORTED_SHARD_ERR)
 				}
 			}
+		case *JoinTableExpr:
+			pl := &SelectPlan{}
+			pr := &SelectPlan{}
+
+			pl.ShardForFrom(r, nil, v.LeftExpr)
+			pr.ShardForFrom(r, nil, v.RightExpr)
+
+			lr := pl.rule
+			rr := pr.rule
+
+			if ! lr.Equal(rr) {
+				panic(UNSUPPORTED_SHARD_ERR)
+			}
+
+			log.Debugf("lr equal rr: %v == %v", lr, rr)
+
+			if b, ok := v.On.(*ComparisonExpr); ok {
+				if b.Operator != "=" {
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+
+				l := p.AnalyzeValue(b.Left)
+				r := p.AnalyzeValue(b.Right)
+
+				if l == r && l == EID_NODE {
+					// only support left and rigth all col
+					// if l.colname == key and
+
+					if lr.KeyEqual(String(b.Left)) && rr.KeyEqual(String(b.Right)) ||
+						lr.KeyEqual(String(b.Right)) && rr.KeyEqual(String(b.Left)) {
+
+							if len(pl.ShardList) == len(pr.ShardList) {
+								if len(pl.ShardList) == 1 && pl.ShardList[0] == pr.ShardList[0] {
+									p.ShardList = pr.ShardList
+								} else {
+									panic(UNSUPPORTED_SHARD_ERR)
+								}
+							} else if len(pl.ShardList) < len(pr.ShardList) {
+								p.ShardList = pl.ShardList
+							} else {
+								p.ShardList = pr.ShardList
+							}
+						p.rule = pl.rule
+						p.fullList = pl.fullList
+					} else {
+						panic(UNSUPPORTED_SHARD_ERR)
+					}
+				} else {
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+			} else {
+				log.Debugf("join table expr's on expr: [%v] not compare(\"=\")", v.On)
+			}
+
+			if preWhere == nil {
+				if p.rule == nil {
+					log.Debugf("join table expr's where: [%v], and can't shard by on", preWhere)
+					panic(UNSUPPORTED_SHARD_ERR)
+				} else {
+					log.Debugf("select from join, and can by on")
+				}
+			} else {
+				if p.rule == nil {
+					compare, ok := preWhere.Expr.(*ComparisonExpr);
+					if ok && compare.Operator == "=" {
+						l := p.AnalyzeValue(compare.Left)
+						r := p.AnalyzeValue(compare.Right)
+						if l == EID_NODE && r == EID_NODE {
+							if lr.KeyEqual(String(compare.Left)) && rr.KeyEqual(String(compare.Right)) {
+								p.rule = lr
+								p.ShardList = makeList(0, len(lr.Nodes))
+								p.fullList = p.ShardList
+							} else if lr.KeyEqual(String(compare.Right)) && rr.KeyEqual(String(compare.Left)) {
+								p.rule = lr
+								p.ShardList = makeList(0, len(lr.Nodes))
+								p.fullList = p.ShardList
+							} else {
+								log.Debug("join table expr's where: [%v] is compare(\"=\") but not [ keys equal to rule.key ], and can't by on", preWhere)
+								panic(UNSUPPORTED_SHARD_ERR)
+							}
+						} else {
+							log.Debug("join table expr's where: [%v] is compare(\"=\") but not [ l == r == EID_NODE ], and can't by on", preWhere)
+							panic(UNSUPPORTED_SHARD_ERR)
+						}
+					} else {
+						log.Debug("join table expr's where: [%v] is not compare(\"=\"), and can't by on", preWhere)
+						panic(UNSUPPORTED_SHARD_ERR)
+					}
+				} else {
+					p.routingAnalyzeBoolean(preWhere.Expr)
+				}
+			}
+
+		case *ParenTableExpr:
+			panic(UNSUPPORTED_SHARD_ERR)
 		}
 	} else {
 		panic(UNSUPPORTED_SHARD_ERR)
@@ -413,4 +510,14 @@ func (plan *SelectPlan) findShardList(valExpr ValExpr) []int {
 
 	sort.Ints(shardlist)
 	return shardlist
+}
+
+func (plan *SelectPlan) AnalyzeValue(valExpr ValExpr) int {
+	switch valExpr.(type) {
+	case *ColName:
+		return EID_NODE
+	default:
+		return ^EID_NODE
+	}
+
 }
