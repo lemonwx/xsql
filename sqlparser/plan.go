@@ -7,12 +7,12 @@ package sqlparser
 
 import (
 	"errors"
-	"hack"
-
-	"github.com/lemonwx/xsql/middleware/router"
 	"fmt"
 	"strconv"
 	"sort"
+	"hack"
+
+	"github.com/lemonwx/xsql/middleware/router"
 	"github.com/lemonwx/log"
 )
 
@@ -30,6 +30,23 @@ type SelectPlan struct {
 	ShardList []int
 	Hide bool
 	fullList []int
+}
+
+func SliceEqual(s1, s2 []int) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	sort.Ints(s1)
+	sort.Ints(s2)
+
+	for idx, item := range s1 {
+		if item != s2[idx] {
+			return false
+		}
+	}
+
+	return true
 }
 
 func SliceIn(s1, s2 []int) bool {
@@ -149,7 +166,7 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 					if err != nil {
 						panic(err)
 					}
-					
+
 					plan.rule.As = hack.String(v.As)
 					p.rule = plan.rule
 					p.ShardList = plan.ShardList
@@ -190,7 +207,7 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 						lr.KeyEqual(String(b.Right)) && rr.KeyEqual(String(b.Left)) {
 
 							if len(pl.ShardList) == len(pr.ShardList) {
-								if len(pl.ShardList) == 1 && pl.ShardList[0] == pr.ShardList[0] {
+								if SliceEqual(pl.ShardList, pr.ShardList) {
 									p.ShardList = pr.ShardList
 								} else {
 									panic(UNSUPPORTED_SHARD_ERR)
