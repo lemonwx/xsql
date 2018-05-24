@@ -43,9 +43,14 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 	if p, err := conn.getPlan(stmt); err != nil {
 		return nil, err
 	} else {
+		log.Debugf("[%d] get shard list's length: %d", conn.ConnectionId, len(p.ShardList))
+		if len(p.ShardList) == 0 {
+			r := conn.newEmptyResultset(stmt)
+			return []*mysql.Result{ &mysql.Result{Resultset: r},  }, nil
+		}
 		conn.nodeIdx = p.ShardList
 	}
-	
+
 	if err = conn.getVInUse(); err != nil {
 		return nil, err
 	}
