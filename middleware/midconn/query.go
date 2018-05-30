@@ -39,7 +39,6 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 
 	var err error
 
-
 	if p, err := conn.getPlan(stmt); err != nil {
 		return nil, err
 	} else {
