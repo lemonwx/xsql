@@ -264,7 +264,8 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 						panic(UNSUPPORTED_SHARD_ERR)
 					}
 				} else {
-					p.routingAnalyzeBoolean(preWhere.Expr)
+					log.Debug("join table expr can be shard by on, now use where to reduce ShardList")
+					p.ShardList = p.routingAnalyzeBoolean(preWhere.Expr)
 				}
 			}
 
