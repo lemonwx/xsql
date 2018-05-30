@@ -104,6 +104,7 @@ func GenealPlanForSelList(r *router.Router, exprs SelectExprs) *SelectPlan{
 	for _, expr := range exprs {
 		switch v := expr.(type) {
 		case *StarExpr:
+			panic(UNSUPPORTED_SHARD_ERR)
 		case *NonStarExpr:
 			if sub, ok := v.Expr.(*Subquery); ok {
 				switch sel := sub.Select.(type) {
@@ -125,6 +126,7 @@ func GenealPlanForSelList(r *router.Router, exprs SelectExprs) *SelectPlan{
 
 					preRule = tmpp.rule
 				case *SimpleSelect:
+					panic(UNSUPPORTED_SHARD_ERR)
 				}
 			}
 		}
