@@ -6,9 +6,10 @@ package sqlparser
 
 import (
 	"errors"
+	"fmt"
 
-	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/sqltypes"
+	"github.com/lemonwx/log"
 )
 
 // Instructions for creating new types: If a type
@@ -25,12 +26,17 @@ import (
 
 // Parse parses the sql and returns a Statement, which
 // is the AST representation of the query.
-func Parse(sql string) (Statement, error) {
+func Parse(sql string) (stmt Statement, err error) {
+
+	defer handleError(&err)
+
 	tokenizer := NewStringTokenizer(sql)
 	if yyParse(tokenizer) != 0 {
-		return nil, errors.New(tokenizer.LastError)
+		err = errors.New(tokenizer.LastError)
+		return
 	}
-	return tokenizer.ParseTree, nil
+	stmt = tokenizer.ParseTree
+	return
 }
 
 // SQLNode defines the interface for all nodes
@@ -83,6 +89,8 @@ type Select struct {
 	OrderBy     OrderBy
 	Limit       *Limit
 	Lock        string
+
+	ExtraCols SelectExprs
 }
 
 // Select.Distinct
@@ -97,8 +105,9 @@ const (
 )
 
 func (node *Select) Format(buf *TrackedBuffer) {
-	buf.Fprintf("select %v%s%v from %v%v%v%v%v%v%s",
-		node.Comments, node.Distinct, node.SelectExprs,
+
+	buf.Fprintf("select %v%s%v, %v from %v%v%v%v%v%v%s",
+		node.Comments, node.Distinct, node.ExtraCols, node.SelectExprs,
 		node.From, node.Where,
 		node.GroupBy, node.Having, node.OrderBy,
 		node.Limit, node.Lock)
@@ -228,23 +237,63 @@ func (node Comments) Format(buf *TrackedBuffer) {
 // SelectExprs represents SELECT expressions.
 type SelectExprs []SelectExpr
 
-func NewSelectExprs(sels []SelectExpr) SelectExprs {
-	if _, ok := sels[0].(*StarExpr); ok {
-		return sels
-	}
+func GeneralExtraSelExprs(from TableExpr, idx int) SelectExprs {
+	extras := make([]SelectExpr, 0)
 
-	if fir, ok := sels[0].(*NonStarExpr); ok {
-		if String(fir.Expr) == "version" {
-			return sels
-		} else {
-			x := &NonStarExpr{
-				Expr: &ColName{Name: []byte("version")},
+	switch table := from.(type) {
+	case *JoinTableExpr:
+		extra1 := GeneralExtraSelExprs(table.LeftExpr, idx + 1)
+		extra2 := GeneralExtraSelExprs(table.RightExpr, idx + 1 + 1)
+		extras = append(extra1, extra2...)
+	case *AliasedTableExpr:
+		var extra SelectExpr
+		var colName string
+
+		switch table.Expr.(type) {
+		case *TableName:
+			colName = "version"
+			colAs := []byte(fmt.Sprintf("%s%d", colName, idx))
+			if table.As != nil {
+				colName := []byte(fmt.Sprintf("%s.%s", table.As, colName))
+				extra = &NonStarExpr{Expr:&ColName{Name:colName}, As:colAs}
+			} else {
+				colName := []byte(fmt.Sprintf("%s.%s", String(table.Expr), colName))
+				extra = &NonStarExpr{Expr:&ColName{Name:colName}, As:colAs}
 			}
-			return append(SelectExprs{x}, sels...)
+			extras = append(extras, extra)
+
+		case *Subquery:
+			colName = "version0"
+			sel := table.Expr.(*Subquery).Select.(*Select)
+
+			for i, col := range sel.ExtraCols {
+				colAs := []byte(fmt.Sprintf("%s%d", colName, idx + i))
+				colName := []byte(fmt.Sprintf("%s.%s", table.As, col.(*NonStarExpr).As))
+				extra = &NonStarExpr{Expr: &ColName{Name:colName}, As:colAs}
+				extras = append(extras, extra)
+			}
 		}
+	default:
+		panic(errors.New("unsupported table type"))
 	}
-	log.Debug("unexpect .....")
-	return nil
+	return extras
+}
+
+func NewSelectExprs(sels []SelectExpr, froms TableExprs) SelectExprs {
+	if _, ok := sels[0].(*StarExpr); ok {
+		panic(errors.New("unsupported select * query"))
+	} else {
+		extras := make([]SelectExpr, 0, len(froms))
+		for idx, tb := range froms {
+			tmp := GeneralExtraSelExprs(tb, idx)
+			extras = append(extras, tmp...)
+		}
+
+		for _, extra := range extras {
+			log.Debug(String(extra))
+		}
+		return extras
+	}
 }
 
 func (node SelectExprs) Format(buf *TrackedBuffer) {
@@ -1001,3 +1050,4 @@ func (*Show) IStatement() {}
 func (node *Show) Format(buf *TrackedBuffer) {
 	buf.Fprintf("show %s %s %v %v", node.Section, node.Key, node.From, node.LikeOrWhere)
 }
+
