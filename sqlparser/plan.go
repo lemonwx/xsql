@@ -268,12 +268,74 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 					p.ShardList = p.routingAnalyzeBoolean(preWhere.Expr)
 				}
 			}
-
 		case *ParenTableExpr:
 			panic(UNSUPPORTED_SHARD_ERR)
 		}
 	} else {
-		panic(UNSUPPORTED_SHARD_ERR)
+		var rules []*router.Rule
+		for _, tb := range froms {
+			switch v := tb.(type){
+			case *AliasedTableExpr:
+				switch node := v.Expr.(type) {
+				case *TableName:
+					rule := r.GetRule(hack.String(node.Name))
+					rule.As = hack.String(v.As)
+
+					if len(rules) != 0 {
+						if !rules[0].Equal(rule) {
+							panic(UNSUPPORTED_SHARD_ERR)
+						}
+					}
+
+					rules = append(rules, rule)
+				default:
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+			}
+		}
+
+		if preWhere == nil {
+			panic(UNSUPPORTED_SHARD_ERR)
+		} else {
+			switch b := preWhere.Expr.(type) {
+			case *AndExpr:
+				panic(UNSUPPORTED_SHARD_ERR)
+			case *ComparisonExpr:
+				if len(froms) != 2 {
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+
+				if b.Operator != "=" {
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+
+				l := p.AnalyzeValue(b.Left)
+				r := p.AnalyzeValue(b.Right)
+
+				if ! (l == EID_NODE && r == EID_NODE) {
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+
+				if rules[0].KeyEqual(String(b.Left)) && rules[1].KeyEqual(String(b.Right)) {
+					p.rule = rules[0]
+					p.ShardList = makeList(0, len(rules[0].Nodes))
+					p.fullList = p.ShardList
+				} else if rules[1].KeyEqual(String(b.Right)) && rules[0].KeyEqual(String(b.Left)) {
+					p.rule = rules[0]
+					p.ShardList = makeList(0, len(rules[0].Nodes))
+					p.fullList = p.ShardList
+				} else {
+					log.Debug("join table expr's where: [%v] is compare(\"=\") but not [ keys equal to rule.key ], and can't by on", preWhere)
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+
+			default:
+				panic(UNSUPPORTED_SHARD_ERR)
+			}
+			log.Debug(preWhere.Type)
+
+			p.ShardList = p.routingAnalyzeBoolean(preWhere.Expr)
+		}
 	}
 
 	return nil, nil
