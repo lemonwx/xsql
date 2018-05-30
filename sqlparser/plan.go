@@ -160,7 +160,7 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 			case *Subquery:
 				switch sel := node.Select.(type) {
 				case *SimpleSelect:
-					return nil, nil
+					panic(UNSUPPORTED_SHARD_ERR)
 				case *Select:
 					plan, err := GeneralPlanForSelect(r, sel)
 					if err != nil {
@@ -273,25 +273,39 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 		}
 	} else {
 		var rules []*router.Rule
+		var rule *router.Rule
 		for _, tb := range froms {
 			switch v := tb.(type){
 			case *AliasedTableExpr:
 				switch node := v.Expr.(type) {
 				case *TableName:
-					rule := r.GetRule(hack.String(node.Name))
+					rule = r.GetRule(hack.String(node.Name))
 					rule.As = hack.String(v.As)
-
-					if len(rules) != 0 {
-						if !rules[0].Equal(rule) {
-							panic(UNSUPPORTED_SHARD_ERR)
+				case *Subquery:
+					switch sel := node.Select.(type) {
+					case *SimpleSelect:
+						panic(UNSUPPORTED_SHARD_ERR)
+					case *Select:
+						plan, err := GeneralPlanForSelect(r, sel)
+						if err != nil {
+							panic(err)
 						}
+						plan.rule.As = hack.String(v.As)
+						rule = plan.rule
+					case *Union:
+						panic(UNSUPPORTED_SHARD_ERR)
 					}
-
-					rules = append(rules, rule)
 				default:
 					panic(UNSUPPORTED_SHARD_ERR)
 				}
 			}
+			if len(rules) != 0 {
+				if !rules[0].Equal(rule) {
+					panic(UNSUPPORTED_SHARD_ERR)
+				}
+			}
+
+			rules = append(rules, rule)
 		}
 
 		if preWhere == nil {
@@ -320,7 +334,7 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms... Ta
 					p.rule = rules[0]
 					p.ShardList = makeList(0, len(rules[0].Nodes))
 					p.fullList = p.ShardList
-				} else if rules[1].KeyEqual(String(b.Right)) && rules[0].KeyEqual(String(b.Left)) {
+				} else if rules[1].KeyEqual(String(b.Left)) && rules[0].KeyEqual(String(b.Right)) {
 					p.rule = rules[0]
 					p.ShardList = makeList(0, len(rules[0].Nodes))
 					p.fullList = p.ShardList
