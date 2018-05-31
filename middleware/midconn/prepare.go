@@ -296,7 +296,7 @@ func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 	//mc := stmt.mc
 
 	// Determine threshould dynamically to avoid packet size shortage.
-	longDataSize := mysql.MaxPayloadLen/len(args) + 1
+	longDataSize := mysql.MaxPayloadLen/(len(args) + 1)
 	if longDataSize < 64 {
 		longDataSize = 64
 	}
