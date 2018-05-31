@@ -37,6 +37,7 @@ type Node struct {
 	NextVersion   uint64
 	NeedHide      bool
 	IsStmt        bool
+	ExtraSize 	int
 }
 
 func (node *Node) String() string {
@@ -354,7 +355,7 @@ func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error)
 	count, _, n := mysql.LengthEncodedInt(data)
 	if node.NeedHide {
 		log.Debugf("[%d] node [%v] read result need to hide extra col", node.ConnectionId, node.addr)
-		count -= 1
+		count -= uint64(node.ExtraSize)
 	}
 
 	if n != len(data) {
@@ -397,7 +398,7 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 			return err
 		}
 
-		if node.NeedHide && idx == 0 {
+		if node.NeedHide && idx < node.ExtraSize {
 			continue
 		}
 
@@ -433,13 +434,14 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			break
 		}
 		if node.NeedHide {
-			node.hideExtraCols(result, &data, node.VersionsInUse)
+			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
+			/*
 			version, err := node.calcVersion(result, &data)
 			if err != nil {
 				retErr = err
 			} else if _, ok := node.VersionsInUse[version]; ok {
 				retErr = errors.New("data in use by another session, pls try again later")
-			}
+			}*/
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}

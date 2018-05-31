@@ -562,8 +562,8 @@ func (conn *MidConn) forUpdate(stmt *Stmt, args []interface{}) error {
 		return err
 	}
 
-	conn.setupNodeStatus(conn.VersionsInUse, true, true)
-	defer conn.setupNodeStatus(nil, false, false)
+	conn.setupNodeStatus(conn.VersionsInUse, true, true, 1)
+	defer conn.setupNodeStatus(nil, false, false, 0)
 
 	var exprCount int
 	if v, ok := stmt.s.(*sqlparser.Update); ok {
@@ -629,8 +629,8 @@ func (conn *MidConn) ExecuteSelect(data []byte) error {
 	if err = conn.getVInUse(); err != nil {
 		return err
 	}
-	conn.setupNodeStatus(conn.VersionsInUse, true, true)
-	defer conn.setupNodeStatus(nil, false, false)
+	conn.setupNodeStatus(conn.VersionsInUse, true, true, 1)
+	defer conn.setupNodeStatus(nil, false, false, 0)
 
 	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, data, conn.nodeIdx); err != nil {
 		return err
