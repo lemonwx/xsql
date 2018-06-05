@@ -415,5 +415,11 @@ func (conn *MidConn) getPlan(stmt *sqlparser.Select) (*sqlparser.SelectPlan, err
 		return nil, err
 	}
 
+	for _, idx := range p.ShardList {
+		if _, ok := conn.executedIdx[idx]; !ok {
+			conn.executedIdx[idx] = 0
+		}
+	}
+
 	return p, err
 }
