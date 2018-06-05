@@ -459,23 +459,6 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	return retErr
 }
 
-func (node *Node) calcVersion(rs *mysql.Result, data *[]byte) (uint64, error) {
-	if node.IsStmt {
-		pos := 1 + (len(rs.Fields)+1+7+2)>>3
-		nullMask := (*data)[1:pos]
-		if ((nullMask[(0+2)>>3] >> uint((0+2)&7)) & 1) == 1 {
-			return 0, errors.New("UNEXPECT VERSION IS NULL")
-		}
-		*data = append((*data)[0:pos], (*data)[pos+8:]...)
-		return uint64(binary.LittleEndian.Uint64((*data)[pos : pos+8])), nil
-	} else {
-		res, err := strconv.ParseUint(string((*data)[1:(*data)[0]+1]), 10, 64)
-		*data = (*data)[(*data)[0]+1:]
-		return res, err
-
-	}
-
-}
 
 func (node *Node) isEOFPacket(data []byte) bool {
 	return node.pkt.IsEOFPacket(data)
