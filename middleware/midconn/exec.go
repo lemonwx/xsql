@@ -89,13 +89,47 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
 
+	if err = conn.getVInUse(); err != nil {
+		return nil, err
+	}
+
+	/*
 	if err = conn.handleSelectForUpdate(
 		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where)); err != nil {
 		return nil, err
 	}
+	*/
 
 	if err = conn.getNextVersion(); err != nil {
 		return nil, err
+	}
+
+	if len(conn.VersionsInUse) != 0 {
+
+		vs := make([]sqlparser.ValExpr, 0, len(conn.VersionsInUse))
+		for v, _ := range conn.VersionsInUse {
+			vs = append(vs, sqlparser.NumVal([]byte(fmt.Sprintf("%d", v))))
+		}
+
+		vNotInExpr := &sqlparser.ComparisonExpr{
+			Operator: "not in",
+			Left: &sqlparser.ColName{
+				Name: []byte(extraColName),
+				},
+			Right: sqlparser.ValTuple(vs)}
+
+		if stmt.Where == nil {
+			stmt.Where = &sqlparser.Where{
+				Type: "where",
+				Expr: vNotInExpr,
+			}
+		} else {
+			tmp := stmt.Where.Expr
+			stmt.Where.Expr = &sqlparser.AndExpr{
+				Left:  tmp,
+				Right: vNotInExpr,
+			}
+		}
 	}
 
 	// add extra col, get new sql
