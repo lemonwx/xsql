@@ -548,7 +548,7 @@ type AndExpr struct {
 }
 
 func (node *AndExpr) Format(buf *TrackedBuffer) {
-	buf.Fprintf("%v and %v", node.Left, node.Right)
+	buf.Fprintf("(%v) and (%v)", node.Left, node.Right)
 }
 
 // OrExpr represents an OR expression.
@@ -557,7 +557,7 @@ type OrExpr struct {
 }
 
 func (node *OrExpr) Format(buf *TrackedBuffer) {
-	buf.Fprintf("%v or %v", node.Left, node.Right)
+	buf.Fprintf("(%v) or (%v)", node.Left, node.Right)
 }
 
 // NotExpr represents a NOT expression.
