@@ -6,7 +6,6 @@ import (
 )
 
 type R interface {
-
 	ISR()
 	GetKey() string
 	GetKeyType() string
@@ -22,16 +21,16 @@ type R interface {
 }
 
 type Rule struct {
-	DB    string
-	Table string
-	As    string
-	Key   string
+	DB      string
+	Table   string
+	As      string
+	Key     string
 	KeyType string
 
 	Type string
 
-	Nodes []string
-	Shard Shard
+	Nodes     []string
+	Shard     Shard
 	ShardList []int
 }
 
@@ -44,7 +43,9 @@ func (r *Rule) GetKeyType() string {
 }
 
 func (r *Rule) KeyEqual(col string) bool {
-	if r.Key == col {return true}
+	if r.Key == col {
+		return true
+	}
 	if strings.Contains(col, ".") {
 		if fmt.Sprintf("%s.%s", r.Table, r.Key) == col {
 			return true
@@ -69,7 +70,7 @@ func (r *Rule) GetTB() string {
 	return r.Table
 }
 
-func (r *Rule) SetAs(as string){
+func (r *Rule) SetAs(as string) {
 	r.As = as
 }
 
@@ -78,7 +79,9 @@ func (r *Rule) GetShardType() string {
 }
 
 func (r *JoinRule) KeyEqual(col string) bool {
-	if r.GetKey() == col {return true}
+	if r.GetKey() == col {
+		return true
+	}
 	if strings.Contains(col, ".") {
 		if fmt.Sprintf("%s.%s", r.GetAs(), r.GetKey()) == col {
 			return true
@@ -99,7 +102,7 @@ func (r *JoinRule) GetAs() string {
 	return r.As
 }
 
-func (r *JoinRule) SetAs(as string){
+func (r *JoinRule) SetAs(as string) {
 	r.As = as
 }
 
@@ -122,18 +125,17 @@ func (r *JoinRule) GetShardType() string {
 func (r *Rule) ISR() {}
 
 type JoinRule struct {
-	Lr, Rr R
-	As string
+	Lr, Rr    R
+	As        string
 	ShardList []int
 }
 
 func (r *JoinRule) ISR() {}
 
-
 func (r *JoinRule) Equal(r1 R) bool {
 	if r.GetKeyType() == r.GetKeyType() && // 分发键的类型一致
 		ShardEqual(r.GetShard(), r1.GetShard()) { // 分发类型一致
-			return true
+		return true
 	}
 	return false
 }
@@ -141,7 +143,7 @@ func (r *JoinRule) Equal(r1 R) bool {
 func (r *Rule) Equal(r1 R) bool {
 	if r.KeyType == r1.GetKeyType() &&
 		ShardEqual(r.GetShard(), r1.GetShard()) {
-			return true
+		return true
 	}
 	return false
 }

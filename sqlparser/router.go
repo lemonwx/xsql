@@ -4,11 +4,10 @@
 
 package sqlparser
 
-
 import (
+	"fmt"
 	"sort"
 	"strconv"
-	"fmt"
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/router"
@@ -351,7 +350,7 @@ func (plan *RoutingPlan) getRule(r *router.Router, preWhere *Where, tbs ...Table
 			lr := plan.getRule(r, nil, v.LeftExpr)
 			rr := plan.getRule(r, nil, v.RightExpr)
 
-			if ! lr.Equal(rr) {
+			if !lr.Equal(rr) {
 				panic(err)
 			}
 
@@ -378,7 +377,7 @@ func (plan *RoutingPlan) getRule(r *router.Router, preWhere *Where, tbs ...Table
 					}
 
 					if lr.KeyEqual(String(b.Right)) && rr.KeyEqual(String(b.Left)) {
-						retR =  &router.JoinRule{
+						retR = &router.JoinRule{
 							Lr: lr,
 							Rr: rr,
 						}
@@ -391,7 +390,7 @@ func (plan *RoutingPlan) getRule(r *router.Router, preWhere *Where, tbs ...Table
 			if preWhere == nil {
 				if retR == nil {
 					panic(err)
-				}else {
+				} else {
 					return retR
 				}
 			}
@@ -736,4 +735,3 @@ func differentList(l1 []int, l2 []int) []int {
 
 	return l3
 }
-

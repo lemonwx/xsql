@@ -19,7 +19,7 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
 
-	if ! strings.Contains(strings.ToLower(sql), "autocommit") {
+	if !strings.Contains(strings.ToLower(sql), "autocommit") {
 
 		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
 		if err != nil {
@@ -34,17 +34,16 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 		}
 	}
 
-
 	/*
-	expr := stmt.Exprs[0]
+		expr := stmt.Exprs[0]
 
-	if v, ok := expr.Expr.(sqlparser.NumVal); ok {
-		log.Debugf("[%d], set num %v", conn.ConnectionId, v)
-	}
+		if v, ok := expr.Expr.(sqlparser.NumVal); ok {
+			log.Debugf("[%d], set num %v", conn.ConnectionId, v)
+		}
 
-	if v, ok := expr.Expr.(sqlparser.StrVal); ok {
-		log.Debugf("[%d], set str d g%v", conn.ConnectionId, v)
-	}
+		if v, ok := expr.Expr.(sqlparser.StrVal); ok {
+			log.Debugf("[%d], set str d g%v", conn.ConnectionId, v)
+		}
 	*/
 
 	/*
@@ -55,6 +54,5 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 	*/
 
 	return conn.cli.WriteOK(nil)
-
 
 }

@@ -6,17 +6,16 @@
 package node
 
 import (
-	"strconv"
 	"errors"
+	"strconv"
 
-	"github.com/lemonwx/xsql/mysql"
-	"github.com/lemonwx/log"
 	"encoding/binary"
+	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/mysql"
 )
 
 func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]uint8) error {
 	log.Debugf("[%d] hide extra cols: %v", node.ConnectionId, data)
-
 
 	if node.IsStmt {
 		pos := 1 + (len(rs.Fields)+1+7+2)>>3
@@ -27,7 +26,7 @@ func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]ui
 		start_pos := pos
 
 		for idx := 0; idx < node.ExtraSize; idx += 1 {
-			extra := uint64(binary.LittleEndian.Uint64((*data)[pos: pos+8]))
+			extra := uint64(binary.LittleEndian.Uint64((*data)[pos : pos+8]))
 			log.Debugf("[%d] extra col val: %v", node.ConnectionId, extra)
 			if _, ok := vs[extra]; ok {
 				return errors.New("data in use by another session, pls try again later")

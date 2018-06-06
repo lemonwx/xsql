@@ -45,7 +45,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 		log.Debugf("[%d] get shard list's length: %d", conn.ConnectionId, len(p.ShardList))
 		if len(p.ShardList) == 0 {
 			r := conn.newEmptyResultset(stmt)
-			return []*mysql.Result{ &mysql.Result{Resultset: r},  }, nil
+			return []*mysql.Result{&mysql.Result{Resultset: r}}, nil
 		}
 		conn.nodeIdx = p.ShardList
 	}

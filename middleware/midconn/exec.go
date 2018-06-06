@@ -94,10 +94,10 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 	}
 
 	/*
-	if err = conn.handleSelectForUpdate(
-		sqlparser.String(stmt.Table), sqlparser.String(stmt.Where)); err != nil {
-		return nil, err
-	}
+		if err = conn.handleSelectForUpdate(
+			sqlparser.String(stmt.Table), sqlparser.String(stmt.Where)); err != nil {
+			return nil, err
+		}
 	*/
 
 	if err = conn.getNextVersion(); err != nil {
@@ -115,7 +115,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 			Operator: "not in",
 			Left: &sqlparser.ColName{
 				Name: []byte(extraColName),
-				},
+			},
 			Right: sqlparser.ValTuple(vs)}
 
 		if stmt.Where == nil {

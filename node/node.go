@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
@@ -37,7 +36,7 @@ type Node struct {
 	NextVersion   uint64
 	NeedHide      bool
 	IsStmt        bool
-	ExtraSize 	int
+	ExtraSize     int
 }
 
 func (node *Node) String() string {
@@ -436,12 +435,12 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 		if node.NeedHide {
 			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
 			/*
-			version, err := node.calcVersion(result, &data)
-			if err != nil {
-				retErr = err
-			} else if _, ok := node.VersionsInUse[version]; ok {
-				retErr = errors.New("data in use by another session, pls try again later")
-			}*/
+				version, err := node.calcVersion(result, &data)
+				if err != nil {
+					retErr = err
+				} else if _, ok := node.VersionsInUse[version]; ok {
+					retErr = errors.New("data in use by another session, pls try again later")
+				}*/
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}
@@ -458,7 +457,6 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	*/
 	return retErr
 }
-
 
 func (node *Node) isEOFPacket(data []byte) bool {
 	return node.pkt.IsEOFPacket(data)

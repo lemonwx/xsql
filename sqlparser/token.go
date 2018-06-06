@@ -107,11 +107,11 @@ var keywords = map[string]int{
 	"unique":   UNIQUE,
 	"using":    USING,
 
-	"begin":    BEGIN,
-	"start":    START,
+	"begin":       BEGIN,
+	"start":       START,
 	"transaction": TRANSACTION,
-	"rollback": ROLLBACK,
-	"commit":   COMMIT,
+	"rollback":    ROLLBACK,
+	"commit":      COMMIT,
 
 	"names":   NAMES,
 	"replace": REPLACE,

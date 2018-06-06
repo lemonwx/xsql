@@ -37,7 +37,7 @@ type MidConn struct {
 	VersionsInUse map[uint64]uint8
 	NextVersion   uint64
 
-	nodeIdx []int // node that has exec sql in the trx
+	nodeIdx     []int // node that has exec sql in the trx
 	executedIdx map[int]uint8
 
 	stmts map[uint32]*Stmt

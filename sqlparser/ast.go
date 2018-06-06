@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/lemonwx/xsql/sqltypes"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/sqltypes"
 )
 
 // Instructions for creating new types: If a type
@@ -242,8 +242,8 @@ func GeneralExtraSelExprs(from TableExpr, idx int) SelectExprs {
 
 	switch table := from.(type) {
 	case *JoinTableExpr:
-		extra1 := GeneralExtraSelExprs(table.LeftExpr, idx + 1)
-		extra2 := GeneralExtraSelExprs(table.RightExpr, idx + 1 + 1)
+		extra1 := GeneralExtraSelExprs(table.LeftExpr, idx+1)
+		extra2 := GeneralExtraSelExprs(table.RightExpr, idx+1+1)
 		extras = append(extra1, extra2...)
 	case *AliasedTableExpr:
 		var extra SelectExpr
@@ -255,10 +255,10 @@ func GeneralExtraSelExprs(from TableExpr, idx int) SelectExprs {
 			colAs := []byte(fmt.Sprintf("%s%d", colName, idx))
 			if table.As != nil {
 				colName := []byte(fmt.Sprintf("%s.%s", table.As, colName))
-				extra = &NonStarExpr{Expr:&ColName{Name:colName}, As:colAs}
+				extra = &NonStarExpr{Expr: &ColName{Name: colName}, As: colAs}
 			} else {
 				colName := []byte(fmt.Sprintf("%s.%s", String(table.Expr), colName))
-				extra = &NonStarExpr{Expr:&ColName{Name:colName}, As:colAs}
+				extra = &NonStarExpr{Expr: &ColName{Name: colName}, As: colAs}
 			}
 			extras = append(extras, extra)
 
@@ -267,9 +267,9 @@ func GeneralExtraSelExprs(from TableExpr, idx int) SelectExprs {
 			sel := table.Expr.(*Subquery).Select.(*Select)
 
 			for i, col := range sel.ExtraCols {
-				colAs := []byte(fmt.Sprintf("%s%d", colName, idx + i))
+				colAs := []byte(fmt.Sprintf("%s%d", colName, idx+i))
 				colName := []byte(fmt.Sprintf("%s.%s", table.As, col.(*NonStarExpr).As))
-				extra = &NonStarExpr{Expr: &ColName{Name:colName}, As:colAs}
+				extra = &NonStarExpr{Expr: &ColName{Name: colName}, As: colAs}
 				extras = append(extras, extra)
 			}
 		}
@@ -1050,4 +1050,3 @@ func (*Show) IStatement() {}
 func (node *Show) Format(buf *TrackedBuffer) {
 	buf.Fprintf("show %s %s %v %v", node.Section, node.Key, node.From, node.LikeOrWhere)
 }
-

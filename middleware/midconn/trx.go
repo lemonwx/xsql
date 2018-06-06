@@ -78,6 +78,8 @@ func (conn *MidConn) getExecutedNodeIdx() []int {
 
 func (conn *MidConn) handleCommit(sql string) error {
 
+	log.Debugf("[%d] status: %v", conn.ConnectionId, conn.status)
+
 	commit := false
 
 	switch {
@@ -122,12 +124,11 @@ func (conn *MidConn) handleCommit(sql string) error {
 func (conn *MidConn) handleStmtTrx(data []byte) error {
 	conn.handleBegin(false)
 
-
 	err := conn.handleStmtExecute(data)
 
 	if err != nil {
 		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
-				conn.status[0] = mysql.SERVER_NOT_SERVE
+			conn.status[0] = mysql.SERVER_NOT_SERVE
 		}
 
 		return err
@@ -176,7 +177,7 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 	}
 }
 
-func (conn *MidConn) myHandleErr (execErr, handleCommitErr error) error {
+func (conn *MidConn) myHandleErr(execErr, handleCommitErr error) error {
 	switch {
 	case execErr == nil && handleCommitErr == nil:
 		return nil
