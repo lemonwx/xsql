@@ -93,52 +93,73 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 		return nil, err
 	}
 
-	/*
-		if err = conn.handleSelectForUpdate(
-			sqlparser.String(stmt.Table), sqlparser.String(stmt.Where)); err != nil {
-			return nil, err
-		}
-	*/
-
 	if err = conn.getNextVersion(); err != nil {
 		return nil, err
 	}
 
-	if len(conn.VersionsInUse) != 0 {
-
-		vs := make([]sqlparser.ValExpr, 0, len(conn.VersionsInUse))
-		for v, _ := range conn.VersionsInUse {
-			vs = append(vs, sqlparser.NumVal([]byte(fmt.Sprintf("%d", v))))
-		}
-
-		vNotInExpr := &sqlparser.ComparisonExpr{
-			Operator: "not in",
-			Left: &sqlparser.ColName{
-				Name: []byte(extraColName),
-			},
-			Right: sqlparser.ValTuple(vs)}
-
-		if stmt.Where == nil {
-			stmt.Where = &sqlparser.Where{
-				Type: "where",
-				Expr: vNotInExpr,
-			}
-		} else {
-			tmp := stmt.Where.Expr
-			stmt.Where.Expr = &sqlparser.AndExpr{
-				Left:  tmp,
-				Right: vNotInExpr,
-			}
-		}
-	}
-
 	// add extra col, get new sql
 	stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
+
+	// change set col = val to case when
+	if err = conn.change2caseWhen(stmt); err != nil {
+		return nil, err
+	}
+
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
 	log.Debugf("generallog--[%d] 3:%s", conn.ConnectionId, newSql)
 
 	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+}
+
+func (conn *MidConn) change2caseWhen(stmt *sqlparser.Update) error {
+
+	maxV := []byte("10000000000000")
+	for idx, expr := range stmt.Exprs {
+
+		// case when's cond
+		var cond sqlparser.BoolExpr
+
+		rCond := &sqlparser.ComparisonExpr{
+			Operator: "<",
+			Left: &sqlparser.ColName{
+				Name: []byte(extraColName),
+			},
+			Right: sqlparser.NumVal(maxV),
+		}
+
+		if len(conn.VersionsInUse) != 0 {
+			vs := make([]sqlparser.ValExpr, 0, len(conn.VersionsInUse))
+			for v, _ := range conn.VersionsInUse {
+				vs = append(vs, sqlparser.NumVal([]byte(fmt.Sprintf("%d", v))))
+			}
+			cond = &sqlparser.AndExpr{
+				Left: &sqlparser.ComparisonExpr{
+					Operator: "not in",
+					Left: &sqlparser.ColName{
+						Name: []byte(extraColName),
+					},
+					Right: sqlparser.ValTuple(vs),
+				},
+				Right: rCond,
+			}
+		} else {
+			cond = rCond
+		}
+
+		stmt.Exprs[idx].Expr = &sqlparser.CaseExpr{
+			Expr: nil,
+			Whens: []*sqlparser.When{
+				&sqlparser.When{
+					Cond: cond,
+					Val:  expr.Expr,
+				},
+			},
+			Else: expr.Name,
+		}
+	}
+
+	return nil
 }
 
 func (conn *MidConn) handleSelectForUpdate(table, where string) error {
