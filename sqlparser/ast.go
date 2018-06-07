@@ -548,7 +548,7 @@ type AndExpr struct {
 }
 
 func (node *AndExpr) Format(buf *TrackedBuffer) {
-	buf.Fprintf("(%v) and (%v)", node.Left, node.Right)
+	buf.Fprintf("((%v) and (%v))", node.Left, node.Right)
 }
 
 // OrExpr represents an OR expression.
@@ -845,7 +845,7 @@ type CaseExpr struct {
 }
 
 func (node *CaseExpr) Format(buf *TrackedBuffer) {
-	buf.Fprintf("case ")
+	buf.Fprintf("(case ")
 	if node.Expr != nil {
 		buf.Fprintf("%v ", node.Expr)
 	}
@@ -855,7 +855,7 @@ func (node *CaseExpr) Format(buf *TrackedBuffer) {
 	if node.Else != nil {
 		buf.Fprintf("else %v ", node.Else)
 	}
-	buf.Fprintf("end")
+	buf.Fprintf("end)")
 }
 
 // When represents a WHEN sub-expression.
