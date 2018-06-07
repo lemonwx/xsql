@@ -1,4 +1,4 @@
-a mysql proxy support xa transaction
+a mysql proxy support distributed transaction
 
 todo list:
 
@@ -30,3 +30,9 @@ todo list:
 
 16. join & multi table plan support
 17. plan.hide attr support
+
+
+18. 统一 must rollback 处理
+19. 整理 err
+    - mysqlErr
+    - 内部逻辑 err
