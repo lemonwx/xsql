@@ -8,6 +8,7 @@ package node
 import (
 	"errors"
 	"strconv"
+	//"math"
 
 	"encoding/binary"
 	"github.com/lemonwx/log"
@@ -16,16 +17,41 @@ import (
 
 var UNEXPECTED_NODE_ERR = errors.New("UNEXPECTED NODE ERROR")
 
+func (node *Node) node2cliNullMask(data *[]byte, fieldCount int) ([]byte, error) {
+
+	cliSize := (fieldCount +7 + 2) >> 3
+	nodePos := 1 + ((fieldCount + node.ExtraSize + 7 + 2) >> 3)
+
+	if nodePos >= len(*data) {
+		log.Errorf("[%d] unexpected node err: node pos: %d >= len(*data): %d", node.ConnectionId, nodePos, len(*data))
+		return nil, UNEXPECTED_NODE_ERR
+	}
+
+	nodeNullMask := (*data)[1:nodePos]
+	cliNullMask := make([]byte, cliSize)
+
+	for idx := 0; idx < fieldCount; idx += 1 {
+		nodeidx := idx + node.ExtraSize
+		if (nodeidx + 2 ) >> 3 >= len(nodeNullMask){
+			log.Errorf("[%d] unexpected node err: idx: %d >= len(node null mask): %d", node.ConnectionId,
+				(nodeidx + 2) >> 3 , len(nodeNullMask))
+			return nil, UNEXPECTED_NODE_ERR
+		}
+		if ((nodeNullMask[(nodeidx+2)>>3] >> uint((nodeidx+2)&7)) & 1) == 1 {
+			cliNullMask[(idx + 2) >> 3] += 1 << uint((idx + 2) % 8)
+		}
+	}
+
+	log.Debugf("[%d] 2 cli null mask : %v, len: %d, %d, %d", node.ConnectionId, cliNullMask, cliSize, nodePos, fieldCount)
+	return cliNullMask, nil
+}
+
 func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]uint8) error {
 	log.Debugf("[%d] hide extra cols: %v", node.ConnectionId, data)
 
 	if node.IsStmt {
-		pos := 1 + (len(rs.Fields)+node.ExtraSize+7+2)>>3
+		pos := 1 + ((len(rs.Fields)+ node.ExtraSize + 7 + 2) >> 3)
 		nullMask := (*data)[1:pos]
-		if ((nullMask[(0+2)>>3] >> uint((0+2)&7)) & 1) == 1 {
-			return errors.New("UNEXPECT VERSION IS NULL")
-		}
-		start_pos := pos
 
 		for idx := 0; idx < node.ExtraSize; idx += 1 {
 			if ((nullMask[(idx+2)>>3] >> uint((idx+2)&7)) & 1) == 1 {
@@ -39,7 +65,12 @@ func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]ui
 			}
 			pos += 8
 		}
-		*data = append((*data)[0:start_pos], (*data)[start_pos+8*node.ExtraSize:]...)
+		mask, err := node.node2cliNullMask(data, len(rs.Fields))
+		if err != nil {
+			return err
+		}
+		mask = append((*data)[:1], mask...)
+		*data = append(mask, (*data)[pos:]...)
 	} else {
 
 		idx := 1 + (*data)[0]

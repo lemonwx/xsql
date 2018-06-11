@@ -270,9 +270,9 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	log.Debugf("[%d] prepare stmt: updateStmtMetaId: %v, forUpdateStmtMetaId: %v",
 		conn.ConnectionId, conn.stmts[id].updateStmtIdMeta, conn.stmts[id].forUpStmtIdMeta)
 
-	switch conn.stmts[id].s.(type) {
+	switch stmt := conn.stmts[id].s.(type) {
 	case *sqlparser.Select:
-		return conn.ExecuteSelect(data)
+		return conn.ExecuteSelect(data, stmt)
 	case *sqlparser.Insert:
 		return conn.ExecuteInsert(conn.stmts[id])
 	case *sqlparser.Update:
@@ -624,12 +624,12 @@ func (conn *MidConn) ExecuteInsert(stmt *Stmt) error {
 	}
 }
 
-func (conn *MidConn) ExecuteSelect(data []byte) error {
+func (conn *MidConn) ExecuteSelect(data []byte, stmt *sqlparser.Select) error {
 	var err error
 	if err = conn.getVInUse(); err != nil {
 		return err
 	}
-	conn.setupNodeStatus(conn.VersionsInUse, true, true, 1)
+	conn.setupNodeStatus(conn.VersionsInUse, true, true, len(stmt.ExtraCols))
 	defer conn.setupNodeStatus(nil, false, false, 0)
 
 	if rets, err := conn.ExecuteMultiNode(mysql.COM_STMT_EXECUTE, data, conn.nodeIdx); err != nil {
