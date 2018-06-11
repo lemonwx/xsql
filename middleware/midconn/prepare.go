@@ -150,7 +150,7 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 		switch stmt.s.(type) {
 		case *sqlparser.Select:
 			stmt.cliParams = stmt.nodeParams
-			stmt.cliColumns = stmt.cliColumns - 1
+			stmt.cliColumns = stmt.nodeColumns - 1
 		case *sqlparser.Update, *sqlparser.Insert:
 			stmt.cliParams = stmt.nodeParams - 1
 		case *sqlparser.Delete:
