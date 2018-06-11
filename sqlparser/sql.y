@@ -777,7 +777,7 @@ value_expression_list:
   }
 | value_expression_list ',' value_expression
   {
-    $$ = append($1, $3)
+    $$ = AppendValExpr($1, $3)
   }
 
 value_expression:

@@ -743,6 +743,16 @@ func NewValExprs(expr ValExpr) ValExprs {
 	}
 }
 
+func AppendValExpr(exprs ValExprs, expr ValExpr) ValExprs {
+
+	switch v := expr.(type){
+	case ValTuple:
+		return append(exprs, v[1:])
+	default:
+		return append(exprs, expr)
+	}
+}
+
 func NewUpdateExprs(expr *UpdateExpr) UpdateExprs {
 
 	if string(expr.Name.Name) == "version" {
@@ -750,7 +760,7 @@ func NewUpdateExprs(expr *UpdateExpr) UpdateExprs {
 	}
 
 	var vExpr *UpdateExpr
-	switch expr.Expr.(type) {
+	switch v := expr.Expr.(type) {
 	case ValArg:
 		vExpr = &UpdateExpr{
 			Name: &ColName{
@@ -758,11 +768,18 @@ func NewUpdateExprs(expr *UpdateExpr) UpdateExprs {
 			},
 			Expr: ValArg("?"),
 		}
-	default:
+	case ValTuple:
 		vExpr = &UpdateExpr{
 			Name: &ColName{Name: []byte("version")},
 			Expr: NumVal([]byte{48})}
+		expr.Expr = v[1:]
+	default:
+		vExpr = &UpdateExpr{
+			Name: &ColName{Name: []byte("version")},
+			Expr: NumVal([]byte{123})}
 	}
+
+
 	return UpdateExprs{vExpr, expr}
 }
 

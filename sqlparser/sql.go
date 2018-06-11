@@ -1710,7 +1710,7 @@ yydefault:
 		yyDollar = yyS[yypt-3 : yypt+1]
 		//line sql.y:779
 		{
-			yyVAL.valExprs = append(yyDollar[1].valExprs, yyDollar[3].valExpr)
+			yyVAL.valExprs = AppendValExpr(yyDollar[1].valExprs, yyDollar[3].valExpr)
 		}
 	case 142:
 		yyDollar = yyS[yypt-1 : yypt+1]
