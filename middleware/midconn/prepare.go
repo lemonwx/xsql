@@ -147,10 +147,10 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 
 	if stmt.firstPrepare {
 		// handle cli params and node params
-		switch stmt.s.(type) {
+		switch v:= stmt.s.(type) {
 		case *sqlparser.Select:
 			stmt.cliParams = stmt.nodeParams
-			stmt.cliColumns = stmt.nodeColumns - 1
+			stmt.cliColumns = stmt.nodeColumns - uint16(len(v.ExtraCols))
 		case *sqlparser.Update, *sqlparser.Insert:
 			stmt.cliParams = stmt.nodeParams - 1
 		case *sqlparser.Delete:
