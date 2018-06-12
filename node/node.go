@@ -482,7 +482,7 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 		pos += 2
 	}
 
-	// Rows matched
+	// Rows matched ...
 	if bytes.Contains(data[pos:], []byte{82, 111, 119, 115, 32, 109, 97, 116, 99, 104, 101, 100, 58}) {
 		x := bytes.Split(data[pos:], []byte{32})
 		log.Debugf("--%d--%s--%d--%d", len(x), x)
@@ -496,6 +496,7 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 		if match != aft {
 			err := new(mysql.SqlError)
 			err.Code = 10001
+			err.State = mysql.DEFAULT_MYSQL_STATE
 			err.Message = "pre sql only exec success in partly node, you must rollback to confirm the global transaction"
 
 			return nil, err
