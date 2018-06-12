@@ -16,6 +16,23 @@ import (
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
+func (conn *MidConn) handleUpdateForDelete(stmt *sqlparser.Delete) error {
+
+	updateSql := fmt.Sprintf("update %s set version = %d %s", sqlparser.String(stmt.Table), conn.NextVersion, sqlparser.String(stmt.Where))
+	updateStmt, err := sqlparser.Parse(updateSql)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = conn.handleUpdate(updateStmt.(*sqlparser.Update), updateSql)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
 	var err error
 	if err = conn.getNodeIdxs(stmt, nil); err != nil {
@@ -24,6 +41,7 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
 
+	/*
 	var tb string = sqlparser.String(stmt.Table)
 	var where string = sqlparser.String(stmt.Where)
 
@@ -42,6 +60,10 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 			return nil, err
 		}
 		log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
+	}
+*/
+	if err = conn.handleUpdateForDelete(stmt); err != nil {
+		return nil, err
 	}
 
 	log.Debugf("[%d] after convert sql: %s", conn.ConnectionId, sql)
