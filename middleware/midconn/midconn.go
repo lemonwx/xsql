@@ -229,21 +229,63 @@ func (conn *MidConn) writeResultset(status uint16, r *mysql.Resultset) error {
 func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 	[]*mysql.Result, error) {
 
-	rets := make([]interface{}, len(nodeIdxs))
+	nodeSize := len(nodeIdxs)
 	wg := sync.WaitGroup{}
-	wg.Add(len(nodeIdxs))
+	wg.Add(nodeSize)
 
-	for idx := 0; idx < len(nodeIdxs); idx += 1 {
+	rets := make([]*mysql.Result, 0, nodeSize)
+	errs := make([]error, 0, nodeSize)
+
+	for idx := 0; idx < nodeSize; idx += 1 {
 		go func(tmp int) {
 			if rs, err := conn.nodes[nodeIdxs[tmp]].Execute(opt, sql); err != nil {
-				rets[tmp] = err
+				errs = append(errs, err)
 			} else {
-				rets[tmp] = rs
+				rets = append(rets, rs)
 			}
 			wg.Done()
 		}(idx)
 	}
 	wg.Wait()
+
+	switch {
+	case len(errs) == 0 && len(rets) == nodeSize:
+		// 所有节点返回的都是执行成功
+		log.Debugf("[%d] all %d nodes return success", conn.ConnectionId, nodeSize)
+		return rets, nil
+
+	case len(rets) == 0 && len(errs) == nodeSize:
+
+		// 所有节点都执行出错
+		desc := errs[0].Error()
+		for _, err := range errs[1:] {
+			// 错误内容不一致，预期外的情况
+			if err.Error() != desc {
+				log.Debugf("[%d] all %d nodes return error, but err's desc not equal", conn.ConnectionId, nodeSize)
+				return nil, UNEXPECT_MIDDLE_WARE_ERR
+			}
+		}
+
+		// 所有节点返回的 错误内容一致
+		if err, ok := errs[0].(*mysql.SqlError); ok {
+			if err.Code == ROWS_IN_USE_BY_OTHER_SESSION {
+				log.Debugf("[%d] all %d nodes return error: %v", conn.ConnectionId, nodeSize, err.Message)
+				return nil, errs[0]
+			}
+		}
+
+		log.Debugf("[%d] all %d nodes return error: %v", conn.ConnectionId, errs[0].Error())
+		return nil, errs[0]
+
+	default:
+		// 既有错误的节点，也有成功的节点， 分布式事务可能不一致
+		return nil, MUST_ROLLBACK_OR_COMMIT_ERR
+	}
+
+
+	/*
+
+	conn.handleMultiNodeError(rets)
 
 	rs := make([]*mysql.Result, 0, len(nodeIdxs))
 	for _, ret := range rets {
@@ -253,6 +295,7 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 		rs = append(rs, ret.(*mysql.Result))
 	}
 	return rs, nil
+	*/
 }
 
 func (conn *MidConn) ExecuteMultiNodePrepare(args []interface{}, stmtMeta map[int]uint32, nodeIdxs []int) ([]*mysql.Result, error) {

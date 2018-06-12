@@ -482,13 +482,15 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 		pos += 2
 	}
 
+	log.Debugf("[%d] recv: %s from node: %v", node.ConnectionId, data[pos:], node.addr)
+
 	// Rows matched ...
 	if bytes.Contains(data[pos:], []byte{82, 111, 119, 115, 32, 109, 97, 116, 99, 104, 101, 100, 58}) {
 		x := bytes.Split(data[pos:], []byte{32})
-		log.Debugf("--%d--%s--%d--%d", len(x), x)
 		match := x[2][0] - 48
 		aft := x[5][0] - 48
 
+		log.Debugf("[%d] match: %d, aft: %d, aft: %d", node.ConnectionId, match, aft, r.AffectedRows)
 		if uint64(aft) != r.AffectedRows {
 			return nil, errors.New("UNEXPECTED ERROR, aft != r.AffectedRows")
 		}
@@ -497,7 +499,7 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 			err := new(mysql.SqlError)
 			err.Code = 10001
 			err.State = mysql.DEFAULT_MYSQL_STATE
-			err.Message = "pre sql only exec success in partly node, you must rollback to confirm the global transaction"
+			err.Message = "this rows you update maybe in use by another session"
 
 			return nil, err
 		}
