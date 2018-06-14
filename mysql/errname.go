@@ -870,4 +870,10 @@ var MySQLErrName = map[uint16]string{
 	ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_NOT_NULL:                    "cannot silently convert NULL values, as required in this SQL_MODE",
 	ER_MUST_CHANGE_PASSWORD_LOGIN:                                       "Your password has expired. To log in you must change it using a client that supports expired passwords.",
 	ER_ROW_IN_WRONG_PARTITION:                                           "Found a row in wrong partition %s",
+
+
+	MID_ER_ROWS_IN_USE_BY_OTHER_SESSION: "Rows in use by another session, pls try again later",
+	MID_ER_SQL_ONLY_SUCCESS_IN_PARTLY_OF_NODE: "Sql only successed in partly node, you must rollback to confirm the global transaction",
+	MID_ER_UNEXPECTED: "Unexpected middleware error",
 }
+

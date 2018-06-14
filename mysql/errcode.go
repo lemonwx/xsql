@@ -873,3 +873,14 @@ const (
 	ER_ROW_IN_WRONG_PARTITION                                                  = 1863
 	ER_ERROR_LAST                                                              = 1863
 )
+
+const (
+	// sql 执行相关的错误
+	MID_ER_ROWS_IN_USE_BY_OTHER_SESSION  uint16 = 10001
+	MID_ER_SQL_ONLY_SUCCESS_IN_PARTLY_OF_NODE = 10002
+	MID_ER_UNEXPECTED = 10003
+	MID_ER_EXEC_COMMIT_ROLLBACK_ERR = 10004
+
+	// version 相关的错误
+	MID_ER_RELEASE_VERSION_ERR = 10005
+)

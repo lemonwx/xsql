@@ -102,7 +102,8 @@ func (conn *MidConn) handleCommit(sql string) error {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
 			err := version.ReleaseVersion(conn.NextVersion)
 			if err != nil {
-				return err
+				log.Errorf("[%d] release version failed: %v", conn.ConnectionId, err)
+				return mysql.NewDefaultError(mysql.MID_ER_RELEASE_VERSION_ERR)
 			}
 		}
 		conn.NextVersion = 0
@@ -110,7 +111,8 @@ func (conn *MidConn) handleCommit(sql string) error {
 
 		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.getExecutedNodeIdx())
 		if err != nil {
-			return err
+			log.Errorf("[%d] execute %s failed: %v", conn.ConnectionId, sql, err)
+			return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_ERR)
 		}
 		for idx, _ := range conn.executedIdx {
 			delete(conn.executedIdx, idx)
@@ -160,7 +162,7 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 		rets, execErr = conn.handleDelete(v, sql)
 	default:
 		isSelect = false
-		execErr = UNEXPECT_MIDDLE_WARE_ERR
+		execErr = mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
 	}
 
 	handleCommitErr = conn.handleCommit("")
@@ -194,6 +196,6 @@ func (conn *MidConn) myHandleErr(execErr, handleCommitErr error) error {
 		}
 		return fmt.Errorf("%v -- %v", execErr, handleCommitErr)
 	default:
-		return UNEXPECT_MIDDLE_WARE_ERR
+		return mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
 	}
 }
