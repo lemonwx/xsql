@@ -10,6 +10,7 @@ import (
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
+	"strconv"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
@@ -58,7 +59,54 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 	defer conn.setupNodeStatus(nil, false, false, 0)
 
 	newSql := sqlparser.String(stmt)
-	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+
+	if err == nil {
+
+		if stmt.Limit != nil {
+			if stmt.Limit.Offset != nil {
+				return nil, mysql.NewDefaultError(mysql.MID_ER_UNSUPPORTED_SQL)
+			}
+			log.Debugf("[%d] offset: %v, rows count: %d", conn.ConnectionId, stmt.Limit.Offset, stmt.Limit.Rowcount)
+
+			limitCount := string(stmt.Limit.Rowcount.(sqlparser.NumVal))
+			count, err := strconv.ParseUint(limitCount, 10, 64)
+
+			if err != nil {
+				log.Errorf("[%d] parse limit count failed: %v", err)
+				return nil, err
+			}
+
+			allCount := 0
+
+			r := &mysql.Result{
+				Status:       0,
+				AffectedRows: 0,
+				Resultset:    &mysql.Resultset{},
+			}
+
+			r.Status = rets[0].Status
+			r.InsertId = rets[0].InsertId
+			r.AffectedRows = rets[0].AffectedRows
+			r.Fields = rets[0].Fields
+			r.FieldNames = rets[0].FieldNames
+			r.RowDatas = make([]mysql.RowData, count)
+
+			s := 0
+			for _, ret := range rets {
+				tmp := len(ret.RowDatas)
+				if allCount + tmp > int(count) {
+					tmp = int(count) - allCount
+					copy(r.RowDatas[s:], ret.RowDatas[:tmp])
+					return []*mysql.Result{r}, nil
+				}
+				copy(r.RowDatas[s:], ret.RowDatas[:tmp])
+				s += tmp
+				allCount += tmp
+			}
+		}
+	}
+	return rets, err
 }
 
 func (conn *MidConn) setupNodeStatus(vInUse map[uint64]byte, hide bool, isStmt bool, extraSize int) {
