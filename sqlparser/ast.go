@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/sqltypes"
 )
 
@@ -287,10 +286,6 @@ func NewSelectExprs(sels []SelectExpr, froms TableExprs) SelectExprs {
 		for idx, tb := range froms {
 			tmp := GeneralExtraSelExprs(tb, idx)
 			extras = append(extras, tmp...)
-		}
-
-		for _, extra := range extras {
-			log.Debug(String(extra))
 		}
 		return extras
 	}

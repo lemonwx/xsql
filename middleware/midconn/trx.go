@@ -71,14 +71,13 @@ func (conn *MidConn) getExecutedNodeIdx() []int {
 		ret = append(ret, k)
 	}
 
-	log.Debug(conn.executedIdx, ret)
-
+	log.Debugf("[%d] conn.executed node idx: %v", conn.ConnectionId, ret)
 	return ret
 }
 
 func (conn *MidConn) handleCommit(sql string) error {
 
-	log.Debugf("[%d] status: %v", conn.ConnectionId, conn.status)
+	log.Debugf("[%d] mid conn's status: %v", conn.ConnectionId, conn.status)
 
 	commit := false
 
@@ -96,14 +95,14 @@ func (conn *MidConn) handleCommit(sql string) error {
 	}
 
 	if commit {
-		log.Debugf("[%d] need commit", conn.ConnectionId)
+		log.Debugf("[%d] need exec: %s", conn.ConnectionId, sql)
 
 		if conn.NextVersion != 0 {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
 			err := version.ReleaseVersion(conn.NextVersion)
 			if err != nil {
 				log.Errorf("[%d] release version failed: %v", conn.ConnectionId, err)
-				return mysql.NewDefaultError(mysql.MID_ER_RELEASE_VERSION_ERR)
+				return mysql.NewDefaultError(mysql.MID_ER_RELEASE_VERSION_FAILED)
 			}
 		}
 		conn.NextVersion = 0
@@ -112,7 +111,7 @@ func (conn *MidConn) handleCommit(sql string) error {
 		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.getExecutedNodeIdx())
 		if err != nil {
 			log.Errorf("[%d] execute %s failed: %v", conn.ConnectionId, sql, err)
-			return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_ERR)
+			return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_FAILED)
 		}
 		for idx, _ := range conn.executedIdx {
 			delete(conn.executedIdx, idx)

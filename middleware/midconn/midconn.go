@@ -183,7 +183,7 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Show:
 		return conn.handleShow(v, sql)
 	case *sqlparser.Select, *sqlparser.Insert, *sqlparser.Update, *sqlparser.Delete:
-		log.Debugf("[%d] sql need to execute in trx", conn.ConnectionId)
+		log.Debugf("[%d] sql:[%s] need to execute in trx", conn.ConnectionId, sql)
 		return conn.handleTrx(stmt, sql)
 
 	default:
@@ -226,8 +226,7 @@ func (conn *MidConn) writeResultset(status uint16, r *mysql.Resultset) error {
 	return conn.cli.WriteResultset(status, r)
 }
 
-func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
-	[]*mysql.Result, error) {
+func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
 
 	nodeSize := len(nodeIdxs)
 	wg := sync.WaitGroup{}
@@ -248,6 +247,7 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 	}
 	wg.Wait()
 
+	// handle returns from multi nodes
 	switch {
 	case len(errs) == 0 && len(rets) == nodeSize:
 		// 所有节点返回的都是执行成功
@@ -255,7 +255,6 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 		return rets, nil
 
 	case len(rets) == 0 && len(errs) == nodeSize:
-
 		// 所有节点都执行出错
 		desc := errs[0].Error()
 		for _, err := range errs[1:] {
@@ -278,24 +277,11 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) (
 		return nil, errs[0]
 
 	default:
-		// 既有错误的节点，也有成功的节点， 分布式事务可能不一致
-		return nil, MUST_ROLLBACK_OR_COMMIT_ERR
+		// 既有错误的节点，也有成功的节点， 分布式事务可能不一致, 必须手动 rollback
+		err := mysql.NewDefaultError(mysql.MID_ER_SQL_ONLY_SUCCESS_IN_PARTLY_OF_NODE)
+		log.Errorf("[%d] %v", err)
+		return nil, err
 	}
-
-
-	/*
-
-	conn.handleMultiNodeError(rets)
-
-	rs := make([]*mysql.Result, 0, len(nodeIdxs))
-	for _, ret := range rets {
-		if err, ok := ret.(error); ok {
-			return nil, err
-		}
-		rs = append(rs, ret.(*mysql.Result))
-	}
-	return rs, nil
-	*/
 }
 
 func (conn *MidConn) ExecuteMultiNodePrepare(args []interface{}, stmtMeta map[int]uint32, nodeIdxs []int) ([]*mysql.Result, error) {
@@ -346,18 +332,6 @@ func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 	}
 
 	return conn.cli.WriteResultsets(conn.status[0], rs)
-
-	/*
-		if rs, err := conn.mergeSelResult(rets); err != nil {
-			log.Errorf("merge select result failed: %v", err)
-			return conn.cli.WriteError(err)
-		} else if rs != nil {
-			return conn.cli.WriteResultset(conn.status, rs.Resultset)
-		} else {
-			return UNEXPECT_MIDDLE_WARE_ERR
-		}
-	*/
-
 }
 
 func (conn *MidConn) mergeExecResult(rets []*mysql.Result) (*mysql.Result, error) {
@@ -443,7 +417,9 @@ func (c *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset {
 func (conn *MidConn) getPlan(stmt *sqlparser.Select) (*sqlparser.SelectPlan, error) {
 	var err error
 	if conn.db == "" {
-		return nil, mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+		err := mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+		log.Errorf("[%d] get conn.db failed: %v", conn.ConnectionId, err)
+		return nil, err
 	}
 
 	r, err := meta.GetRouter(conn.db)

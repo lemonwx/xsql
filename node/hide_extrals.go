@@ -47,7 +47,6 @@ func (node *Node) node2cliNullMask(data *[]byte, fieldCount int) ([]byte, error)
 }
 
 func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]uint8) error {
-	log.Debugf("[%d] hide extra cols: %v", node.ConnectionId, data)
 
 	if node.IsStmt {
 		pos := 1 + ((len(rs.Fields)+ node.ExtraSize + 7 + 2) >> 3)
@@ -72,33 +71,39 @@ func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]ui
 		mask = append((*data)[:1], mask...)
 		*data = append(mask, (*data)[pos:]...)
 	} else {
-
 		idx := 1 + (*data)[0]
-		res, err := strconv.ParseUint(string((*data)[1:(*data)[0]+1]), 10, 64)
+		vStr := string((*data)[1:(*data)[0]+1])
+		res, err := strconv.ParseUint(vStr, 10, 64)
 		if err != nil {
-			return err
+			log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
+			return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
 		}
 
 		if _, ok := vs[res]; ok {
-			return errors.New("data in use by another session, pls try again later")
+			err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
+			log.Errorf("[%d] hide extra col failed: %v", node.ConnectionId, err)
+			return err
 		}
 
 		for count := 0; count < node.ExtraSize-1; count += 1 {
 			s := idx + 1
 			e := s + (*data)[idx]
 
-			res, err := strconv.ParseUint(string((*data)[s:e]), 10, 64)
+			vStr :=  string((*data)[s:e])
+			res, err := strconv.ParseUint(vStr, 10, 64)
 			if err != nil {
-				return err
+				log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
+				return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
 			}
 			if _, ok := vs[res]; ok {
-				return errors.New("data in use by another session, pls try again later")
+				err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
+				log.Errorf("[%d] hide extra col failed: %v", node.ConnectionId, err)
+				return err
 			}
 
 			idx = (*data)[idx] + idx + 1
 		}
 		*data = (*data)[idx:]
-		log.Debug(idx, *data)
 	}
 	return nil
 }

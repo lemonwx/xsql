@@ -333,7 +333,7 @@ func (node *Node) parseResult() (*mysql.Result, error) {
 		log.Errorf("[%d] parse result from %v failed: %v", node.ConnectionId, node.addr, err)
 		return nil, err
 	}
-	log.Debugf("[%d] recv [%d]-[%s] from node %v", node.ConnectionId, data[0], data[1:], node.addr)
+	log.Debugf("[%d] recv [%d]-[%s] from node [%v]", node.ConnectionId, data[0], data[1:], node.addr)
 
 	switch data[0] {
 	case mysql.OK_HEADER:
@@ -353,7 +353,7 @@ func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error)
 
 	count, _, n := mysql.LengthEncodedInt(data)
 	if node.NeedHide {
-		log.Debugf("[%d] node [%v] read result need to hide extra col", node.ConnectionId, node.addr)
+		log.Debugf("[%d] node [%v] read result need to hide extra col, extra size: %d", node.ConnectionId, node.addr, node.ExtraSize)
 		count -= uint64(node.ExtraSize)
 	}
 
@@ -419,6 +419,12 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	// pre row's version value
 	//var preRowV uint64 = 0
 
+	if node.IsStmt {
+		log.Debugf("[%d] hide extra col under stmt", node.ConnectionId)
+	} else {
+		log.Debugf("[%d] [%v] hide extra col under query", node.ConnectionId, node.addr)
+	}
+
 	for {
 		data, err = node.pkt.ReadPacket()
 		if err != nil {
@@ -434,27 +440,9 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 		}
 		if node.NeedHide {
 			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
-			/*
-				version, err := node.calcVersion(result, &data)
-				if err != nil {
-					retErr = err
-				} else if _, ok := node.VersionsInUse[version]; ok {
-					retErr = errors.New("data in use by another session, pls try again later")
-				}*/
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}
-	/*
-		no affect to send resultset to mysql cli
-		result.Values = make([][]interface{}, len(result.RowDatas))
-		for i := range result.Values {
-			result.Values[i], err = result.RowDatas[i].Parse(result.Fields, isBinary)
-
-			if err != nil {
-				return err
-			}
-		}
-	*/
 	return retErr
 }
 
@@ -482,7 +470,7 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 		pos += 2
 	}
 
-	log.Debugf("[%d] recv: %s from node: %v", node.ConnectionId, data[pos:], node.addr)
+	log.Debugf("[%d] recv: %s from node: [%v]", node.ConnectionId, data[pos:], node.addr)
 
 	// Rows matched ...
 	if bytes.Contains(data[pos:], []byte{82, 111, 119, 115, 32, 109, 97, 116, 99, 104, 101, 100, 58}) {
@@ -492,16 +480,13 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 
 		log.Debugf("[%d] match: %d, aft: %d, aft: %d", node.ConnectionId, match, aft, r.AffectedRows)
 		if uint64(aft) != r.AffectedRows {
-			return nil, errors.New("UNEXPECTED ERROR, aft != r.AffectedRows")
+			log.Debugf("[%d] aft parsed from proto and desc not equal")
+			return nil, mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
 		}
 
 		if match != aft {
-			err := new(mysql.SqlError)
-			err.Code = 10001
-			err.State = mysql.DEFAULT_MYSQL_STATE
-			err.Message = "this rows you update maybe in use by another session"
-
-			return nil, err
+			log.Errorf("[%d] match != aft", node.ConnectionId)
+			return nil, mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
 		}
 	}
 
