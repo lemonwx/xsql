@@ -62,51 +62,49 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 
 	if err == nil {
-
 		if stmt.Limit != nil {
-			if stmt.Limit.Offset != nil {
-				log.Errorf("[%d] offset : %v not nil, not support this sql now", conn.ConnectionId, stmt.Limit.Offset)
-				return nil, mysql.NewDefaultError(mysql.MID_ER_UNSUPPORTED_SQL)
+			rets, err = conn.handleLimit(rets, stmt.Limit)
+		}
+
+		// group by [having] , order by, distinct
+	}
+
+	return rets, err
+}
+
+func (conn *MidConn) handleLimit(rets []*mysql.Result, limit *sqlparser.Limit) ([]*mysql.Result, error) {
+
+	if len(rets) == 0 {
+		log.Errorf("[%d] handle limit rets's len == 0, unexpected err", conn.ConnectionId)
+		return nil, mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
+	}
+
+	if limit != nil {
+		if limit.Offset != nil {
+			log.Errorf("[%d] offset : %v not nil, not support this sql now", conn.ConnectionId, limit.Offset)
+			return nil, mysql.NewDefaultError(mysql.MID_ER_UNSUPPORTED_SQL)
+		}
+		log.Debugf("[%d] offset: %v, rows count: %d", conn.ConnectionId, limit.Offset, limit.Rowcount)
+
+		limitCount, err := strconv.ParseUint(string(limit.Rowcount.(sqlparser.NumVal)), 10, 64)
+		if err != nil {
+			log.Errorf("[%d] parse limit count failed: %v", conn.ConnectionId, err)
+			return nil, err
+		}
+
+		allCount := uint64(0)
+		for idx, ret := range rets {
+			tmp := uint64(len(ret.RowDatas))
+			if allCount + tmp >= limitCount {
+
+				rets[idx].RowDatas = rets[idx].RowDatas[:limitCount - allCount]
+				return rets[:idx + 1], nil
 			}
-			log.Debugf("[%d] offset: %v, rows count: %d", conn.ConnectionId, stmt.Limit.Offset, stmt.Limit.Rowcount)
-
-			count, err := strconv.ParseUint(string(stmt.Limit.Rowcount.(sqlparser.NumVal)), 10, 64)
-
-			if err != nil {
-				log.Errorf("[%d] parse limit count failed: %v", conn.ConnectionId, err)
-				return nil, err
-			}
-
-			allCount := 0
-
-			r := &mysql.Result{
-				Status:       0,
-				AffectedRows: 0,
-				Resultset:    &mysql.Resultset{},
-			}
-
-			r.Status = rets[0].Status
-			r.InsertId = rets[0].InsertId
-			r.AffectedRows = rets[0].AffectedRows
-			r.Fields = rets[0].Fields
-			r.FieldNames = rets[0].FieldNames
-			r.RowDatas = make([]mysql.RowData, count)
-
-			s := 0
-			for _, ret := range rets {
-				tmp := len(ret.RowDatas)
-				if allCount + tmp > int(count) {
-					tmp = int(count) - allCount
-					copy(r.RowDatas[s:], ret.RowDatas[:tmp])
-					return []*mysql.Result{r}, nil
-				}
-				copy(r.RowDatas[s:], ret.RowDatas[:tmp])
-				s += tmp
-				allCount += tmp
-			}
+			allCount += tmp
 		}
 	}
-	return rets, err
+
+	return rets, nil
 }
 
 func (conn *MidConn) setupNodeStatus(vInUse map[uint64]byte, hide bool, isStmt bool, extraSize int) {
