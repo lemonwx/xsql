@@ -65,15 +65,15 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 
 		if stmt.Limit != nil {
 			if stmt.Limit.Offset != nil {
+				log.Errorf("[%d] offset : %v not nil, not support this sql now", conn.ConnectionId, stmt.Limit.Offset)
 				return nil, mysql.NewDefaultError(mysql.MID_ER_UNSUPPORTED_SQL)
 			}
 			log.Debugf("[%d] offset: %v, rows count: %d", conn.ConnectionId, stmt.Limit.Offset, stmt.Limit.Rowcount)
 
-			limitCount := string(stmt.Limit.Rowcount.(sqlparser.NumVal))
-			count, err := strconv.ParseUint(limitCount, 10, 64)
+			count, err := strconv.ParseUint(string(stmt.Limit.Rowcount.(sqlparser.NumVal)), 10, 64)
 
 			if err != nil {
-				log.Errorf("[%d] parse limit count failed: %v", err)
+				log.Errorf("[%d] parse limit count failed: %v", conn.ConnectionId, err)
 				return nil, err
 			}
 
