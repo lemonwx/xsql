@@ -27,6 +27,10 @@ type RedisConf struct {
 	Password string
 }
 
+type Auth struct {
+	User, Password string
+}
+
 type Conf struct {
 	Id         string
 	Addr       string
@@ -38,6 +42,7 @@ type Conf struct {
 	MaxSize    int       `yaml:"MaxSize"`
 	InitSize   int       `yaml:"InitSize"`
 	Batch      int       `yaml:"Batch"`
+	Auths       []*Auth     `yaml:"auth"`
 }
 
 func ReadConf() *Conf {

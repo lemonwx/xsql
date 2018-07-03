@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
@@ -43,7 +44,7 @@ type MidConn struct {
 	stmts map[uint32]*Stmt
 }
 
-func NewMidConn(conn net.Conn) (*MidConn, error) {
+func NewMidConn(conn net.Conn, cfg *config.Conf) (*MidConn, error) {
 
 	var err error
 	midConn := new(MidConn)
@@ -52,7 +53,7 @@ func NewMidConn(conn net.Conn) (*MidConn, error) {
 	baseConnId = atomic.AddUint32(&baseConnId, 1)
 	midConn.ConnectionId = baseConnId
 
-	cli := client.NewClieConn(conn, midConn.ConnectionId)
+	cli := client.NewClieConn(conn, midConn.ConnectionId, cfg)
 	err = cli.Handshake()
 	if err != nil {
 		cli.WriteError(err)

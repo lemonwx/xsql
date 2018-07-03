@@ -19,10 +19,12 @@ import (
 type Server struct {
 	lis  net.Listener
 	addr string
+	cfg *config.Conf
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {
 	s := new(Server)
+	s.cfg = cfg
 	s.addr = cfg.Addr
 	s.parseSchemas(cfg)
 
@@ -50,7 +52,7 @@ func (s *Server) Run() error {
 // serve for mysql client conn(get by lis.Accept)
 func (s *Server) ServeConn(conn net.Conn) {
 	// init and connect with back mysql server
-	if midConn, err := midconn.NewMidConn(conn); err != nil {
+	if midConn, err := midconn.NewMidConn(conn, s.cfg); err != nil {
 		log.Errorf("new mid conn failed: %v", err)
 		return
 	} else {

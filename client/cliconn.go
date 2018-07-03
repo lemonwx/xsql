@@ -11,6 +11,7 @@ import (
 	"net"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/mysql"
 )
 
@@ -34,11 +35,10 @@ type CliConn struct {
 	user string
 	Db   string
 
-	defaultUser   string
-	defaultPasswd string
+	auths []*config.Auth
 }
 
-func NewClieConn(conn net.Conn, connid uint32) *CliConn {
+func NewClieConn(conn net.Conn, connid uint32, cfg *config.Conf) *CliConn {
 
 	tcpConn := conn.(*net.TCPConn)
 	tcpConn.SetNoDelay(false)
@@ -53,6 +53,8 @@ func NewClieConn(conn net.Conn, connid uint32) *CliConn {
 	cli.charset = mysql.DEFAULT_CHARSET
 	cli.collation = mysql.DEFAULT_COLLATION_ID
 	cli.connectionId = connid
+
+	cli.auths = cfg.Auths
 
 	return cli
 }
@@ -153,13 +155,22 @@ func (c *CliConn) readHandshakeResponse() error {
 	//auth length and auth
 	authLen := int(data[pos])
 	pos++
-	auth := data[pos : pos+authLen]
+	cliAuth := data[pos : pos+authLen]
 
-	checkAuth := mysql.CalcPassword(c.salt, []byte(c.defaultPasswd))
-	if c.user != c.defaultUser || !bytes.Equal(auth, checkAuth) {
-
+	// chk cli's user & password for every auth cfg
+	var idx int
+	for idx < len(c.auths) {
+		auth := c.auths[idx]
+		if auth.User == c.user {
+			checkAuth := mysql.CalcPassword(c.salt, []byte(auth.Password))
+			if bytes.Equal(cliAuth, checkAuth) {
+				break
+			}
+		}
+		idx += 1
 	}
-	if false {
+	if idx == len(c.auths) {
+		log.Errorf("[%d] cli's password != cfg.Auth.Password", c.connectionId)
 		return mysql.NewDefaultError(mysql.ER_ACCESS_DENIED_ERROR, c.user, c.conn.RemoteAddr().String(), "Yes")
 	}
 
