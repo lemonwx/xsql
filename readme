@@ -37,3 +37,8 @@ todo list:
     - mysqlErr
     - 内部逻辑 err
 20. handle audit
+
+2018.7.11
+21. binlog 回滚
+22. prepare sql exec router test
+23. backend conn pool
