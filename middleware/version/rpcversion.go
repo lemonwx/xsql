@@ -79,7 +79,7 @@ func VersionsInUse() (map[uint64]uint8, error) {
 	if err != nil {
 		return nil, GET_VERSION_CONN_FAILED
 	}
-	defer cli.Close()
+	defer pool.Put(cli)
 
 	var vInuse map[uint64]uint8
 	err = cli.Call("VSeq.VInUser", uint8(0), &vInuse)
