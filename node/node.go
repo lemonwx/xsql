@@ -439,7 +439,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			break
 		}
 		if node.NeedHide {
-			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
+			retErr = node.hideExtraCols(result, data, node.VersionsInUse)
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}
@@ -551,6 +551,10 @@ func (node *Node) writePacket(data []byte) error {
 }
 
 func (node *Node) readPacket() ([]byte, error) {
+	return node.pkt.ReadPacket()
+}
+
+func (node *Node) ReadPacket() ([]byte, error) {
 	return node.pkt.ReadPacket()
 }
 
