@@ -14,6 +14,8 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
+	"strconv"
+	"strings"
 )
 
 type Node struct {
@@ -473,10 +475,18 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 	log.Debugf("[%d] recv: %s from node: [%v]", node.ConnectionId, data[pos:], node.addr)
 
 	// Rows matched ...
-	if bytes.Contains(data[pos:], []byte{82, 111, 119, 115, 32, 109, 97, 116, 99, 104, 101, 100, 58}) {
-		x := bytes.Split(data[pos:], []byte{32})
-		match := x[2][0] - 48
-		aft := x[5][0] - 48
+	execDesc := string(data[pos:])
+
+	if strings.Contains(execDesc, "Rows matched") {
+		x := strings.Split(execDesc, " ")
+		match, err := strconv.ParseUint(x[2], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		aft, err := strconv.ParseUint(x[5], 10, 64)
+		if err != nil {
+			return nil, err
+		}
 
 		log.Debugf("[%d] match: %d, aft: %d, aft: %d", node.ConnectionId, match, aft, r.AffectedRows)
 		if uint64(aft) != r.AffectedRows {
