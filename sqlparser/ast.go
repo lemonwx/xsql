@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/sqltypes"
 )
 
@@ -155,6 +156,39 @@ type InsertRows interface {
 func (*Select) IInsertRows() {}
 func (*Union) IInsertRows()  {}
 func (Values) IInsertRows()  {}
+
+// handle prepare like: insert into tb(123, ?, ?)
+func NewIstRows(rows InsertRows) InsertRows {
+	var ret ValTuple
+	v, ok := rows.(Values)
+	if !ok {
+		return rows
+	}
+
+	if len(v) != 1 {
+		return rows
+	}
+
+	row, ok := v[0].(ValTuple)
+	if !ok {
+		return rows
+	}
+
+	isStmt := false
+	for _, v := range row {
+		if _, ok := v.(ValArg); ok {
+			isStmt = true
+		}
+	}
+	if !isStmt {
+		return rows
+	}
+
+	ret = append(ret, ValArg{byte(63)})
+	ret = append(ret, row[1:]...)
+	log.Debug(ret)
+	return Values{ret}
+}
 
 // Update represents an UPDATE statement.
 type Update struct {

@@ -980,7 +980,7 @@ yydefault:
 		yyDollar = yyS[yypt-7 : yypt+1]
 		//line sql.y:215
 		{
-			yyVAL.statement = &Insert{Comments: Comments(yyDollar[2].bytes2), Table: yyDollar[4].tableName, Columns: yyDollar[5].columns, Rows: yyDollar[6].insRows, OnDup: OnDup(yyDollar[7].updateExprs)}
+			yyVAL.statement = &Insert{Comments: Comments(yyDollar[2].bytes2), Table: yyDollar[4].tableName, Columns: yyDollar[5].columns, Rows: NewIstRows(yyDollar[6].insRows), OnDup: OnDup(yyDollar[7].updateExprs)}
 		}
 	case 22:
 		yyDollar = yyS[yypt-7 : yypt+1]
