@@ -740,7 +740,7 @@ func NewValExprs(expr ValExpr) ValExprs {
 
 func AppendValExpr(exprs ValExprs, expr ValExpr) ValExprs {
 
-	switch v := expr.(type){
+	switch v := expr.(type) {
 	case ValTuple:
 		return append(exprs, v[1:])
 	default:
@@ -773,7 +773,6 @@ func NewUpdateExprs(expr *UpdateExpr) UpdateExprs {
 			Name: &ColName{Name: []byte("version")},
 			Expr: NumVal([]byte{123})}
 	}
-
 
 	return UpdateExprs{vExpr, expr}
 }

@@ -19,8 +19,8 @@ func handleErr(err error) {
 }
 
 func main() {
-	//db, err := sql.Open("mysql", "root:root@tcp(172.17.0.3:5518)/db")
-	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.6:1234)/db")
+	db, err := sql.Open("mysql", "root:root@tcp(172.17.0.2:5518)/db")
+	//db, err := sql.Open("mysql", "root:root@tcp(192.168.1.6:1234)/db")
 	handleErr(err)
 
 	//srvstmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")

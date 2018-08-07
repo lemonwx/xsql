@@ -19,7 +19,7 @@ import (
 type Server struct {
 	lis  net.Listener
 	addr string
-	cfg *config.Conf
+	cfg  *config.Conf
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {

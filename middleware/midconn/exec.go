@@ -42,26 +42,26 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 	}
 
 	/*
-	var tb string = sqlparser.String(stmt.Table)
-	var where string = sqlparser.String(stmt.Where)
+		var tb string = sqlparser.String(stmt.Table)
+		var where string = sqlparser.String(stmt.Where)
 
-	if err = conn.handleSelectForUpdate(tb, where); err != nil {
-		return nil, err
-	}
-
-	if err = conn.getNextVersion(); err != nil {
-		return nil, err
-	}
-
-	updateSql := fmt.Sprintf("update %s set version = %d %s", tb, conn.NextVersion, where)
-	if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), conn.nodeIdx); err != nil {
-		if err != nil {
-			log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
+		if err = conn.handleSelectForUpdate(tb, where); err != nil {
 			return nil, err
 		}
-		log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
-	}
-*/
+
+		if err = conn.getNextVersion(); err != nil {
+			return nil, err
+		}
+
+		updateSql := fmt.Sprintf("update %s set version = %d %s", tb, conn.NextVersion, where)
+		if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), conn.nodeIdx); err != nil {
+			if err != nil {
+				log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
+				return nil, err
+			}
+			log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
+		}
+	*/
 	if err = conn.handleUpdateForDelete(stmt); err != nil {
 		return nil, err
 	}

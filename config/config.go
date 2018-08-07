@@ -42,7 +42,7 @@ type Conf struct {
 	MaxSize    int       `yaml:"MaxSize"`
 	InitSize   int       `yaml:"InitSize"`
 	Batch      int       `yaml:"Batch"`
-	Auths       []*Auth     `yaml:"auth"`
+	Auths      []*Auth   `yaml:"auth"`
 }
 
 func ReadConf() *Conf {

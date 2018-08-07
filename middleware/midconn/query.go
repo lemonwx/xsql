@@ -95,10 +95,10 @@ func (conn *MidConn) handleLimit(rets []*mysql.Result, limit *sqlparser.Limit) (
 		allCount := uint64(0)
 		for idx, ret := range rets {
 			tmp := uint64(len(ret.RowDatas))
-			if allCount + tmp >= limitCount {
+			if allCount+tmp >= limitCount {
 
-				rets[idx].RowDatas = rets[idx].RowDatas[:limitCount - allCount]
-				return rets[:idx + 1], nil
+				rets[idx].RowDatas = rets[idx].RowDatas[:limitCount-allCount]
+				return rets[:idx+1], nil
 			}
 			allCount += tmp
 		}

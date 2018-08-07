@@ -20,11 +20,11 @@ func handleErr(err error) {
 
 func main() {
 	//db, err := sql.Open("mysql", "root:root@tcp(172.17.0.3:5518)/db")
-	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.6:1234)/tpcctest")
+	db, err := sql.Open("mysql", "root:root@tcp(192.168.1.6:1234)/tpccmysql")
 	handleErr(err)
 
 	//srvstmt, err := db.Prepare("insert into tb(id, name) values (?, ?)")
-	stmt, err := db.Prepare("insert into item values (?, ?, ?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO item (i_id, i_im_id, i_name, i_price, i_data) values(?,?,?,?,?)")
 	handleErr(err)
 	fmt.Println(stmt)
 

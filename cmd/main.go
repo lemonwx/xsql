@@ -23,11 +23,14 @@ func setupConfig() {
 }
 
 func setupLogger() {
-	f, err := os.Create("xsql.log")
-	if err != nil {
-		fmt.Println("touch log file xsql.log failed: %v", err)
-	}
-	log.NewDefaultLogger(f)
+	/*
+		f, err := os.Create("xsql.log")
+		if err != nil {
+			fmt.Println("touch log file xsql.log failed: %v", err)
+		}
+		log.NewDefaultLogger(f)
+	*/
+	log.NewDefaultLogger(os.Stdout)
 	log.SetLevel(cfg.LogLevel)
 	log.Debug("this is xsql's log")
 }
