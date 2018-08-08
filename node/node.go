@@ -40,6 +40,8 @@ type Node struct {
 	NeedHide      bool
 	IsStmt        bool
 	ExtraSize     int
+
+	Ch chan interface{}
 }
 
 func (node *Node) String() string {
@@ -54,6 +56,7 @@ func NewNode(host string, port int, user, password, db string, connid uint32) *N
 		password:     password,
 		Db:           db,
 		ConnectionId: connid,
+		Ch:           make(chan interface{}),
 	}
 
 	return node
@@ -295,7 +298,17 @@ func (node *Node) Execute(opt uint8, data []byte) (*mysql.Result, error) {
 	} else {
 		return node.parseResult()
 	}
+}
 
+func (node *Node) WriteCmd(cmd uint8, data []byte) error {
+	node.pkt.Sequence = 0
+	length := len(data) + 1
+	send := make([]byte, length+4)
+	send[4] = cmd
+	copy(send[5:], data)
+
+	log.Debugf("[%d] send [%d:%s] to node [%s]", node.ConnectionId, send[4], send[5:], node.addr)
+	return node.writePacket(send)
 }
 
 func (node *Node) ExecuteSql(opt uint8, data []byte) error {
@@ -373,7 +386,6 @@ func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error)
 		return nil, err
 	}
 	return ret, nil
-
 }
 
 func (node *Node) readResultColumns(result *mysql.Result) error {
@@ -428,6 +440,19 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 		log.Debugf("[%d] [%v] hide extra col under query", node.ConnectionId, node.addr)
 	}
 
+	if node.NeedHide {
+		v := <-node.Ch
+		log.Debug(v)
+		switch vv := v.(type) {
+		case error:
+			return vv
+		case map[uint64]uint8:
+			node.VersionsInUse = vv
+		default:
+			return fmt.Errorf("unexpect type recv: %v", vv)
+		}
+	}
+
 	for {
 		data, err = node.pkt.ReadPacket()
 		if err != nil {
@@ -441,9 +466,12 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			}
 			break
 		}
+
+		log.Debug(node.NeedHide)
 		if node.NeedHide {
 			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
 		}
+
 		result.RowDatas = append(result.RowDatas, data)
 	}
 	return retErr

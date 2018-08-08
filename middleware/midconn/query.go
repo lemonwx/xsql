@@ -6,11 +6,12 @@
 package midconn
 
 import (
+	"strconv"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"strconv"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
@@ -37,6 +38,35 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 }
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.Result, error) {
+	var err error
+
+	plan, err := conn.getPlan(stmt)
+	if err != nil {
+		return nil, err
+	}
+	conn.nodeIdx = plan.ShardList
+
+	if len(conn.nodeIdx) == 0 {
+		r := conn.newEmptyResultset(stmt)
+		return []*mysql.Result{&mysql.Result{Resultset: r}}, nil
+	}
+
+	go func() {
+		ret := conn.getCurVInUse()
+		for idx, _ := range conn.nodeIdx {
+			conn.nodes[idx].Ch <- ret
+		}
+	}()
+
+	conn.setupNodeStatus(nil, true, false, len(stmt.ExtraCols))
+	defer conn.setupNodeStatus(nil, false, false, 0)
+
+	newSql := sqlparser.String(stmt)
+	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+	return rets, err
+}
+
+func (conn *MidConn) handleSelect1(stmt *sqlparser.Select, sql string) ([]*mysql.Result, error) {
 
 	var err error
 

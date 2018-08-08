@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/errors"
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
@@ -109,10 +110,6 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 		return nil, err
 	} else if conn.nodeIdx == nil {
 		return nil, UNEXPECT_MIDDLE_WARE_ERR
-	}
-
-	if err = conn.getVInUse(); err != nil {
-		return nil, err
 	}
 
 	if err = conn.getNextVersion(); err != nil {
@@ -236,6 +233,19 @@ func (conn *MidConn) getNextVersion() error {
 	return nil
 }
 
+func (conn *MidConn) getCurVInUse() interface{} {
+	vs, err := version.VersionsInUse()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := conn.VersionsInUse[conn.NextVersion]; ok {
+		delete(conn.VersionsInUse, conn.NextVersion)
+	}
+
+	return vs
+}
+
 func (conn *MidConn) getVInUse() error {
 	// get v in use by other session
 	var err error
@@ -261,12 +271,13 @@ func (conn *MidConn) getVInUse() error {
 func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]interface{}) error {
 	var err error
 	if conn.db == "" {
-		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+		err = errors.New(mysql.NewDefaultError(mysql.ER_NO_DB_ERROR))
+		return err
 	}
 
 	r, err := meta.GetRouter(conn.db)
 	if err != nil {
-		log.Errorf("[%d] get router faild: %v", err)
+		log.Errorf("[%d] get router failed: %v", err)
 		return err
 	}
 
