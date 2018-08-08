@@ -12,10 +12,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/mysql"
 	"strconv"
 	"strings"
+
+	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/mysql"
 )
 
 type Node struct {
@@ -441,7 +442,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			break
 		}
 		if node.NeedHide {
-			retErr = node.hideExtraCols(result, data, node.VersionsInUse)
+			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
 		}
 		result.RowDatas = append(result.RowDatas, data)
 	}

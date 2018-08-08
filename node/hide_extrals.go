@@ -11,6 +11,7 @@ import (
 	//"math"
 
 	"encoding/binary"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 )
@@ -46,33 +47,33 @@ func (node *Node) node2cliNullMask(data []byte, fieldCount int) ([]byte, error) 
 	return cliNullMask, nil
 }
 
-func (node *Node) hideExtraCols(rs *mysql.Result, data []byte, vs map[uint64]uint8) error {
+func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]uint8) error {
 
 	if node.IsStmt {
 		pos := 1 + ((len(rs.Fields) + node.ExtraSize + 7 + 2) >> 3)
-		nullMask := (data)[1:pos]
+		nullMask := (*data)[1:pos]
 
 		for idx := 0; idx < node.ExtraSize; idx += 1 {
 			if ((nullMask[(idx+2)>>3] >> uint((idx+2)&7)) & 1) == 1 {
 				log.Errorf("[%d] unexpected node err: version parsed from ret is nil", node.ConnectionId)
 				return UNEXPECTED_NODE_ERR
 			}
-			extra := uint64(binary.LittleEndian.Uint64((data)[pos : pos+8]))
+			extra := uint64(binary.LittleEndian.Uint64((*data)[pos : pos+8]))
 			log.Debugf("[%d] extra col val: %v", node.ConnectionId, extra)
 			if _, ok := vs[extra]; ok {
 				return errors.New("data in use by another session, pls try again later")
 			}
 			pos += 8
 		}
-		mask, err := node.node2cliNullMask(data, len(rs.Fields))
+		mask, err := node.node2cliNullMask(*data, len(rs.Fields))
 		if err != nil {
 			return err
 		}
-		mask = append((data)[:1], mask...)
-		data = append(mask, data[pos:]...)
+		mask = append((*data)[:1], mask...)
+		*data = append(mask, (*data)[pos:]...)
 	} else {
-		idx := 1 + data[0]
-		vStr := string(data[1 : data[0]+1])
+		idx := 1 + (*data)[0]
+		vStr := string((*data)[1 : (*data)[0]+1])
 		res, err := strconv.ParseUint(vStr, 10, 64)
 		if err != nil {
 			log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
@@ -87,9 +88,9 @@ func (node *Node) hideExtraCols(rs *mysql.Result, data []byte, vs map[uint64]uin
 
 		for count := 0; count < node.ExtraSize-1; count += 1 {
 			s := idx + 1
-			e := s + data[idx]
+			e := s + (*data)[idx]
 
-			vStr := string(data[s:e])
+			vStr := string((*data)[s:e])
 			res, err := strconv.ParseUint(vStr, 10, 64)
 			if err != nil {
 				log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
@@ -101,9 +102,9 @@ func (node *Node) hideExtraCols(rs *mysql.Result, data []byte, vs map[uint64]uin
 				return err
 			}
 
-			idx = data[idx] + idx + 1
+			idx = (*data)[idx] + idx + 1
 		}
-		data = data[idx:]
+		(*data) = (*data)[idx:]
 	}
 	return nil
 }
