@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"hack"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/config"
@@ -20,7 +22,6 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/sqlparser"
-	"hack"
 )
 
 var baseConnId uint32 = 1000

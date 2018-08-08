@@ -119,7 +119,6 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 
 		stmt.forUpdateStmts[idx] = updateStmt.forUpdateStmts[idx]
 		stmt.forUpStmtIdMeta[idx] = updateStmt.forUpStmtIdMeta[idx]
-
 	default:
 		break
 	}

@@ -36,7 +36,9 @@ func setupLogger() {
 }
 
 func main() {
+
 	setupConfig()
+
 	fmt.Println("init cfg done.")
 	setupLogger()
 	version.NewRpcPool(cfg.InitSize, cfg.MaxSize, cfg.VerSeqAddr)
