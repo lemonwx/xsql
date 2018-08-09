@@ -467,7 +467,6 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			break
 		}
 
-		log.Debug(node.NeedHide)
 		if node.NeedHide {
 			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
 		}

@@ -8,6 +8,10 @@ package midconn
 import (
 	"strconv"
 
+	"sync"
+
+	"fmt"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
@@ -37,7 +41,7 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 	return conn.HandleSelRets(rets)
 }
 
-func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.Result, error) {
+func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
 	var err error
 
 	plan, err := conn.getPlan(stmt)
@@ -51,19 +55,70 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select, sql string) ([]*mysql.
 		return []*mysql.Result{&mysql.Result{Resultset: r}}, nil
 	}
 
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var vRet interface{}
+	var vInUse map[uint64]uint8
+	var rets []*mysql.Result
+	var exeErr error
+
 	go func() {
-		ret := conn.getCurVInUse()
-		for idx, _ := range conn.nodeIdx {
-			conn.nodes[idx].Ch <- ret
-		}
+		vRet = conn.getCurVInUse()
+		wg.Done()
 	}()
 
-	conn.setupNodeStatus(nil, true, false, len(stmt.ExtraCols))
-	defer conn.setupNodeStatus(nil, false, false, 0)
+	go func() {
+		newSql := sqlparser.String(stmt)
+		rets, exeErr = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+		wg.Done()
+	}()
+	wg.Wait()
 
-	newSql := sqlparser.String(stmt)
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+	switch vv := vRet.(type) {
+	case error:
+		return nil, err
+	case map[uint64]uint8:
+		vInUse = vv
+	default:
+		return nil, fmt.Errorf("unexpected error from getCurVInUse")
+	}
+
+	extraSz := len(stmt.ExtraCols)
+	for idx, ret := range rets {
+		ret.Fields = ret.Fields[extraSz:]
+
+		for rowIdx, _ := range ret.RowDatas {
+			if err := conn.hideExtraCols(&ret.RowDatas[rowIdx], extraSz, vInUse); err != nil {
+				return nil, err
+			}
+		}
+		rets[idx] = ret
+	}
+
 	return rets, err
+}
+
+func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]uint8) error {
+	idx := uint8(0)
+	for count := 0; count < size; count += 1 {
+		s := idx + 1
+		e := s + (*data)[idx]
+
+		vStr := string((*data)[s:e])
+		res, err := strconv.ParseUint(vStr, 10, 64)
+		if err != nil {
+			log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
+			return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
+		}
+		if _, ok := vs[res]; ok {
+			err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
+			log.Errorf("[%d] hide extra col failed: %v", conn.ConnectionId, err)
+			return err
+		}
+		idx = (*data)[idx] + idx + 1
+	}
+	(*data) = (*data)[idx:]
+	return nil
 }
 
 func (conn *MidConn) handleSelect1(stmt *sqlparser.Select, sql string) ([]*mysql.Result, error) {

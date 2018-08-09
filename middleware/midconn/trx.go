@@ -16,11 +16,12 @@ import (
 	"fmt"
 	"strings"
 
+	"hack"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"hack"
 )
 
 func (conn *MidConn) handleServerNotServe(data []byte) {
@@ -149,7 +150,7 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 	switch v := stmt.(type) {
 	case *sqlparser.Select:
 		isSelect = true
-		rets, execErr = conn.handleSelect(v, sql)
+		rets, execErr = conn.handleSelect(v)
 	case *sqlparser.Insert:
 		isSelect = false
 		rets, execErr = conn.handleInsert(v, sql)
