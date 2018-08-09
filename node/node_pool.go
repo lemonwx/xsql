@@ -8,6 +8,7 @@ package node
 import (
 	"fmt"
 
+	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
 )
 
@@ -91,7 +92,45 @@ func NewNodePool(initSize, idleSize, maxConnSize uint32, cfg *config.Node) (*Poo
 	return p, nil
 }
 
-func (pool *Pool) GetConn() *Node {
-	conn := <-pool.idleConns
-	return conn
+func (pool *Pool) GetConn() (*Node, error) {
+	var conn *Node
+	select {
+	case conn = <-pool.idleConns:
+	case conn = <-pool.freeConns:
+	}
+
+	if conn.conn != nil {
+		return conn, nil
+	}
+
+	if err := conn.Connect(); err != nil {
+		pool.freeConns <- conn
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (pool *Pool) freeConn(node *Node) {
+	node.Close()
+	select {
+	case pool.freeConns <- node:
+		return
+	default:
+		log.Errorf("unexpected both full of idle and free node list")
+		return
+	}
+}
+
+func (pool *Pool) PutConn(node *Node) {
+	select {
+	case pool.idleConns <- node:
+		return
+	default:
+		pool.freeConn(node)
+	}
+}
+
+func (pool *Pool) DumpInfo() {
+	log.Debug(len(pool.idleConns))
+	log.Debug(len(pool.freeConns))
 }
