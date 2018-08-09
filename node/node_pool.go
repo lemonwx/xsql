@@ -5,15 +5,21 @@
 
 package node
 
-import "github.com/lemonwx/xsql/config"
+import (
+	"fmt"
+
+	"github.com/lemonwx/xsql/config"
+)
 
 const (
 	MaxInitFailedSize = 5
 )
 
 type Pool struct {
-	adminConn   *Node
-	idleChan    chan *Node
+	adminConn *Node
+	idleConns chan *Node
+	freeConns chan *Node
+
 	maxConnSize uint32
 
 	host     string
@@ -22,7 +28,11 @@ type Pool struct {
 	password string
 }
 
-func (p *Pool) NewConn() (*Node, error) {
+func (p *Pool) NewConn() *Node {
+	return NewNode(p.host, p.port, p.user, p.password, "", 0)
+}
+
+func (p *Pool) NewAndConnect() (*Node, error) {
 	conn := NewNode(p.host, p.port, p.user, p.password, "", 0)
 	if err := conn.Connect(); err != nil {
 		return nil, err
@@ -31,6 +41,13 @@ func (p *Pool) NewConn() (*Node, error) {
 }
 
 func NewNodePool(initSize, idleSize, maxConnSize uint32, cfg *config.Node) (*Pool, error) {
+	if initSize > idleSize {
+		return nil, fmt.Errorf("pool's init size must < idle size")
+	}
+	if idleSize > maxConnSize {
+		return nil, fmt.Errorf("pool's idle size must < max size")
+	}
+
 	p := &Pool{
 		maxConnSize: maxConnSize,
 		host:        cfg.Host,
@@ -39,28 +56,42 @@ func NewNodePool(initSize, idleSize, maxConnSize uint32, cfg *config.Node) (*Poo
 		password:    cfg.Password,
 	}
 
-	if conn, err := p.NewConn(); err != nil {
+	if conn, err := p.NewAndConnect(); err != nil {
 		return nil, err
 	} else {
 		p.adminConn = conn
 	}
 
 	failedSize := 0
-	p.idleChan = make(chan *Node, idleSize)
-	for count := uint32(0); count < initSize; {
-		if conn, err := p.NewConn(); err != nil {
+	p.idleConns = make(chan *Node, idleSize)
+	p.freeConns = make(chan *Node, maxConnSize-idleSize)
+
+	count := uint32(0)
+	for count < initSize {
+		if conn, err := p.NewAndConnect(); err != nil {
 			failedSize++
+			if failedSize > MaxInitFailedSize {
+				return nil, fmt.Errorf("too many errors when connect to backend")
+			}
 		} else {
-			p.idleChan <- conn
+			p.idleConns <- conn
 			count++
-			failedSize++
+			failedSize = 0
 		}
 	}
 
+	for count < maxConnSize {
+		if count < idleSize {
+			p.idleConns <- p.NewConn()
+		} else {
+			p.freeConns <- p.NewConn()
+		}
+		count++
+	}
 	return p, nil
 }
 
 func (pool *Pool) GetConn() *Node {
-	conn := <-pool.idleChan
+	conn := <-pool.idleConns
 	return conn
 }
