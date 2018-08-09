@@ -1,11 +1,15 @@
 # xsql
 id: xsql_1
-addr : 192.168.1.4:1234
+addr : 192.168.43.53:1234
 loglevel : 5
 nodelay: false
 XA: true
 
-VerSeqAddr: 192.168.1.4:1235
+BackInitSize: 10
+BackMaxIdleSize: 100
+BackMaxSize: 5000
+
+VerSeqAddr: 192.168.43.53:1235
 InitSize: 100
 MaxSize: 400
 Batch: 10

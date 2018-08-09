@@ -14,12 +14,14 @@ import (
 	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/middleware/midconn"
 	"github.com/lemonwx/xsql/middleware/router"
+	"github.com/lemonwx/xsql/node"
 )
 
 type Server struct {
-	lis  net.Listener
-	addr string
-	cfg  *config.Conf
+	lis   net.Listener
+	addr  string
+	cfg   *config.Conf
+	pools map[int]*node.Pool
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {
@@ -27,6 +29,7 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 	s.cfg = cfg
 	s.addr = cfg.Addr
 	s.parseSchemas(cfg)
+	s.newBackendPool(cfg)
 
 	lis, err := net.Listen("tcp", s.addr)
 	if err != nil {
@@ -249,6 +252,26 @@ func (s *Server) parseSchemas(cfg *config.Conf) error {
 			}
 		}
 	*/
+
+	return nil
+}
+
+func (s *Server) newBackendPool(cfg *config.Conf) error {
+	if len(cfg.Nodes) == 0 {
+		return fmt.Errorf("length of backend nodes can not be 0")
+	}
+
+	s.pools = make(map[int]*node.Pool)
+
+	log.Debug(cfg.BackInitSize, cfg.BackMaxIdleSize, cfg.BackMaxSize)
+	for idx, nodeCfg := range cfg.Nodes {
+		pool, err := node.NewNodePool(cfg.BackInitSize, cfg.BackMaxIdleSize, cfg.BackMaxSize, nodeCfg)
+		if err != nil {
+			return err
+		} else {
+			s.pools[idx] = pool
+		}
+	}
 
 	return nil
 }

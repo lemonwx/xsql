@@ -32,17 +32,22 @@ type Auth struct {
 }
 
 type Conf struct {
-	Id         string
-	Addr       string
-	Nodes      []*Node
-	LogLevel   int       `yaml:"loglevel"`
-	RedisCfg   RedisConf `yaml:"RedisCfg"`
-	Xa         bool      `yaml:"XA"`
-	VerSeqAddr string    `yaml:"VerSeqAddr"`
-	MaxSize    int       `yaml:"MaxSize"`
-	InitSize   int       `yaml:"InitSize"`
-	Batch      int       `yaml:"Batch"`
-	Auths      []*Auth   `yaml:"auth"`
+	Id       string
+	Addr     string
+	Nodes    []*Node
+	LogLevel int       `yaml:"loglevel"`
+	RedisCfg RedisConf `yaml:"RedisCfg"`
+	Xa       bool      `yaml:"XA"`
+
+	BackInitSize    uint32 `yaml:"BackInitSize"`
+	BackMaxIdleSize uint32 `yaml:"BackMaxIdleSize"`
+	BackMaxSize     uint32 `yaml:"BackMaxSize"`
+
+	VerSeqAddr string  `yaml:"VerSeqAddr"`
+	MaxSize    int     `yaml:"MaxSize"`
+	InitSize   int     `yaml:"InitSize"`
+	Batch      int     `yaml:"Batch"`
+	Auths      []*Auth `yaml:"auth"`
 }
 
 func ReadConf() *Conf {
