@@ -92,11 +92,11 @@ func NewNodePool(initSize, idleSize, maxConnSize uint32, cfg *config.Node) (*Poo
 	return p, nil
 }
 
-func (pool *Pool) GetConn() (*Node, error) {
+func (p *Pool) GetConn() (*Node, error) {
 	var conn *Node
 	select {
-	case conn = <-pool.idleConns:
-	case conn = <-pool.freeConns:
+	case conn = <-p.idleConns:
+	case conn = <-p.freeConns:
 	}
 
 	if conn.conn != nil {
@@ -104,16 +104,16 @@ func (pool *Pool) GetConn() (*Node, error) {
 	}
 
 	if err := conn.Connect(); err != nil {
-		pool.freeConns <- conn
+		p.freeConns <- conn
 		return nil, err
 	}
 	return conn, nil
 }
 
-func (pool *Pool) freeConn(node *Node) {
+func (p *Pool) freeConn(node *Node) {
 	node.Close()
 	select {
-	case pool.freeConns <- node:
+	case p.freeConns <- node:
 		return
 	default:
 		log.Errorf("unexpected both full of idle and free node list")
@@ -121,16 +121,16 @@ func (pool *Pool) freeConn(node *Node) {
 	}
 }
 
-func (pool *Pool) PutConn(node *Node) {
+func (p *Pool) PutConn(node *Node) {
 	select {
-	case pool.idleConns <- node:
+	case p.idleConns <- node:
 		return
 	default:
-		pool.freeConn(node)
+		p.freeConn(node)
 	}
 }
 
-func (pool *Pool) DumpInfo() {
-	log.Debug(len(pool.idleConns))
-	log.Debug(len(pool.freeConns))
+func (p *Pool) DumpInfo() {
+	log.Debug(len(p.idleConns))
+	log.Debug(len(p.freeConns))
 }
