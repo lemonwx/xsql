@@ -14,6 +14,7 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -86,7 +87,8 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 
 	go func() {
 		newSql := sqlparser.String(stmt)
-		rets, exeErr = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+		rets, exeErr = conn.ExecuteOnNodePool([]byte(newSql), plan.ShardList)
+		//rets, exeErr = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -113,6 +115,47 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 	}
 
 	return rets, err
+}
+
+func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
+	shardSize := len(nodeIdxs)
+	rets := make([]*mysql.Result, 0, shardSize)
+	errs := make([]error, 0, shardSize)
+
+	var wg sync.WaitGroup
+	wg.Add(shardSize)
+
+	for _, idx := range nodeIdxs {
+		if _, ok := conn.execNodes[idx]; ok {
+			continue
+		}
+		back, err := conn.pools[idx].GetConn()
+		if err != nil {
+			return nil, err
+		} else {
+			conn.execNodes[idx] = back
+		}
+		go func(back *node.Node) {
+			if ret, err := back.Execute(mysql.COM_QUERY, sql); err != nil {
+				errs = append(errs, err)
+			} else {
+				rets = append(rets, ret)
+			}
+			wg.Done()
+		}(back)
+	}
+
+	wg.Wait()
+
+	log.Debug(rets)
+	switch {
+	case len(errs) == shardSize:
+		return nil, errs[0]
+	case len(rets) == shardSize:
+		return rets, nil
+	default:
+		return nil, fmt.Errorf("unexpected multi node return not equal")
+	}
 }
 
 func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]uint8) error {

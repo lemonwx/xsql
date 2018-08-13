@@ -109,10 +109,17 @@ func (conn *MidConn) handleCommit(sql string) error {
 		conn.NextVersion = 0
 		conn.VersionsInUse = nil
 
-		_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.getExecutedNodeIdx())
-		if err != nil {
-			log.Errorf("[%d] execute %s failed: %v", conn.ConnectionId, sql, err)
-			return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_FAILED)
+		if conn.nodes[0] != nil && conn.nodes[1] != nil {
+			_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.getExecutedNodeIdx())
+			if err != nil {
+				log.Errorf("[%d] execute %s failed: %v", conn.ConnectionId, sql, err)
+				return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_FAILED)
+			}
+		}
+
+		for nodeIdx, back := range conn.execNodes {
+			conn.pools[nodeIdx].PutConn(back)
+			delete(conn.execNodes, nodeIdx)
 		}
 		for idx, _ := range conn.executedIdx {
 			delete(conn.executedIdx, idx)
