@@ -391,8 +391,10 @@ func (conn *MidConn) mergeSelResult(rets []*mysql.Result) (*mysql.Result, error)
 func (conn *MidConn) Close() {
 	conn.closed = true
 	conn.cli.Close()
-	for _, node := range conn.nodes {
-		node.Close()
+
+	for idx, back := range conn.execNodes {
+		conn.pools[idx].PutConn(back)
+		delete(conn.execNodes, idx)
 	}
 }
 
