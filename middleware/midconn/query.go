@@ -24,12 +24,12 @@ func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 	if err != nil {
 		return err
 	}
+	defer conn.pools[0].PutConn(back)
 
 	ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
 	if err != nil {
 		return err
 	}
-
 	return conn.HandleSelRets([]*mysql.Result{ret})
 	/*
 		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), []int{0})
@@ -50,12 +50,12 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 	if err != nil {
 		return err
 	}
+	defer conn.pools[0].PutConn(back)
 
 	ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
 	if err != nil {
 		return err
 	}
-
 	return conn.HandleSelRets([]*mysql.Result{ret})
 }
 
@@ -126,15 +126,19 @@ func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Res
 	wg.Add(shardSize)
 
 	for _, idx := range nodeIdxs {
-		if _, ok := conn.execNodes[idx]; ok {
-			continue
-		}
-		back, err := conn.pools[idx].GetConn()
-		if err != nil {
-			return nil, err
+		var back *node.Node
+		var ok bool
+		if back, ok = conn.execNodes[idx]; ok {
 		} else {
-			conn.execNodes[idx] = back
+			var err error
+			back, err = conn.pools[idx].GetConn()
+			if err != nil {
+				return nil, err
+			} else {
+				conn.execNodes[idx] = back
+			}
 		}
+
 		go func(back *node.Node) {
 			if ret, err := back.Execute(mysql.COM_QUERY, sql); err != nil {
 				errs = append(errs, err)
