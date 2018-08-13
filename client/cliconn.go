@@ -68,12 +68,10 @@ func (c *CliConn) Handshake() error {
 		return err
 	}
 
-	/*
-		if err := c.WriteOK(nil); err != nil {
-			return err
-		}
-		c.pkt.Sequence = 0
-	*/
+	if err := c.WriteOK(nil); err != nil {
+		return err
+	}
+	c.pkt.Sequence = 0
 
 	return nil
 }

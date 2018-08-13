@@ -68,39 +68,41 @@ func NewMidConn(conn net.Conn, cfg *config.Conf) (*MidConn, error) {
 	// init and connect to back mysql server
 	midConn.nodes = make([]*node.Node, len(meta.GetNodeAddrs()))
 
-	for idx, nodeCfg := range meta.GetNodeAddrs() {
-		tmpNode := node.NewNode(nodeCfg.Host, nodeCfg.Port, nodeCfg.User, nodeCfg.Password,
-			cli.Db, midConn.ConnectionId)
-		midConn.nodes[idx] = tmpNode
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(midConn.nodes))
-
-	for idx := 0; idx < len(midConn.nodes); idx += 1 {
-		go func(tmp int) {
-			if err = midConn.nodes[tmp].Connect(); err != nil {
-				log.Errorf("connected to backend mysqld %d failed: %v", tmp, err)
-			} else {
-				log.Debugf("[%d] connect to mysqld [%s] success",
-					midConn.ConnectionId, midConn.nodes[tmp])
-			}
-			wg.Done()
-		}(idx)
-	}
-	wg.Wait()
-
-	if err != nil {
-		midConn.cli.WriteError(err)
-		return nil, err
-	} else {
-		// hand shake with cli finish
-		log.Debugf("[%d] hand shake with cli and mysqld finish", midConn.ConnectionId)
-		if err := midConn.cli.WriteOK(nil); err != nil {
-			return nil, err
+	/*
+		for idx, nodeCfg := range meta.GetNodeAddrs() {
+			tmpNode := node.NewNode(nodeCfg.Host, nodeCfg.Port, nodeCfg.User, nodeCfg.Password,
+				cli.Db, midConn.ConnectionId)
+			midConn.nodes[idx] = tmpNode
 		}
-		midConn.cli.SetPktSeq(0)
-	}
+
+		var wg sync.WaitGroup
+		wg.Add(len(midConn.nodes))
+
+		for idx := 0; idx < len(midConn.nodes); idx += 1 {
+			go func(tmp int) {
+				if err = midConn.nodes[tmp].Connect(); err != nil {
+					log.Errorf("connected to backend mysqld %d failed: %v", tmp, err)
+				} else {
+					log.Debugf("[%d] connect to mysqld [%s] success",
+						midConn.ConnectionId, midConn.nodes[tmp])
+				}
+				wg.Done()
+			}(idx)
+		}
+		wg.Wait()
+
+		if err != nil {
+			midConn.cli.WriteError(err)
+			return nil, err
+		} else {
+			// hand shake with cli finish
+			log.Debugf("[%d] hand shake with cli and mysqld finish", midConn.ConnectionId)
+			if err := midConn.cli.WriteOK(nil); err != nil {
+				return nil, err
+			}
+			midConn.cli.SetPktSeq(0)
+		}
+	*/
 	midConn.closed = false
 	midConn.RemoteAddr = conn.RemoteAddr()
 	midConn.defaultStatus = mysql.SERVER_STATUS_AUTOCOMMIT
