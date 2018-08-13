@@ -43,9 +43,11 @@ type MidConn struct {
 	executedIdx map[int]uint8
 
 	stmts map[uint32]*Stmt
+
+	pools map[int]*node.Pool
 }
 
-func NewMidConn(conn net.Conn, cfg *config.Conf) (*MidConn, error) {
+func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool) (*MidConn, error) {
 
 	var err error
 	midConn := new(MidConn)
@@ -103,6 +105,7 @@ func NewMidConn(conn net.Conn, cfg *config.Conf) (*MidConn, error) {
 			midConn.cli.SetPktSeq(0)
 		}
 	*/
+	midConn.pools = pools
 	midConn.closed = false
 	midConn.RemoteAddr = conn.RemoteAddr()
 	midConn.defaultStatus = mysql.SERVER_STATUS_AUTOCOMMIT

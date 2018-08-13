@@ -13,32 +13,49 @@ import (
 	"fmt"
 
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 	// show only send to one node
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), []int{0})
+	back, err := conn.pools[0].GetConn()
 	if err != nil {
-		log.Errorf("execute in multi node failed: %v", err)
 		return err
 	}
 
-	return conn.HandleSelRets(rets)
+	ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
+	if err != nil {
+		return err
+	}
+
+	return conn.HandleSelRets([]*mysql.Result{ret})
+	/*
+		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), []int{0})
+		if err != nil {
+			log.Errorf("execute in multi node failed: %v", err)
+			return err
+		}
+
+		return conn.HandleSelRets(rets)
+	*/
 
 }
 
 func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string) error {
 	log.Debugf("[%d] handle simple select", conn.ConnectionId)
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
+
+	back, err := conn.pools[0].GetConn()
 	if err != nil {
-		log.Errorf("execute in multi node failed: %v", err)
 		return err
 	}
 
-	return conn.HandleSelRets(rets)
+	ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
+	if err != nil {
+		return err
+	}
+
+	return conn.HandleSelRets([]*mysql.Result{ret})
 }
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
