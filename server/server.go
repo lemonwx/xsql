@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"net"
 
+	"time"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/middleware/meta"
@@ -36,6 +38,9 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 		return nil, err
 	}
 	s.lis = lis
+
+	go s.dumpPoolsInfo()
+
 	return s, nil
 }
 
@@ -55,7 +60,7 @@ func (s *Server) Run() error {
 // serve for mysql client conn(get by lis.Accept)
 func (s *Server) ServeConn(conn net.Conn) {
 	// init and connect with back mysql server
-	if midConn, err := midconn.NewMidConn(conn, s.cfg); err != nil {
+	if midConn, err := midconn.NewMidConn(conn, s.cfg, s.pools); err != nil {
 		log.Errorf("new mid conn failed: %v", err)
 		return
 	} else {
@@ -274,4 +279,13 @@ func (s *Server) newBackendPool(cfg *config.Conf) error {
 	}
 
 	return nil
+}
+
+func (s *Server) dumpPoolsInfo() {
+	for {
+		for _, p := range s.pools {
+			p.DumpInfo()
+		}
+		time.Sleep(time.Second * 5)
+	}
 }

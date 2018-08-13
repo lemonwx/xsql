@@ -130,7 +130,10 @@ func (p *Pool) PutConn(node *Node) {
 	}
 }
 
+func (p *Pool) String() string {
+	return fmt.Sprintf("%s:%d", p.host, p.port)
+}
+
 func (p *Pool) DumpInfo() {
-	log.Debug(len(p.idleConns))
-	log.Debug(len(p.freeConns))
+	log.Infof("pool:%v idle: %d, free: %d", p, len(p.idleConns), len(p.freeConns))
 }
