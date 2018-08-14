@@ -211,7 +211,12 @@ func (conn *MidConn) handleFieldList(data []byte) error {
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
 
-	if fs, err := conn.nodes[0].FieldList(table, wildcard); err != nil {
+	back, err := conn.pools[0].GetConn(conn.db)
+	if err != nil {
+		return err
+	}
+
+	if fs, err := back.FieldList(table, wildcard); err != nil {
 		log.Errorf("node 0 execute fieldList failed: %v", err)
 		return err
 	} else {
