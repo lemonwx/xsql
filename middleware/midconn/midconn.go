@@ -141,6 +141,7 @@ func (conn *MidConn) Serve() {
 
 func (conn *MidConn) dispatch(sql []byte) error {
 	opt, sql := sql[0], sql[1:]
+	log.Debugf("[%d] general: %d:%s", conn.ConnectionId, opt, sql)
 	switch opt {
 	case mysql.COM_QUERY:
 		return conn.handleQuery(string(sql))
@@ -222,13 +223,17 @@ func (conn *MidConn) handleUse(db []byte) error {
 	tmp := string(db)
 	conn.db = tmp
 	conn.cli.Db = tmp
-	// rets, errs := conn
 
-	rets, err := conn.ExecuteMultiNode(mysql.COM_INIT_DB, db, meta.GetFullNodeIdxs())
-	if err != nil {
-		return err
-	}
-	return conn.HandleExecRets(rets)
+	/*
+		// rets, errs := conn
+
+		rets, err := conn.ExecuteMultiNode(mysql.COM_INIT_DB, db, meta.GetFullNodeIdxs())
+		if err != nil {
+			return err
+		}
+		return conn.HandleExecRets(rets)
+	*/
+	return conn.cli.WriteOK(nil)
 }
 
 func (conn *MidConn) writeResultset(status uint16, r *mysql.Resultset) error {
