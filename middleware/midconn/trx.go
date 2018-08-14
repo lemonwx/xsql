@@ -18,9 +18,12 @@ import (
 
 	"hack"
 
+	"sync"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -117,10 +120,10 @@ func (conn *MidConn) handleCommit(sql string) error {
 			}
 		}
 
-		for nodeIdx, back := range conn.execNodes {
-			conn.pools[nodeIdx].PutConn(back)
-			delete(conn.execNodes, nodeIdx)
+		if commitErr := conn.clearExecNodes([]byte(sql)); commitErr != nil {
+			return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_FAILED)
 		}
+
 		for idx, _ := range conn.executedIdx {
 			delete(conn.executedIdx, idx)
 		}
@@ -128,6 +131,25 @@ func (conn *MidConn) handleCommit(sql string) error {
 		conn.status[1] = conn.defaultStatus
 	}
 	return nil
+}
+
+func (conn *MidConn) clearExecNodes(sql []byte) error {
+	var retErr error
+	var wg sync.WaitGroup
+	wg.Add(len(conn.execNodes))
+
+	for nodeIdx, back := range conn.execNodes {
+		go func(idx int, backNode *node.Node) {
+			_, retErr = backNode.Execute(mysql.COM_QUERY, sql)
+			conn.pools[idx].PutConn(backNode)
+			delete(conn.execNodes, idx)
+			wg.Done()
+		}(nodeIdx, back)
+	}
+
+	wg.Wait()
+
+	return retErr
 }
 
 func (conn *MidConn) handleStmtTrx(data []byte) error {
