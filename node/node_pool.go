@@ -10,6 +10,7 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
+	"github.com/lemonwx/xsql/mysql"
 )
 
 const (
@@ -92,7 +93,7 @@ func NewNodePool(initSize, idleSize, maxConnSize uint32, cfg *config.Node) (*Poo
 	return p, nil
 }
 
-func (p *Pool) GetConn() (*Node, error) {
+func (p *Pool) GetConn(schema string) (*Node, error) {
 	var conn *Node
 	select {
 	case conn = <-p.idleConns:
@@ -100,11 +101,17 @@ func (p *Pool) GetConn() (*Node, error) {
 	}
 
 	if conn.conn != nil {
+		if _, err := conn.Execute(mysql.COM_INIT_DB, []byte(schema)); err != nil {
+			return nil, err
+		}
 		return conn, nil
 	}
 
 	if err := conn.Connect(); err != nil {
 		p.freeConns <- conn
+		return nil, err
+	}
+	if _, err := conn.Execute(mysql.COM_INIT_DB, []byte(schema)); err != nil {
 		return nil, err
 	}
 	return conn, nil

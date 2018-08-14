@@ -216,6 +216,8 @@ func (conn *MidConn) handleFieldList(data []byte) error {
 		return err
 	}
 
+	defer conn.pools[0].PutConn(back)
+
 	if fs, err := back.FieldList(table, wildcard); err != nil {
 		log.Errorf("node 0 execute fieldList failed: %v", err)
 		return err

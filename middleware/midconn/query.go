@@ -20,7 +20,7 @@ import (
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 	// show only send to one node
-	back, err := conn.pools[0].GetConn()
+	back, err := conn.pools[0].GetConn(conn.db)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string) error {
 	log.Debugf("[%d] handle simple select", conn.ConnectionId)
 
-	back, err := conn.pools[0].GetConn()
+	back, err := conn.pools[0].GetConn(conn.db)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Res
 		if back, ok = conn.execNodes[idx]; ok {
 		} else {
 			var err error
-			back, err = conn.pools[idx].GetConn()
+			back, err = conn.pools[idx].GetConn(conn.db)
 			if err != nil {
 				return nil, err
 			} else {
