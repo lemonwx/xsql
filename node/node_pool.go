@@ -100,8 +100,8 @@ func (p *Pool) GetConn(schema string) (*Node, error) {
 	case conn = <-p.freeConns:
 	}
 
-	if conn.conn != nil {
-		if _, err := conn.Execute(mysql.COM_INIT_DB, []byte(schema)); err != nil {
+	if conn != nil {
+		if err := p.useDB(conn, schema); err != nil {
 			return nil, err
 		}
 		return conn, nil
@@ -111,10 +111,24 @@ func (p *Pool) GetConn(schema string) (*Node, error) {
 		p.freeConns <- conn
 		return nil, err
 	}
-	if _, err := conn.Execute(mysql.COM_INIT_DB, []byte(schema)); err != nil {
+
+	if err := p.useDB(conn, schema); err != nil {
 		return nil, err
 	}
 	return conn, nil
+}
+
+func (p *Pool) useDB(back *Node, schema string) error {
+	if len(schema) == 0 || back.Db == schema {
+		return nil
+	}
+
+	if _, err := back.Execute(mysql.COM_INIT_DB, []byte(schema)); err != nil {
+		return err
+	}
+	back.Db = schema
+
+	return nil
 }
 
 func (p *Pool) freeConn(node *Node) {
