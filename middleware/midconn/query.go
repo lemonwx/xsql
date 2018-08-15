@@ -14,7 +14,6 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
-	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -123,16 +122,9 @@ func (conn *MidConn) ExecuteOnSinglePool(sql []byte, nodeIdxs []int) ([]*mysql.R
 	}
 
 	idx := nodeIdxs[0]
-	var back *node.Node
-	var ok bool
-	var err error
-	back, ok = conn.execNodes[idx]
-	if !ok {
-		back, err = conn.pools[idx].GetConn(conn.db)
-		if err != nil {
-			return nil, err
-		}
-		conn.execNodes[idx] = back
+	back, err := conn.getSingleBackConn(idx)
+	if err != nil {
+		return nil, err
 	}
 
 	ret, err := back.Execute(mysql.COM_QUERY, sql)
@@ -147,31 +139,26 @@ func (conn *MidConn) ExecuteOnMultiPool(sql []byte, nodeIdxs []int) ([]*mysql.Re
 	rets := make([]*mysql.Result, 0, shardSize)
 	errs := make([]error, 0, shardSize)
 
+	if err := conn.getMultiBackConn(nodeIdxs); err != nil {
+		return nil, err
+	}
+
 	var wg sync.WaitGroup
-	wg.Add(shardSize)
+	wg.Add(len(nodeIdxs))
 
 	for _, idx := range nodeIdxs {
-		var back *node.Node
-		var ok bool
-		if back, ok = conn.execNodes[idx]; ok {
-		} else {
-			var err error
-			back, err = conn.pools[idx].GetConn(conn.db)
-			if err != nil {
-				return nil, err
-			} else {
-				conn.execNodes[idx] = back
+		go func(idx int) {
+			back, ok := conn.execNodes[idx]
+			if !ok {
+				errs = append(errs, fmt.Errorf("unexpected error, idx should in conn.execNodes"))
 			}
-		}
-
-		go func(back *node.Node) {
 			if ret, err := back.Execute(mysql.COM_QUERY, sql); err != nil {
 				errs = append(errs, err)
 			} else {
 				rets = append(rets, ret)
 			}
 			wg.Done()
-		}(back)
+		}(idx)
 	}
 	wg.Wait()
 
@@ -214,42 +201,6 @@ func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]
 	}
 	(*data) = (*data)[idx:]
 	return nil
-}
-
-func (conn *MidConn) handleSelect1(stmt *sqlparser.Select, sql string) ([]*mysql.Result, error) {
-
-	var err error
-
-	if p, err := conn.getPlan(stmt); err != nil {
-		return nil, err
-	} else {
-		log.Debugf("[%d] get shard list's: %v", conn.ConnectionId, p.ShardList)
-		if len(p.ShardList) == 0 {
-			r := conn.newEmptyResultset(stmt)
-			return []*mysql.Result{&mysql.Result{Resultset: r}}, nil
-		}
-		conn.nodeIdx = p.ShardList
-	}
-
-	if err = conn.getVInUse(); err != nil {
-		return nil, err
-	}
-
-	conn.setupNodeStatus(conn.VersionsInUse, true, false, len(stmt.ExtraCols))
-	defer conn.setupNodeStatus(nil, false, false, 0)
-
-	newSql := sqlparser.String(stmt)
-	rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
-
-	if err == nil {
-		if stmt.Limit != nil {
-			rets, err = conn.handleLimit(rets, stmt.Limit)
-		}
-
-		// group by [having] , order by, distinct
-	}
-
-	return rets, err
 }
 
 func (conn *MidConn) handleLimit(rets []*mysql.Result, limit *sqlparser.Limit) ([]*mysql.Result, error) {

@@ -465,3 +465,33 @@ func (conn *MidConn) getPlan(stmt *sqlparser.Select) (*sqlparser.SelectPlan, err
 
 	return p, err
 }
+
+func (conn *MidConn) getMultiBackConn(idxs []int) error {
+	for _, idx := range idxs {
+		if _, ok := conn.execNodes[idx]; ok {
+			continue
+		}
+
+		back, err := conn.pools[idx].GetConn(conn.db)
+		if err != nil {
+			return err
+		} else {
+			conn.execNodes[idx] = back
+		}
+	}
+	return nil
+}
+
+func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
+	back, ok := conn.execNodes[idx]
+	if ok {
+		return back, nil
+	}
+	back, err := conn.pools[idx].GetConn(conn.db)
+	if err != nil {
+		return nil, err
+	}
+
+	conn.execNodes[idx] = back
+	return back, nil
+}
