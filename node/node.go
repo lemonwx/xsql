@@ -12,9 +12,6 @@ import (
 	"fmt"
 	"net"
 
-	"strconv"
-	"strings"
-
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 )
@@ -503,31 +500,32 @@ func (node *Node) parseOKPkt(data []byte) (*mysql.Result, error) {
 	log.Debugf("[%d] recv: %s from node: [%v]", node.ConnectionId, data[pos:], node.addr)
 
 	// Rows matched ...
-	execDesc := string(data[pos:])
+	/*
+		execDesc := string(data[pos:])
 
-	if strings.Contains(execDesc, "Rows matched") {
-		x := strings.Split(execDesc, " ")
-		match, err := strconv.ParseUint(x[2], 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		aft, err := strconv.ParseUint(x[5], 10, 64)
-		if err != nil {
-			return nil, err
-		}
+		if strings.Contains(execDesc, "Rows matched") {
+			x := strings.Split(execDesc, " ")
+			match, err := strconv.ParseUint(x[2], 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			aft, err := strconv.ParseUint(x[5], 10, 64)
+			if err != nil {
+				return nil, err
+			}
 
-		log.Debugf("[%d] match: %d, aft: %d, aft: %d", node.ConnectionId, match, aft, r.AffectedRows)
-		if uint64(aft) != r.AffectedRows {
-			log.Debugf("[%d] aft parsed from proto and desc not equal")
-			return nil, mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
-		}
+			log.Debugf("[%d] match: %d, aft: %d, aft: %d", node.ConnectionId, match, aft, r.AffectedRows)
+			if uint64(aft) != r.AffectedRows {
+				log.Debugf("[%d] aft parsed from proto and desc not equal")
+				return nil, mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
+			}
 
-		if match != aft {
-			log.Errorf("[%d] match != aft", node.ConnectionId)
-			return nil, mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
+			if match != aft {
+				log.Errorf("[%d] match != aft", node.ConnectionId)
+				return nil, mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
+			}
 		}
-	}
-
+	*/
 	return r, nil
 }
 
