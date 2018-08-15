@@ -81,8 +81,12 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
 
-	// get next version
-	if err = conn.getNextVersion(); err != nil {
+	if len(conn.nodeIdx) != 1 {
+		log.Errorf("[%d] insert stmt must route to 1 node, but recv: %d", conn.ConnectionId, len(conn.nodeIdx))
+		return nil, fmt.Errorf("insert must route to 1 node")
+	}
+
+	if err := conn.getVInUse(); err != nil {
 		return nil, err
 	}
 
@@ -99,7 +103,18 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 	log.Debugf("[%d]: after convert sql: %s", conn.ConnectionId, newSql)
 
 	// exec
-	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+	nodeIdx := conn.nodeIdx[0]
+	back, err := conn.getSingleBackConn(nodeIdx)
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := back.Execute(mysql.COM_QUERY, []byte(newSql))
+	if err != nil {
+		return nil, err
+	}
+
+	return []*mysql.Result{ret}, nil
 }
 
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.Result, error) {
