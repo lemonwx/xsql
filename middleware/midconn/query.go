@@ -117,7 +117,32 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 	return rets, err
 }
 
-func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
+func (conn *MidConn) ExecuteOnSinglePool(sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
+	if len(nodeIdxs) != 1 {
+		return nil, fmt.Errorf("len of nodeIdxs must be 1")
+	}
+
+	idx := nodeIdxs[0]
+	var back *node.Node
+	var ok bool
+	var err error
+	back, ok = conn.execNodes[idx]
+	if !ok {
+		back, err = conn.pools[idx].GetConn(conn.db)
+		if err != nil {
+			return nil, err
+		}
+		conn.execNodes[idx] = back
+	}
+
+	ret, err := back.Execute(mysql.COM_QUERY, sql)
+	if err != nil {
+		return nil, err
+	}
+	return []*mysql.Result{ret}, nil
+}
+
+func (conn *MidConn) ExecuteOnMultiPool(sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
 	shardSize := len(nodeIdxs)
 	rets := make([]*mysql.Result, 0, shardSize)
 	errs := make([]error, 0, shardSize)
@@ -148,10 +173,8 @@ func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Res
 			wg.Done()
 		}(back)
 	}
-
 	wg.Wait()
 
-	log.Debug(rets)
 	switch {
 	case len(errs) == shardSize:
 		return nil, errs[0]
@@ -159,6 +182,14 @@ func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Res
 		return rets, nil
 	default:
 		return nil, fmt.Errorf("unexpected multi node return not equal")
+	}
+}
+
+func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
+	if len(nodeIdxs) == 1 {
+		return conn.ExecuteOnSinglePool(sql, nodeIdxs)
+	} else {
+		return conn.ExecuteOnMultiPool(sql, nodeIdxs)
 	}
 }
 

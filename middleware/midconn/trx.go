@@ -134,22 +134,32 @@ func (conn *MidConn) handleCommit(sql string) error {
 }
 
 func (conn *MidConn) clearExecNodes(sql []byte) error {
-	var retErr error
-	var wg sync.WaitGroup
-	wg.Add(len(conn.execNodes))
+	if len(conn.execNodes) == 1 {
+		for nodeIdx, back := range conn.execNodes {
+			if _, err := back.Execute(mysql.COM_QUERY, sql); err != nil {
+				return err
+			}
+			conn.pools[nodeIdx].PutConn(back)
+			delete(conn.execNodes, nodeIdx)
+		}
+		return nil
+	} else {
+		var retErr error
+		var wg sync.WaitGroup
+		wg.Add(len(conn.execNodes))
 
-	for nodeIdx, back := range conn.execNodes {
-		go func(idx int, backNode *node.Node) {
-			_, retErr = backNode.Execute(mysql.COM_QUERY, sql)
-			conn.pools[idx].PutConn(backNode)
-			delete(conn.execNodes, idx)
-			wg.Done()
-		}(nodeIdx, back)
+		for nodeIdx, back := range conn.execNodes {
+			go func(idx int, backNode *node.Node) {
+				_, retErr = backNode.Execute(mysql.COM_QUERY, sql)
+				conn.pools[idx].PutConn(backNode)
+				delete(conn.execNodes, idx)
+				wg.Done()
+			}(nodeIdx, back)
+		}
+		wg.Wait()
+
+		return retErr
 	}
-
-	wg.Wait()
-
-	return retErr
 }
 
 func (conn *MidConn) handleStmtTrx(data []byte) error {
