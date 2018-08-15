@@ -116,7 +116,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 		return nil, fmt.Errorf("insert must route to 1 node")
 	}
 
-	if err := conn.getVInUse(); err != nil {
+	if err := conn.getNextVersion(); err != nil {
 		return nil, err
 	}
 
@@ -299,8 +299,8 @@ func (conn *MidConn) getCurVInUse() interface{} {
 		return err
 	}
 
-	if _, ok := conn.VersionsInUse[conn.NextVersion]; ok {
-		delete(conn.VersionsInUse, conn.NextVersion)
+	if _, ok := vs[conn.NextVersion]; ok {
+		delete(vs, conn.NextVersion)
 	}
 
 	return vs

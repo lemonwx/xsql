@@ -88,6 +88,10 @@ func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, er
 		return nil, fmt.Errorf("unexpected error from getCurVInUse")
 	}
 
+	if exeErr != nil {
+		return nil, exeErr
+	}
+
 	for idx, ret := range rets {
 		ret.Fields = ret.Fields[extraSz:]
 
