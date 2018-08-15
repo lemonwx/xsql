@@ -33,8 +33,33 @@ func (conn *MidConn) handleUpdateForDelete(stmt *sqlparser.Delete) error {
 
 	return nil
 }
-
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
+	if err := conn.getNodeIdxs(stmt, nil); err != nil {
+		return nil, err
+	}
+
+	table := sqlparser.String(stmt.Table)
+	where := sqlparser.String(stmt.Where)
+	if err := conn.chkAndLockRows(table, where); err != nil {
+		return nil, err
+	}
+
+	if err := conn.getNextVersion(); err != nil {
+		return nil, err
+	}
+
+	updateSql := fmt.Sprintf("update %s set version = %d %s", table, conn.NextVersion, where)
+	log.Debugf("[%d] update version sql: %s", conn.ConnectionId, updateSql)
+
+	if _, err := conn.ExecuteOnNodePool([]byte(updateSql), conn.nodeIdx); err != nil {
+		return nil, err
+	}
+
+	newSql := sqlparser.String(stmt)
+	return conn.ExecuteOnNodePool([]byte(newSql), conn.nodeIdx)
+}
+
+func (conn *MidConn) handleDelete1(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
 	var err error
 	if err = conn.getNodeIdxs(stmt, nil); err != nil {
 		return nil, err
