@@ -40,8 +40,13 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 
 	table := sqlparser.String(stmt.Table)
 	where := sqlparser.String(stmt.Where)
-	if err := conn.chkAndLockRows(table, where); err != nil {
+	beContinue, err := conn.chkAndLockRows(table, where)
+	if err != nil {
 		return nil, err
+	}
+
+	if !beContinue {
+		return nil, nil
 	}
 
 	if err := conn.getNextVersion(); err != nil {
@@ -153,8 +158,13 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 
 	table := sqlparser.String(stmt.Table)
 	where := sqlparser.String(stmt.Where)
-	if err := conn.chkAndLockRows(table, where); err != nil {
+	beContinue, err := conn.chkAndLockRows(table, where)
+	if err != nil {
 		return nil, err
+	}
+
+	if !beContinue {
+		return nil, nil
 	}
 
 	stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
@@ -164,10 +174,19 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 	return conn.ExecuteOnNodePool([]byte(newSql), conn.nodeIdx)
 }
 
-func (conn *MidConn) chkAndLockRows(table, where string) error {
+func (conn *MidConn) chkAndLockRows(table, where string) (bool, error) {
 	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
-	_, err := conn.executeSelect(selSql, 1)
-	return err
+	rets, err := conn.executeSelect(selSql, 1)
+	if err != nil {
+		return false, err
+	}
+
+	for _, ret := range rets {
+		if len(ret.RowDatas) != 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 /*
