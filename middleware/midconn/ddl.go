@@ -6,24 +6,33 @@
 package midconn
 
 import (
+	"strings"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/meta"
-	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"strings"
 )
 
 func (conn *MidConn) handleDDL(stmt *sqlparser.DDL, sql string) error {
 	// ddl send to all nodes
-
 	log.Debugf("[%d]: recv ddl sql: %s", conn.ConnectionId, sql)
 	sql = conn.addExtraCol(sql)
-	rs, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), meta.GetFullNodeIdxs())
+
+	defer func() {
+		log.Debug(conn.execNodes)
+		for idx, back := range conn.execNodes {
+			conn.pools[idx].PutConn(back)
+			delete(conn.execNodes, idx)
+		}
+		log.Debug(conn.execNodes)
+	}()
+
+	rs, err := conn.ExecuteOnNodePool([]byte(sql), meta.GetFullNodeIdxs())
 	if err != nil {
 		return err
-	} else {
-		return conn.HandleExecRets(rs)
 	}
+
+	return conn.HandleExecRets(rs)
 }
 
 func (conn *MidConn) addExtraCol(sql string) string {
