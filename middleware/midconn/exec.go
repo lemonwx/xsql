@@ -90,7 +90,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 		return nil, err
 	}
 
-	// add extra col
+	// add extra col for every rows
 	vals := make(sqlparser.Values, len(stmt.Rows.(sqlparser.Values)))
 	for idx, row := range stmt.Rows.(sqlparser.Values) {
 		t := row.(sqlparser.ValTuple)
@@ -118,33 +118,34 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 }
 
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.Result, error) {
-
-	var err error
-
-	if err = conn.getNodeIdxs(stmt, nil); err != nil {
-		return nil, err
-	} else if conn.nodeIdx == nil {
-		return nil, UNEXPECT_MIDDLE_WARE_ERR
-	}
-
-	if err = conn.getNextVersion(); err != nil {
+	if err := conn.getNodeIdxs(stmt, nil); err != nil {
 		return nil, err
 	}
 
-	// add extra col, get new sql
+	if err := conn.getNextVersion(); err != nil {
+		return nil, err
+	}
+
+	table := sqlparser.String(stmt.Table)
+	where := sqlparser.String(stmt.Where)
+	if err := conn.chkAndLockRows(table, where); err != nil {
+		return nil, err
+	}
+
 	stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
-
-	// change set col = val to case when
-	if err = conn.change2caseWhen(stmt); err != nil {
-		return nil, err
-	}
-
 	newSql := sqlparser.String(stmt)
-	log.Debugf("[%d] sql convert to: %s", conn.ConnectionId, newSql)
-	log.Debugf("generallog--[%d] 3:%s", conn.ConnectionId, newSql)
+	log.Debugf("[%d] sql after convert: %s", conn.ConnectionId, newSql)
 
-	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
+	return conn.ExecuteOnNodePool([]byte(newSql), conn.nodeIdx)
 }
+
+func (conn *MidConn) chkAndLockRows(table, where string) error {
+	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
+	_, err := conn.executeSelect(selSql, 1)
+	return err
+}
+
+/*
 
 func (conn *MidConn) change2caseWhen(stmt *sqlparser.Update) error {
 
@@ -196,7 +197,7 @@ func (conn *MidConn) change2caseWhen(stmt *sqlparser.Update) error {
 	return nil
 }
 
-func (conn *MidConn) handleSelectForUpdate(table, where string) error {
+func (conn *MidConn) handleSelectForUpdate1(table, where string) error {
 	var err error
 
 	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
@@ -218,7 +219,7 @@ func (conn *MidConn) handleSelectForUpdate(table, where string) error {
 	log.Debugf("[%d] select for update success", conn.ConnectionId)
 	return nil
 }
-
+*/
 func (conn *MidConn) needGetNextV(nodeIdxs []int) bool {
 	// judge if this sql need to get next version or not
 	need := true

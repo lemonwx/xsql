@@ -58,19 +58,7 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 	return conn.HandleSelRets([]*mysql.Result{ret})
 }
 
-func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
-	var err error
-
-	plan, err := conn.getPlan(stmt)
-	if err != nil {
-		return nil, err
-	}
-	conn.nodeIdx = plan.ShardList
-
-	if len(conn.nodeIdx) == 0 {
-		r := conn.newEmptyResultset(stmt)
-		return []*mysql.Result{&mysql.Result{Resultset: r}}, nil
-	}
+func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, error) {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -85,8 +73,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 	}()
 
 	go func() {
-		newSql := sqlparser.String(stmt)
-		rets, exeErr = conn.ExecuteOnNodePool([]byte(newSql), plan.ShardList)
+		rets, exeErr = conn.ExecuteOnNodePool([]byte(sql), conn.nodeIdx)
 		//rets, exeErr = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 		wg.Done()
 	}()
@@ -94,14 +81,13 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 
 	switch vv := vRet.(type) {
 	case error:
-		return nil, err
+		return nil, vv
 	case map[uint64]uint8:
 		vInUse = vv
 	default:
 		return nil, fmt.Errorf("unexpected error from getCurVInUse")
 	}
 
-	extraSz := len(stmt.ExtraCols)
 	for idx, ret := range rets {
 		ret.Fields = ret.Fields[extraSz:]
 
@@ -113,6 +99,24 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 		rets[idx] = ret
 	}
 
+	return rets, nil
+}
+
+func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
+	var err error
+
+	plan, err := conn.getPlan(stmt)
+	if err != nil {
+		return nil, err
+	}
+	conn.nodeIdx = plan.ShardList
+
+	if len(conn.nodeIdx) == 0 {
+		r := conn.newEmptyResultset(stmt)
+		return []*mysql.Result{&mysql.Result{Resultset: r}}, nil
+	}
+
+	rets, err := conn.executeSelect(sqlparser.String(stmt), len(stmt.ExtraCols))
 	return rets, err
 }
 
