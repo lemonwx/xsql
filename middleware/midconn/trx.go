@@ -60,27 +60,14 @@ func (conn *MidConn) handleBegin(isBegin bool) {
 			conn.handleCommit("commit")
 		}
 		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
-		conn.executedIdx = make(map[int]uint8)
 	} else {
 		if conn.status[0] == conn.defaultStatus {
 			conn.status[0] = mysql.SERVER_STATUS_IN_TRANS
-			conn.executedIdx = make(map[int]uint8)
 		}
 	}
 }
 
-func (conn *MidConn) getExecutedNodeIdx() []int {
-	ret := make([]int, 0, len(conn.executedIdx))
-	for k, _ := range conn.executedIdx {
-		ret = append(ret, k)
-	}
-
-	log.Debugf("[%d] conn.executed node idx: %v", conn.ConnectionId, ret)
-	return ret
-}
-
 func (conn *MidConn) handleCommit(sql string) error {
-
 	log.Debugf("[%d] mid conn's status: %v", conn.ConnectionId, conn.status)
 
 	commit := false
@@ -112,21 +99,10 @@ func (conn *MidConn) handleCommit(sql string) error {
 		conn.NextVersion = 0
 		conn.VersionsInUse = nil
 
-		if conn.nodes[0] != nil && conn.nodes[1] != nil {
-			_, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.getExecutedNodeIdx())
-			if err != nil {
-				log.Errorf("[%d] execute %s failed: %v", conn.ConnectionId, sql, err)
-				return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_FAILED)
-			}
-		}
-
 		if commitErr := conn.clearExecNodes([]byte(sql)); commitErr != nil {
 			return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_FAILED)
 		}
 
-		for idx, _ := range conn.executedIdx {
-			delete(conn.executedIdx, idx)
-		}
 		conn.status[0] = conn.defaultStatus
 		conn.status[1] = conn.defaultStatus
 	}

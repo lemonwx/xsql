@@ -39,8 +39,7 @@ type MidConn struct {
 	VersionsInUse map[uint64]uint8
 	NextVersion   uint64
 
-	nodeIdx     []int // node that has exec sql in the trx
-	executedIdx map[int]uint8
+	nodeIdx []int // node that has exec sql in the trx
 
 	stmts map[uint32]*Stmt
 
@@ -117,7 +116,6 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool) (*Mid
 	midConn.NextVersion = 0
 
 	midConn.stmts = make(map[uint32]*Stmt)
-	midConn.executedIdx = make(map[int]uint8)
 
 	return midConn, nil
 }
@@ -455,12 +453,6 @@ func (conn *MidConn) getPlan(stmt *sqlparser.Select) (*sqlparser.SelectPlan, err
 	if err != nil {
 		log.Errorf("[%d] get plan failed: %v", conn.ConnectionId, err)
 		return nil, err
-	}
-
-	for _, idx := range p.ShardList {
-		if _, ok := conn.executedIdx[idx]; !ok {
-			conn.executedIdx[idx] = 0
-		}
 	}
 
 	return p, err

@@ -349,10 +349,5 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]i
 	}
 	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId, conn.nodeIdx)
 
-	for _, idx := range conn.nodeIdx {
-		if _, ok := conn.executedIdx[idx]; !ok {
-			conn.executedIdx[idx] = 0
-		}
-	}
 	return nil
 }
