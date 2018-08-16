@@ -102,6 +102,7 @@ func (p *Pool) GetConn(schema string) (*Node, error) {
 
 	if conn != nil {
 		if err := p.useDB(conn, schema); err != nil {
+			p.idleConns <- conn
 			return nil, err
 		}
 		return conn, nil
@@ -156,5 +157,5 @@ func (p *Pool) String() string {
 }
 
 func (p *Pool) DumpInfo() {
-	log.Infof("pool:%v idle: %d, free: %d", p, len(p.idleConns), len(p.freeConns))
+	log.Errorf("pool:%v idle: %d, free: %d", p, len(p.idleConns), len(p.freeConns))
 }
