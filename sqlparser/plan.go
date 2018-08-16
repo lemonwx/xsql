@@ -75,75 +75,6 @@ func SliceIn(s1, s2 []int) bool {
 	return true
 }
 
-func (plan *SelectPlan) SetupFinalShardList() {
-
-	if plan.SelectListPlan != nil {
-
-		if plan.SelectListPlan.rule == nil || len(plan.SelectListPlan.ShardList) == 0 {
-			panic(UNSUPPORTED_SHARD_ERR)
-		}
-
-		if !plan.SelectListPlan.rule.Equal(plan.rule) {
-			panic(UNSUPPORTED_SHARD_ERR)
-		}
-
-		plan.SelectListPlan.SetupFinalShardList()
-
-		if len(plan.ShardList) == len(plan.SelectListPlan.ShardList) &&
-			len(plan.ShardList) == 1 &&
-			plan.ShardList[0] == plan.SelectListPlan.ShardList[0] {
-		} else {
-			panic(UNSUPPORTED_SHARD_ERR)
-		}
-	}
-}
-
-func GenealPlanForSelList(r *router.Router, exprs SelectExprs) *SelectPlan {
-
-	l := make([]int, 0, len(exprs))
-	var preRule *router.Rule
-
-	for _, expr := range exprs {
-		switch v := expr.(type) {
-		case *StarExpr:
-			panic(UNSUPPORTED_SHARD_ERR)
-		case *NonStarExpr:
-			if sub, ok := v.Expr.(*Subquery); ok {
-				switch sel := sub.Select.(type) {
-				case *Select:
-					tmpp, err := GeneralPlanForSelect(r, sel)
-					if err != nil {
-						panic(err)
-					}
-
-					if preRule != nil {
-						if preRule.Equal(tmpp.rule) {
-							l = unionList(tmpp.ShardList, l)
-						} else {
-							panic(UNSUPPORTED_SHARD_ERR)
-						}
-					} else {
-						l = unionList(tmpp.ShardList, l)
-					}
-
-					preRule = tmpp.rule
-				case *SimpleSelect:
-					panic(UNSUPPORTED_SHARD_ERR)
-				}
-			}
-		}
-	}
-
-	if len(l) == 0 {
-		return nil
-	} else {
-		return &SelectPlan{
-			ShardList: l,
-			rule:      preRule,
-		}
-	}
-}
-
 func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms ...TableExpr) (*SelectPlan, error) {
 
 	if len(froms) == 1 {
@@ -303,6 +234,7 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms ...Ta
 					panic(UNSUPPORTED_SHARD_ERR)
 				}
 			}
+
 			if len(rules) != 0 {
 				if !rules[0].Equal(rule) {
 					panic(UNSUPPORTED_SHARD_ERR)
@@ -362,14 +294,20 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms ...Ta
 func GeneralPlanForSelect(r *router.Router, stmt *Select) (plan *SelectPlan, err error) {
 
 	defer handleError(&err)
-
 	plan = &SelectPlan{}
 
-	plan.SelectListPlan = GenealPlanForSelList(r, stmt.SelectExprs)
-	plan.ShardForFrom(r, stmt.Where, stmt.From...)
+	for _, expr := range stmt.SelectExprs {
+		switch ee := expr.(type) {
+		case *StarExpr:
+			panic("unsupported select *")
+		case *NonStarExpr:
+			if _, ok := ee.Expr.(*Subquery); ok {
+				panic(UNSUPPORTED_SHARD_ERR)
+			}
+		}
+	}
 
-	// 确定最终的分发方式
-	plan.SetupFinalShardList()
+	plan.ShardForFrom(r, stmt.Where, stmt.From...)
 	return
 }
 
