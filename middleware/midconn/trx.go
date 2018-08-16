@@ -15,6 +15,7 @@ package midconn
 import (
 	"fmt"
 	"strings"
+	"utils"
 
 	"hack"
 
@@ -29,7 +30,7 @@ import (
 
 func (conn *MidConn) handleServerNotServe(data []byte) {
 	log.Debugf("[%d] midconn is under not serve status, and recv is %s", conn.ConnectionId, string(data[1:]))
-	if sqlparser.StringIn(strings.ToLower(hack.String(data[1:])), "rollback", "commit") {
+	if utils.StringIn(strings.ToLower(hack.String(data[1:])), "rollback", "commit") {
 		err := conn.handleCommit(hack.String(data[1:]))
 		if err != nil {
 			log.Errorf("[%d] handle commit faild: %v", conn.ConnectionId, err)

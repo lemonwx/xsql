@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 
+	"utils"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/router"
 )
@@ -385,13 +387,13 @@ func (plan *SelectPlan) routingAnalyzeBoolean(where BoolExpr) []int {
 		return plan.routingAnalyzeBoolean(node.Expr)
 	case *ComparisonExpr:
 		switch {
-		case StringIn(node.Operator, "=", "<", ">", "<=", ">=", "<=>"):
+		case utils.StringIn(node.Operator, "=", "<", ">", "<=", ">=", "<=>"):
 			left := plan.routingAnalyzeValue(node.Left)
 			right := plan.routingAnalyzeValue(node.Right)
 			if (left == EID_NODE && right == VALUE_NODE) || (left == VALUE_NODE && right == EID_NODE) {
 				return plan.findConditionShard(node)
 			}
-		case StringIn(node.Operator, "in", "not in"):
+		case utils.StringIn(node.Operator, "in", "not in"):
 			//judge node.Left is col and dis key
 			left := plan.routingAnalyzeValue(node.Left)
 			right := plan.routingAnalyzeValue(node.Right)

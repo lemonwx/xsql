@@ -89,3 +89,14 @@ func AppendLengthEncodedInteger(b []byte, n uint64) []byte {
 	return append(b, 0xfe, byte(n), byte(n>>8), byte(n>>16), byte(n>>24),
 		byte(n>>32), byte(n>>40), byte(n>>48), byte(n>>56))
 }
+
+// StringIn is a convenience function that returns
+// true if str matches any of the values.
+func StringIn(str string, values ...string) bool {
+	for _, val := range values {
+		if str == val {
+			return true
+		}
+	}
+	return false
+}
