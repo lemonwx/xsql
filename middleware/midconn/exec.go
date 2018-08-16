@@ -293,17 +293,17 @@ func (conn *MidConn) getNextVersion() error {
 	return nil
 }
 
-func (conn *MidConn) getCurVInUse() interface{} {
+func (conn *MidConn) getCurVInUse() (map[uint64]uint8, error) {
 	vs, err := version.VersionsInUse()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if _, ok := vs[conn.NextVersion]; ok {
 		delete(vs, conn.NextVersion)
 	}
 
-	return vs
+	return vs, nil
 }
 
 func (conn *MidConn) getVInUse() error {

@@ -62,30 +62,25 @@ func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, er
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	var vRet interface{}
+
+	var vErr error
 	var vInUse map[uint64]uint8
+	go func() {
+		vInUse, vErr = conn.getCurVInUse()
+		wg.Done()
+	}()
+
 	var rets []*mysql.Result
 	var exeErr error
-
-	go func() {
-		vRet = conn.getCurVInUse()
-		wg.Done()
-	}()
-
 	go func() {
 		rets, exeErr = conn.ExecuteOnNodePool([]byte(sql), conn.nodeIdx)
-		//rets, exeErr = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(newSql), conn.nodeIdx)
 		wg.Done()
 	}()
+
 	wg.Wait()
 
-	switch vv := vRet.(type) {
-	case error:
-		return nil, vv
-	case map[uint64]uint8:
-		vInUse = vv
-	default:
-		return nil, fmt.Errorf("unexpected error from getCurVInUse")
+	if vErr != nil {
+		return nil, vErr
 	}
 
 	if exeErr != nil {
@@ -94,7 +89,6 @@ func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, er
 
 	for idx, ret := range rets {
 		ret.Fields = ret.Fields[extraSz:]
-
 		for rowIdx, _ := range ret.RowDatas {
 			if err := conn.hideExtraCols(&ret.RowDatas[rowIdx], extraSz, vInUse); err != nil {
 				return nil, err
