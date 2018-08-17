@@ -137,28 +137,36 @@ func (conn *MidConn) ExecuteOnSinglePool(sql []byte, nodeIdxs []int) ([]*mysql.R
 }
 
 func (conn *MidConn) ExecuteOnMultiPool(sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
-	shardSize := len(nodeIdxs)
-	rets := make([]*mysql.Result, 0, shardSize)
-	errs := make([]error, 0, shardSize)
-
 	if err := conn.getMultiBackConn(nodeIdxs); err != nil {
 		return nil, err
 	}
 
+	shardSize := len(nodeIdxs)
+	rets := make([]*mysql.Result, 0, shardSize)
+	errs := make([]error, 0, shardSize)
+
 	var wg sync.WaitGroup
 	wg.Add(len(nodeIdxs))
+	lock := sync.Mutex{}
 
 	for _, idx := range nodeIdxs {
 		go func(idx int) {
 			back, ok := conn.execNodes[idx]
 			if !ok {
+				lock.Lock()
 				errs = append(errs, fmt.Errorf("unexpected error, idx should in conn.execNodes"))
+				lock.Unlock()
+				wg.Done()
+				return
 			}
-			if ret, err := back.Execute(mysql.COM_QUERY, sql); err != nil {
+			ret, err := back.Execute(mysql.COM_QUERY, sql)
+			lock.Lock()
+			if err != nil {
 				errs = append(errs, err)
 			} else {
 				rets = append(rets, ret)
 			}
+			lock.Unlock()
 			wg.Done()
 		}(idx)
 	}
