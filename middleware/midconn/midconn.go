@@ -402,10 +402,7 @@ func (conn *MidConn) Close() {
 	conn.closed = true
 	conn.cli.Close()
 
-	for idx, back := range conn.execNodes {
-		conn.pools[idx].PutConn(back)
-		delete(conn.execNodes, idx)
-	}
+	conn.clearExecNodes([]byte("rollback"))
 }
 
 func (c *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset {
