@@ -69,6 +69,7 @@ func (node *Node) Connect() error {
 	tcpConn.SetNoDelay(false)
 	node.conn = tcpConn
 	node.pkt = mysql.NewPacketIO(tcpConn)
+	node.salt = nil
 
 	if err := node.readInitialHandshake(); err != nil {
 		log.Errorf("read init handshake from mysqld [%v] failed: %v", node.addr, err)

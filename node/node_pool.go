@@ -100,20 +100,21 @@ func (p *Pool) GetConn(schema string) (*Node, error) {
 	case conn = <-p.freeConns:
 	}
 
-	if conn != nil {
+	if conn.conn != nil {
 		if err := p.useDB(conn, schema); err != nil {
-			p.idleConns <- conn
+			p.PutConn(conn)
 			return nil, err
 		}
 		return conn, nil
 	}
 
 	if err := conn.Connect(); err != nil {
-		p.freeConns <- conn
+		p.PutConn(conn)
 		return nil, err
 	}
 
 	if err := p.useDB(conn, schema); err != nil {
+		p.PutConn(conn)
 		return nil, err
 	}
 	return conn, nil
