@@ -93,15 +93,10 @@ func NewNodePool(initSize, idleSize, maxConnSize uint32, cfg *config.Node) (*Poo
 	return p, nil
 }
 
-func (p *Pool) GetConn(schema string) (*Node, error) {
-	var conn *Node
-	select {
-	case conn = <-p.idleConns:
-	case conn = <-p.freeConns:
-	}
-
+func (p *Pool) tryReuse(conn *Node, schema string) (*Node, error) {
 	if conn.conn != nil {
 		if err := p.useDB(conn, schema); err != nil {
+			conn.Close()
 			p.PutConn(conn)
 			return nil, err
 		}
@@ -109,15 +104,45 @@ func (p *Pool) GetConn(schema string) (*Node, error) {
 	}
 
 	if err := conn.Connect(); err != nil {
+		conn.Close()
 		p.PutConn(conn)
 		return nil, err
 	}
 
 	if err := p.useDB(conn, schema); err != nil {
+		conn.Close()
 		p.PutConn(conn)
 		return nil, err
 	}
 	return conn, nil
+}
+
+func (p *Pool) GetConnFromIdle(schema string) (*Node, error) {
+	var conn *Node
+	select {
+	case conn = <-p.idleConns:
+		return p.tryReuse(conn, schema)
+	default:
+		return nil, fmt.Errorf("idle list empty, try get from free list")
+	}
+}
+
+func (p *Pool) GetConn(schema string) (*Node, error) {
+	// first try get conn from idle
+	if conn, err := p.GetConnFromIdle(schema); err == nil {
+		return conn, nil
+	}
+
+	// during this time,
+	//      1. may some conn put back to idle list, we expect all conn get from idle list
+	//   or 2. may free empty and idle not empty
+	// so try get conn from both idle and free
+	var conn *Node
+	select {
+	case conn = <-p.idleConns:
+	case conn = <-p.freeConns:
+	}
+	return p.tryReuse(conn, schema)
 }
 
 func (p *Pool) useDB(back *Node, schema string) error {
