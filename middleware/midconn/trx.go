@@ -134,7 +134,7 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 				if retErr != nil {
 					backNode.Close()
 				}
-				conn.pools[nodeIdx].PutConn(backNode)
+				conn.pools[idx].PutConn(backNode)
 				wg.Done()
 			}(nodeIdx, back)
 			delete(conn.execNodes, nodeIdx)
