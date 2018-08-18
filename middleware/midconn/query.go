@@ -102,13 +102,7 @@ func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, er
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
 	var err error
-
-	plan, err := conn.getPlan(stmt)
-	if err != nil {
-		return nil, err
-	}
-	conn.nodeIdx = plan.ShardList
-
+	conn.nodeIdx, err = conn.getShardList(stmt)
 	if len(conn.nodeIdx) == 0 {
 		r := conn.newEmptyResultset(stmt)
 		return []*mysql.Result{&mysql.Result{Resultset: r}}, nil

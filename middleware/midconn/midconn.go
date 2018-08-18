@@ -8,6 +8,7 @@ package midconn
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -432,7 +433,7 @@ func (c *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset {
 	return r
 }
 
-func (conn *MidConn) getPlan(stmt *sqlparser.Select) (*sqlparser.SelectPlan, error) {
+func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
 	var err error
 	if conn.db == "" {
 		err := mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
@@ -446,13 +447,16 @@ func (conn *MidConn) getPlan(stmt *sqlparser.Select) (*sqlparser.SelectPlan, err
 		return nil, err
 	}
 
-	p, err := sqlparser.GeneralPlanForSelect(r, stmt)
-	if err != nil {
-		log.Errorf("[%d] get plan failed: %v", conn.ConnectionId, err)
-		return nil, err
+	switch s := stmt.(type) {
+	case *sqlparser.Select:
+		p, err := sqlparser.GeneralPlanForSelect(r, s)
+		if err != nil {
+			return nil, err
+		}
+		return p.ShardList, nil
+	default:
+		return nil, fmt.Errorf("[%d] unsupported for this type of sql")
 	}
-
-	return p, err
 }
 
 func (conn *MidConn) getMultiBackConn(idxs []int) error {
