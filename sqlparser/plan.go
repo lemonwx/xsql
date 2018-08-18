@@ -6,7 +6,6 @@
 package sqlparser
 
 import (
-	"errors"
 	"fmt"
 	"hack"
 	"sort"
@@ -15,23 +14,19 @@ import (
 	"utils"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/errors"
 	"github.com/lemonwx/xsql/middleware/router"
 )
 
-var UNSUPPORTED_SHARD_ERR = errors.New("unsupported shard for this sql")
+var UNSUPPORTED_SHARD_ERR = errors.New(fmt.Errorf("unsupported shard for this sql"))
 
-type Plan interface {
-	ShardEqual() bool
-}
-
-type SelectPlan struct {
-	rule *router.Rule
-
-	SelectListPlan *SelectPlan
-
-	ShardList []int
-	Hide      bool
+type Plan struct {
+	rule      *router.Rule
 	fullList  []int
+	ShardList []int
+
+	//for insert
+	shardKeyIdx int
 }
 
 func SliceEqual(s1, s2 []int) bool {
@@ -75,7 +70,7 @@ func SliceIn(s1, s2 []int) bool {
 	return true
 }
 
-func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms ...TableExpr) (*SelectPlan, error) {
+func (p *Plan) ShardForFrom(r *router.Router, preWhere *Where, froms ...TableExpr) (*Plan, error) {
 
 	if len(froms) == 1 {
 		switch v := froms[0].(type) {
@@ -111,8 +106,8 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms ...Ta
 				}
 			}
 		case *JoinTableExpr:
-			pl := &SelectPlan{}
-			pr := &SelectPlan{}
+			pl := &Plan{}
+			pr := &Plan{}
 
 			pl.ShardForFrom(r, nil, v.LeftExpr)
 			pr.ShardForFrom(r, nil, v.RightExpr)
@@ -291,27 +286,7 @@ func (p *SelectPlan) ShardForFrom(r *router.Router, preWhere *Where, froms ...Ta
 	return nil, nil
 }
 
-func GeneralPlanForSelect(r *router.Router, stmt *Select) (plan *SelectPlan, err error) {
-
-	defer handleError(&err)
-	plan = &SelectPlan{}
-
-	for _, expr := range stmt.SelectExprs {
-		switch ee := expr.(type) {
-		case *StarExpr:
-			panic("unsupported select *")
-		case *NonStarExpr:
-			if _, ok := ee.Expr.(*Subquery); ok {
-				panic(UNSUPPORTED_SHARD_ERR)
-			}
-		}
-	}
-
-	plan.ShardForFrom(r, stmt.Where, stmt.From...)
-	return
-}
-
-func (plan *SelectPlan) routingAnalyzeBoolean(where BoolExpr) []int {
+func (plan *Plan) routingAnalyzeBoolean(where BoolExpr) []int {
 	switch node := where.(type) {
 	case *AndExpr:
 		left := plan.routingAnalyzeBoolean(node.Left)
@@ -363,13 +338,18 @@ func (plan *SelectPlan) routingAnalyzeBoolean(where BoolExpr) []int {
 
 }
 
-func (plan *SelectPlan) routingAnalyzeValue(valExpr ValExpr) int {
+func (plan *Plan) routingAnalyzeValue(valExpr ValExpr) int {
 	switch node := valExpr.(type) {
 	case *ColName:
 		if plan.rule.KeyEqual(String(node)) {
 			return EID_NODE
 		}
 	case ValTuple:
+		if plan.shardKeyIdx != 0 {
+			if plan.routingAnalyzeValue(node[plan.shardKeyIdx]) != VALUE_NODE {
+				return OTHER_NODE
+			}
+		}
 		for _, n := range node {
 			if plan.routingAnalyzeValue(n) != VALUE_NODE {
 				return OTHER_NODE
@@ -382,7 +362,24 @@ func (plan *SelectPlan) routingAnalyzeValue(valExpr ValExpr) int {
 	return OTHER_NODE
 }
 
-func (plan *SelectPlan) findConditionShard(expr BoolExpr) (shardList []int) {
+func (plan *Plan) routingAnalyzeValues(vals Values) Values {
+	// Analyze first value of every item in the list
+	log.Debug(vals)
+	for i := 0; i < len(vals); i++ {
+		switch tuple := vals[i].(type) {
+		case ValTuple:
+			result := plan.routingAnalyzeValue(tuple[plan.shardKeyIdx])
+			if result != VALUE_NODE {
+				panic(NewParserError("insert is too complex"))
+			}
+		default:
+			panic(NewParserError("insert is too complex"))
+		}
+	}
+	return vals
+}
+
+func (plan *Plan) findConditionShard(expr BoolExpr) (shardList []int) {
 	var index int
 	switch criteria := expr.(type) {
 	case *ComparisonExpr:
@@ -479,12 +476,12 @@ func (plan *SelectPlan) findConditionShard(expr BoolExpr) (shardList []int) {
 	return plan.fullList
 }
 
-func (plan *SelectPlan) findShard(valExpr ValExpr) int {
+func (plan *Plan) findShard(valExpr ValExpr) int {
 	value := plan.getBoundValue(valExpr)
 	return plan.rule.FindNodeIndex(value)
 }
 
-func (plan *SelectPlan) getBoundValue(valExpr ValExpr) interface{} {
+func (plan *Plan) getBoundValue(valExpr ValExpr) interface{} {
 	switch node := valExpr.(type) {
 	case ValTuple:
 		if len(node) != 1 {
@@ -509,7 +506,7 @@ func (plan *SelectPlan) getBoundValue(valExpr ValExpr) interface{} {
 	panic("Unexpected token")
 }
 
-func (plan *SelectPlan) adjustShardIndex(valExpr ValExpr, index int) int {
+func (plan *Plan) adjustShardIndex(valExpr ValExpr, index int) int {
 	value := plan.getBoundValue(valExpr)
 
 	s, ok := plan.rule.Shard.(router.RangeShard)
@@ -526,7 +523,7 @@ func (plan *SelectPlan) adjustShardIndex(valExpr ValExpr, index int) int {
 	return index
 }
 
-func (plan *SelectPlan) findShardList(valExpr ValExpr) []int {
+func (plan *Plan) findShardList(valExpr ValExpr) []int {
 	shardset := make(map[int]bool)
 	switch node := valExpr.(type) {
 	case ValTuple:
@@ -546,7 +543,7 @@ func (plan *SelectPlan) findShardList(valExpr ValExpr) []int {
 	return shardlist
 }
 
-func (plan *SelectPlan) AnalyzeValue(valExpr ValExpr) int {
+func (plan *Plan) AnalyzeValue(valExpr ValExpr) int {
 	switch valExpr.(type) {
 	case *ColName:
 		return EID_NODE
@@ -554,4 +551,107 @@ func (plan *SelectPlan) AnalyzeValue(valExpr ValExpr) int {
 		return ^EID_NODE
 	}
 
+}
+
+func (plan *Plan) findInsertShard(val Tuple) int {
+	row, ok := val.(ValTuple)
+	if !ok {
+		panic(errors.New2("can't shard for this type of values"))
+	}
+
+	return plan.findShard(row[plan.shardKeyIdx])
+}
+
+func GeneralPlanForSelect(r *router.Router, stmt *Select) (plan *Plan, err error) {
+
+	defer handleError(&err)
+	plan = &Plan{}
+
+	for _, expr := range stmt.SelectExprs {
+		switch ee := expr.(type) {
+		case *StarExpr:
+			panic("unsupported select *")
+		case *NonStarExpr:
+			if _, ok := ee.Expr.(*Subquery); ok {
+				panic(UNSUPPORTED_SHARD_ERR)
+			}
+		}
+	}
+
+	plan.ShardForFrom(r, stmt.Where, stmt.From...)
+	return
+}
+
+func GeneralPlanForInsert(r *router.Router, ist *Insert) (plan *Plan, err error) {
+	defer handleError(&err)
+
+	if r == nil {
+		panic(errors.New(fmt.Errorf("cant't shard use nil router")))
+	}
+
+	var ok bool
+	var vals Values
+	plan = &Plan{}
+
+	// get rule for this table
+	if plan.rule, ok = r.Rules[string(ist.Table.Name)]; !ok {
+		panic(errors.New(fmt.Errorf("can't find shard rule for this table: %s", ist.Table.Name)))
+	}
+
+	// only shard for values, insert select or any others not support
+	vals, ok = ist.Rows.(Values)
+	if !ok {
+		panic(errors.New(fmt.Errorf("can't shard for this kind of insert rows")))
+	}
+
+	// can not shard for insert multi vals
+	if len(vals) != 1 {
+		panic(fmt.Errorf("can't shard for insert multi values"))
+	}
+
+	// find shard key idx
+	for idx, col := range ist.Columns {
+		c := col.(*NonStarExpr).Expr.(*ColName)
+		if string(c.Name) == plan.rule.Key {
+			plan.shardKeyIdx = idx
+			break
+		}
+	}
+
+	if plan.shardKeyIdx == 0 {
+		panic(errors.New(fmt.Errorf("can't find shard key in insert cols")))
+	}
+
+	idx := plan.findInsertShard(vals[0])
+	plan.ShardList = []int{idx}
+
+	return
+}
+
+func GeneralShardList(r *router.Router, stmt Statement) ([]int, error) {
+	var plan *Plan
+	var err error
+
+	switch s := stmt.(type) {
+	case *Select:
+		plan, err = GeneralPlanForSelect(r, s)
+	case *Insert:
+		plan, err = GeneralPlanForInsert(r, s)
+	default:
+		return nil, errors.New2("can't shard for this type of sql")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if plan != nil {
+		if plan.ShardList == nil {
+			return nil, errors.New2("un expected plan's shard list is nil")
+		} else {
+			return plan.ShardList, nil
+		}
+	} else {
+		return nil, errors.New2("un expected plan is nil")
+	}
 }

@@ -33,6 +33,7 @@ func (conn *MidConn) handleUpdateForDelete(stmt *sqlparser.Delete) error {
 
 	return nil
 }
+
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
 	if err := conn.getNodeIdxs(stmt, nil); err != nil {
 		return nil, err
@@ -103,15 +104,13 @@ func (conn *MidConn) handleDelete1(stmt *sqlparser.Delete, sql string) ([]*mysql
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.Result, error) {
 	var err error
+	var shardList []int
 
-	// router
-	if err = conn.getNodeIdxs(stmt, nil); err != nil {
+	if shardList, err = conn.getShardList(stmt); err != nil {
 		return nil, err
-	} else if conn.nodeIdx == nil {
-		return nil, UNEXPECT_MIDDLE_WARE_ERR
 	}
 
-	if len(conn.nodeIdx) != 1 {
+	if len(shardList) != 1 {
 		log.Errorf("[%d] insert stmt must route to 1 node, but recv: %d", conn.ConnectionId, len(conn.nodeIdx))
 		return nil, fmt.Errorf("insert must route to 1 node")
 	}
@@ -133,7 +132,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 	log.Debugf("[%d]: after convert sql: %s", conn.ConnectionId, newSql)
 
 	// exec
-	nodeIdx := conn.nodeIdx[0]
+	nodeIdx := shardList[0]
 	back, err := conn.getSingleBackConn(nodeIdx)
 	if err != nil {
 		return nil, err

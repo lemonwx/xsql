@@ -24,6 +24,20 @@ func (err *Err) Error() string {
 	return fmt.Sprintf("%s \n%s", err.msg, err.bt)
 }
 
+func New2(msg string) *Err {
+	e := &Err{}
+	e.msg = msg
+
+	buf := make([]byte, BTSIZE)
+	size := runtime.Stack(buf, false)
+	stacks := strings.Split(string(buf[:size]), "\n")
+
+	stacks = append(stacks[:1], stacks[3:]...)
+	e.bt = strings.Join(stacks, "\n")
+
+	return e
+}
+
 func New(err error) *Err {
 	e := &Err{}
 	e.msg = err.Error()
