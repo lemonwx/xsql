@@ -153,7 +153,9 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 		return nil, err
 	}
 
-	log.Debug(conn.nodeIdx)
+	if len(conn.nodeIdx) == 0 {
+		return nil, nil
+	}
 
 	if err := conn.getNextVersion(); err != nil {
 		return nil, err

@@ -13,6 +13,7 @@ import (
 	"fmt"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/errors"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 )
@@ -59,6 +60,9 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 }
 
 func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, error) {
+	if len(conn.nodeIdx) == 0 {
+		return nil, errors.New2("can't execute sql under empty node idxs")
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -105,10 +109,6 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 	conn.nodeIdx, err = conn.getShardList(stmt)
 	if err != nil {
 		log.Errorf("[%d] get shard list faild:%v", conn.ConnectionId, err)
-	}
-	if len(conn.nodeIdx) == 0 {
-		r := conn.newEmptyResultset(stmt)
-		return []*mysql.Result{&mysql.Result{Resultset: r}}, nil
 	}
 
 	rets, err := conn.executeSelect(sqlparser.String(stmt), len(stmt.ExtraCols))
