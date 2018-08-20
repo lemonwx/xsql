@@ -147,9 +147,13 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 }
 
 func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.Result, error) {
-	if err := conn.getNodeIdxs(stmt, nil); err != nil {
+	var err error
+
+	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
 		return nil, err
 	}
+
+	log.Debug(conn.nodeIdx)
 
 	if err := conn.getNextVersion(); err != nil {
 		return nil, err

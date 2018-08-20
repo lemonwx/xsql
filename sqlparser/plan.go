@@ -553,6 +553,14 @@ func (plan *Plan) AnalyzeValue(valExpr ValExpr) int {
 
 }
 
+func (plan *Plan) ShardForWhere(where *Where) {
+	if where == nil {
+		plan.ShardList = plan.fullList
+		return
+	}
+	plan.ShardList = plan.routingAnalyzeBoolean(where.Expr)
+}
+
 func (plan *Plan) findInsertShard(val Tuple) int {
 	row, ok := val.(ValTuple)
 	if !ok {
@@ -628,6 +636,20 @@ func GeneralPlanForInsert(r *router.Router, ist *Insert) (plan *Plan, err error)
 	return
 }
 
+func GeneralPlanForUpdate(r *router.Router, upd *Update) (plan *Plan, err error) {
+	defer handleError(&err)
+	plan = &Plan{}
+
+	log.Debug(plan, r.Rules)
+	var ok bool
+	if plan.rule, ok = r.Rules[string(upd.Table.Name)]; !ok {
+		panic(errors.New(fmt.Errorf("can't find shard rule for this table: %s", upd.Table.Name)))
+	}
+	plan.fullList = makeList(0, len(plan.rule.Nodes))
+	plan.ShardForWhere(upd.Where)
+	return
+}
+
 func GeneralShardList(r *router.Router, stmt Statement) ([]int, error) {
 	var plan *Plan
 	var err error
@@ -637,6 +659,8 @@ func GeneralShardList(r *router.Router, stmt Statement) ([]int, error) {
 		plan, err = GeneralPlanForSelect(r, s)
 	case *Insert:
 		plan, err = GeneralPlanForInsert(r, s)
+	case *Update:
+		plan, err = GeneralPlanForUpdate(r, s)
 	default:
 		return nil, errors.New2("can't shard for this type of sql")
 	}
@@ -649,6 +673,7 @@ func GeneralShardList(r *router.Router, stmt Statement) ([]int, error) {
 		if plan.ShardList == nil {
 			return nil, errors.New2("un expected plan's shard list is nil")
 		} else {
+			log.Debugf("get shard list: %v", plan.ShardList)
 			return plan.ShardList, nil
 		}
 	} else {
