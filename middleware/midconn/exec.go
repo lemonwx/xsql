@@ -35,8 +35,14 @@ func (conn *MidConn) handleUpdateForDelete(stmt *sqlparser.Delete) error {
 }
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
-	if err := conn.getNodeIdxs(stmt, nil); err != nil {
+	var err error
+
+	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
 		return nil, err
+	}
+
+	if len(conn.nodeIdx) == 0 {
+		return nil, nil
 	}
 
 	table := sqlparser.String(stmt.Table)

@@ -636,17 +636,16 @@ func GeneralPlanForInsert(r *router.Router, ist *Insert) (plan *Plan, err error)
 	return
 }
 
-func GeneralPlanForUpdate(r *router.Router, upd *Update) (plan *Plan, err error) {
+func GeneralPlanForWhere(r *router.Router, table string, where *Where) (plan *Plan, err error) {
 	defer handleError(&err)
 	plan = &Plan{}
 
-	log.Debug(plan, r.Rules)
 	var ok bool
-	if plan.rule, ok = r.Rules[string(upd.Table.Name)]; !ok {
-		panic(errors.New(fmt.Errorf("can't find shard rule for this table: %s", upd.Table.Name)))
+	if plan.rule, ok = r.Rules[table]; !ok {
+		panic(errors.New(fmt.Errorf("can't find shard rule for this table: %s", table)))
 	}
 	plan.fullList = makeList(0, len(plan.rule.Nodes))
-	plan.ShardForWhere(upd.Where)
+	plan.ShardForWhere(where)
 	return
 }
 
@@ -660,7 +659,9 @@ func GeneralShardList(r *router.Router, stmt Statement) ([]int, error) {
 	case *Insert:
 		plan, err = GeneralPlanForInsert(r, s)
 	case *Update:
-		plan, err = GeneralPlanForUpdate(r, s)
+		plan, err = GeneralPlanForWhere(r, string(s.Table.Name), s.Where)
+	case *Delete:
+		plan, err = GeneralPlanForWhere(r, string(s.Table.Name), s.Where)
 	default:
 		return nil, errors.New2("can't shard for this type of sql")
 	}
