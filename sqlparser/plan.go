@@ -20,6 +20,13 @@ import (
 
 var UNSUPPORTED_SHARD_ERR = errors.New(fmt.Errorf("unsupported shard for this sql"))
 
+const (
+	EID_NODE = iota
+	VALUE_NODE
+	LIST_NODE
+	OTHER_NODE
+)
+
 type Plan struct {
 	rule      *router.Rule
 	fullList  []int
@@ -68,6 +75,104 @@ func SliceIn(s1, s2 []int) bool {
 	}
 
 	return true
+}
+
+func makeList(start, end int) []int {
+	list := make([]int, end-start)
+	for i := start; i < end; i++ {
+		list[i-start] = i
+	}
+	return list
+}
+
+// l1 & l2
+func interList(l1 []int, l2 []int) []int {
+	if len(l1) == 0 || len(l2) == 0 {
+		return []int{}
+	}
+
+	l3 := make([]int, 0, len(l1)+len(l2))
+	var i = 0
+	var j = 0
+	for i < len(l1) && j < len(l2) {
+		if l1[i] == l2[j] {
+			l3 = append(l3, l1[i])
+			i++
+			j++
+		} else if l1[i] < l2[j] {
+			i++
+		} else {
+			j++
+		}
+	}
+
+	return l3
+}
+
+// l1 | l2
+func unionList(l1 []int, l2 []int) []int {
+	if len(l1) == 0 {
+		return l2
+	} else if len(l2) == 0 {
+		return l1
+	}
+
+	l3 := make([]int, 0, len(l1)+len(l2))
+
+	var i = 0
+	var j = 0
+	for i < len(l1) && j < len(l2) {
+		if l1[i] < l2[j] {
+			l3 = append(l3, l1[i])
+			i++
+		} else if l1[i] > l2[j] {
+			l3 = append(l3, l2[j])
+			j++
+		} else {
+			l3 = append(l3, l1[i])
+			i++
+			j++
+		}
+	}
+
+	if i != len(l1) {
+		l3 = append(l3, l1[i:]...)
+	} else if j != len(l2) {
+		l3 = append(l3, l2[j:]...)
+	}
+
+	return l3
+}
+
+// l1 - l2
+func differentList(l1 []int, l2 []int) []int {
+	if len(l1) == 0 {
+		return []int{}
+	} else if len(l2) == 0 {
+		return l1
+	}
+
+	l3 := make([]int, 0, len(l1))
+
+	var i = 0
+	var j = 0
+	for i < len(l1) && j < len(l2) {
+		if l1[i] < l2[j] {
+			l3 = append(l3, l1[i])
+			i++
+		} else if l1[i] > l2[j] {
+			j++
+		} else {
+			i++
+			j++
+		}
+	}
+
+	if i != len(l1) {
+		l3 = append(l3, l1[i:]...)
+	}
+
+	return l3
 }
 
 func (p *Plan) ShardForFrom(r *router.Router, preWhere *Where, froms ...TableExpr) (*Plan, error) {

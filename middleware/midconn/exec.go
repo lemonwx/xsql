@@ -11,28 +11,10 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/errors"
-	"github.com/lemonwx/xsql/middleware/meta"
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 )
-
-func (conn *MidConn) handleUpdateForDelete(stmt *sqlparser.Delete) error {
-
-	updateSql := fmt.Sprintf("update %s set version = %d %s", sqlparser.String(stmt.Table), conn.NextVersion, sqlparser.String(stmt.Where))
-	updateStmt, err := sqlparser.Parse(updateSql)
-
-	if err != nil {
-		return err
-	}
-
-	_, err = conn.handleUpdate(updateStmt.(*sqlparser.Update), updateSql)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
 	var err error
@@ -69,43 +51,6 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 
 	newSql := sqlparser.String(stmt)
 	return conn.ExecuteOnNodePool([]byte(newSql), conn.nodeIdx)
-}
-
-func (conn *MidConn) handleDelete1(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
-	var err error
-	if err = conn.getNodeIdxs(stmt, nil); err != nil {
-		return nil, err
-	} else if conn.nodeIdx == nil {
-		return nil, UNEXPECT_MIDDLE_WARE_ERR
-	}
-
-	/*
-		var tb string = sqlparser.String(stmt.Table)
-		var where string = sqlparser.String(stmt.Where)
-
-		if err = conn.handleSelectForUpdate(tb, where); err != nil {
-			return nil, err
-		}
-
-		if err = conn.getNextVersion(); err != nil {
-			return nil, err
-		}
-
-		updateSql := fmt.Sprintf("update %s set version = %d %s", tb, conn.NextVersion, where)
-		if _, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(updateSql), conn.nodeIdx); err != nil {
-			if err != nil {
-				log.Errorf("[%d] execute in multi node failed: %v", conn.ConnectionId, err)
-				return nil, err
-			}
-			log.Debugf("[%d] exec update in multi node finish", conn.ConnectionId)
-		}
-	*/
-	if err = conn.handleUpdateForDelete(stmt); err != nil {
-		return nil, err
-	}
-
-	log.Debugf("[%d] after convert sql: %s", conn.ConnectionId, sql)
-	return conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), conn.nodeIdx)
 }
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.Result, error) {
@@ -200,93 +145,6 @@ func (conn *MidConn) chkAndLockRows(table, where string) (bool, error) {
 	return false, nil
 }
 
-/*
-
-func (conn *MidConn) change2caseWhen(stmt *sqlparser.Update) error {
-
-	maxV := []byte("10000000000000")
-	for idx, expr := range stmt.Exprs {
-
-		// case when's cond
-		var cond sqlparser.BoolExpr
-
-		rCond := &sqlparser.ComparisonExpr{
-			Operator: "<",
-			Left: &sqlparser.ColName{
-				Name: []byte(extraColName),
-			},
-			Right: sqlparser.NumVal(maxV),
-		}
-
-		if len(conn.VersionsInUse) != 0 {
-			vs := make([]sqlparser.ValExpr, 0, len(conn.VersionsInUse))
-			for v, _ := range conn.VersionsInUse {
-				vs = append(vs, sqlparser.NumVal([]byte(fmt.Sprintf("%d", v))))
-			}
-			cond = &sqlparser.AndExpr{
-				Left: &sqlparser.ComparisonExpr{
-					Operator: "not in",
-					Left: &sqlparser.ColName{
-						Name: []byte(extraColName),
-					},
-					Right: sqlparser.ValTuple(vs),
-				},
-				Right: rCond,
-			}
-		} else {
-			cond = rCond
-		}
-
-		stmt.Exprs[idx].Expr = &sqlparser.CaseExpr{
-			Expr: nil,
-			Whens: []*sqlparser.When{
-				&sqlparser.When{
-					Cond: cond,
-					Val:  expr.Expr,
-				},
-			},
-			Else: expr.Name,
-		}
-	}
-
-	return nil
-}
-
-func (conn *MidConn) handleSelectForUpdate1(table, where string) error {
-	var err error
-
-	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
-
-	if err = conn.getVInUse(); err != nil {
-		return err
-	} else if conn.nodeIdx == nil {
-		return conn.cli.WriteOK(nil)
-	}
-
-	conn.setupNodeStatus(conn.VersionsInUse, true, false, 1)
-	defer conn.setupNodeStatus(nil, false, false, 0)
-
-	_, err = conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(selSql), conn.nodeIdx)
-	if err != nil {
-		log.Debugf("[%d] row data in use by another session, update failed: %v", conn.ConnectionId, err)
-		return err
-	}
-	log.Debugf("[%d] select for update success", conn.ConnectionId)
-	return nil
-}
-*/
-func (conn *MidConn) needGetNextV(nodeIdxs []int) bool {
-	// judge if this sql need to get next version or not
-	need := true
-
-	if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
-		conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT &&
-		len(nodeIdxs) == 1 {
-		need = false
-	}
-	return need
-}
-
 func (conn *MidConn) getNextVersion() error {
 	// get next version
 	var err error
@@ -346,13 +204,7 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]i
 		return err
 	}
 
-	r, err := meta.GetRouter(conn.db)
-	if err != nil {
-		log.Errorf("[%d] get router failed: %v", err)
-		return err
-	}
-
-	conn.nodeIdx, err = sqlparser.GetStmtShardListIndex(stmt, r, bindVars)
+	conn.nodeIdx, err = conn.getShardList(stmt)
 
 	if err != nil {
 		log.Debugf("[%d] get node idxs failed: %v", conn.ConnectionId, err)
