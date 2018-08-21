@@ -59,7 +59,7 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 	return conn.HandleSelRets([]*mysql.Result{ret})
 }
 
-func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, error) {
+func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysql.Result, error) {
 	if len(conn.nodeIdx) == 0 {
 		return nil, errors.New2("can't execute sql under empty node idxs")
 	}
@@ -70,7 +70,7 @@ func (conn *MidConn) executeSelect(sql string, extraSz int) ([]*mysql.Result, er
 	var vErr error
 	var vInUse map[uint64]uint8
 	go func() {
-		vInUse, vErr = conn.getCurVInUse()
+		vInUse, vErr = conn.getCurVInUse(flag)
 		wg.Done()
 	}()
 
@@ -118,7 +118,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 		return []*mysql.Result{ret}, nil
 	}
 
-	rets, err := conn.executeSelect(sqlparser.String(stmt), len(stmt.ExtraCols))
+	rets, err := conn.executeSelect(sqlparser.String(stmt), len(stmt.ExtraCols), SELECT)
 	return rets, err
 }
 

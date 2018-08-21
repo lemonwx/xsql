@@ -10,6 +10,8 @@ import (
 	"net/rpc"
 	"rpcpool"
 	"sync"
+
+	"github.com/lemonwx/VSequence/base"
 )
 
 const (
@@ -87,4 +89,19 @@ func VersionsInUse() (map[uint64]uint8, error) {
 		return nil, err
 	}
 	return vInuse, nil
+}
+
+func InUseAndNext() (*base.UseAndNext, error) {
+	cli, err := pool.Get()
+	if err != nil {
+		return nil, GET_VERSION_CONN_FAILED
+	}
+	defer pool.Put(cli)
+
+	useAndNext := base.UseAndNext{}
+	err = cli.Call("VSeq.InUseAndNext", uint8(0), &useAndNext)
+	if err != nil {
+		return nil, err
+	}
+	return &useAndNext, nil
 }

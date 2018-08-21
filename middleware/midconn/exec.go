@@ -108,10 +108,6 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 		return nil, nil
 	}
 
-	if err := conn.getNextVersion(); err != nil {
-		return nil, err
-	}
-
 	table := sqlparser.String(stmt.Table)
 	where := sqlparser.String(stmt.Where)
 	beContinue, err := conn.chkAndLockRows(table, where)
@@ -123,6 +119,10 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 		return nil, nil
 	}
 
+	if err := conn.getNextVersion(); err != nil {
+		return nil, err
+	}
+
 	stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
 	newSql := sqlparser.String(stmt)
 	log.Debugf("[%d] sql after convert: %s", conn.ConnectionId, newSql)
@@ -132,7 +132,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 
 func (conn *MidConn) chkAndLockRows(table, where string) (bool, error) {
 	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
-	rets, err := conn.executeSelect(selSql, 1)
+	rets, err := conn.executeSelect(selSql, 1, UPDATE_OR_DELETE)
 	if err != nil {
 		return false, err
 	}
@@ -162,17 +162,30 @@ func (conn *MidConn) getNextVersion() error {
 	return nil
 }
 
-func (conn *MidConn) getCurVInUse() (map[uint64]uint8, error) {
-	vs, err := version.VersionsInUse()
-	if err != nil {
-		return nil, err
+func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]uint8, error) {
+	var err error
+	var ret map[uint64]uint8
+
+	if flag == UPDATE_OR_DELETE && conn.NextVersion == 0 {
+		log.Debugf("[%d] chk v in use for update, get next version at the same time", conn.ConnectionId)
+		base, err := version.InUseAndNext()
+		if err != nil {
+			return nil, err
+		}
+		conn.NextVersion = base.Next
+		ret = conn.VersionsInUse
+	} else {
+		ret, err = version.VersionsInUse()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if _, ok := vs[conn.NextVersion]; ok {
-		delete(vs, conn.NextVersion)
+	if _, ok := ret[conn.NextVersion]; ok {
+		delete(ret, conn.NextVersion)
 	}
 
-	return vs, nil
+	return ret, nil
 }
 
 func (conn *MidConn) getVInUse() error {
