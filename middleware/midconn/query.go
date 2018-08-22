@@ -107,8 +107,8 @@ func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysq
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
 	var err error
 	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
-		log.Errorf("[%d] get shard list faild:%v", conn.ConnectionId, err)
-		return nil, err
+		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
+		return nil, conn.NewMySQLErr(ERR_UNSUPPORTED_SHARD)
 	}
 
 	if len(conn.nodeIdx) == 0 {

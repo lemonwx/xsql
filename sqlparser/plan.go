@@ -18,7 +18,7 @@ import (
 	"github.com/lemonwx/xsql/middleware/router"
 )
 
-var UNSUPPORTED_SHARD_ERR = errors.New(fmt.Errorf("unsupported shard for this sql"))
+var UNSUPPORTED_SHARD_ERR = fmt.Errorf("unsupported shard for this sql")
 
 const (
 	EID_NODE = iota
@@ -221,7 +221,7 @@ func (p *Plan) ShardForFrom(r *router.Router, preWhere *Where, froms ...TableExp
 			rr := pr.rule
 
 			if !lr.Equal(rr) {
-				panic(UNSUPPORTED_SHARD_ERR)
+				panic(errors.New(UNSUPPORTED_SHARD_ERR))
 			}
 
 			log.Debugf("lr equal rr: %v == %v", lr, rr)
@@ -291,8 +291,9 @@ func (p *Plan) ShardForFrom(r *router.Router, preWhere *Where, froms ...TableExp
 								panic(UNSUPPORTED_SHARD_ERR)
 							}
 						} else {
-							log.Debug("join table expr's where: [%v] is compare(\"=\") but not [ l == r == EID_NODE ], and can't by on", preWhere)
-							panic(UNSUPPORTED_SHARD_ERR)
+							log.Debugf("join table expr's where: [%s] is compare(\"=\") but not [ l == r == EID_NODE ], and can't shard by on",
+								String(preWhere))
+							panic(errors.New(UNSUPPORTED_SHARD_ERR))
 						}
 					} else {
 						log.Debug("join table expr's where: [%v] is not compare(\"=\"), and can't by on", preWhere)

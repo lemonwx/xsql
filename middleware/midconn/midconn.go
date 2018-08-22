@@ -405,7 +405,7 @@ func (conn *MidConn) Close() {
 	conn.clearExecNodes([]byte("rollback"))
 }
 
-func (c *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset {
+func (conn *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset {
 	r := new(mysql.Resultset)
 	r.Fields = make([]*mysql.Field, len(stmt.SelectExprs))
 
@@ -445,7 +445,6 @@ func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
 	} else {
 		return sqlparser.GeneralShardList(r, stmt)
 	}
-
 }
 
 func (conn *MidConn) getMultiBackConn(idxs []int) error {
@@ -476,4 +475,8 @@ func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
 
 	conn.execNodes[idx] = back
 	return back, nil
+}
+
+func (conn *MidConn) NewMySQLErr(errCode uint16) *mysql.SqlError {
+	return mysql.NewError(errCode, MySQLErrName[errCode])
 }
