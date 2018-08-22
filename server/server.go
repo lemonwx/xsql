@@ -11,12 +11,16 @@ import (
 
 	"time"
 
+	"encoding/json"
+	"io/ioutil"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
-	"github.com/lemonwx/xsql/middleware/meta"
+	"github.com/lemonwx/xsql/errors"
+	"github.com/lemonwx/xsql/meta"
 	"github.com/lemonwx/xsql/middleware/midconn"
-	"github.com/lemonwx/xsql/middleware/router"
 	"github.com/lemonwx/xsql/node"
+	"github.com/lemonwx/xsql/router"
 )
 
 type Server struct {
@@ -27,19 +31,25 @@ type Server struct {
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {
+	var err error
+
 	s := new(Server)
 	s.cfg = cfg
 	s.addr = cfg.Addr
-	s.parseSchemas(cfg)
-	s.newBackendPool(cfg)
 
-	lis, err := net.Listen("tcp", s.addr)
-	if err != nil {
+	if err = s.parseSchemas(cfg); err != nil {
 		return nil, err
 	}
-	s.lis = lis
 
-	go s.dumpPoolsInfo()
+	if err = s.newBackendPool(cfg); err != nil {
+		return nil, err
+	}
+
+	if s.lis, err = net.Listen("tcp", s.addr); err != nil {
+		return nil, err
+	}
+
+	//go s.dumpPoolsInfo()
 
 	return s, nil
 }
@@ -74,190 +84,41 @@ func (s *Server) ServeConn(conn net.Conn) {
 }
 
 func (s *Server) parseSchemas(cfg *config.Conf) error {
-
-	fullNodeIdx := make([]int, 0, len(cfg.Nodes))
-	nodeAddrs := make([]*config.Node, 0, len(cfg.Nodes))
-	for idx, node := range cfg.Nodes {
-		fullNodeIdx = append(fullNodeIdx, idx)
-		nodeAddrs = append(nodeAddrs, node)
+	data, err := ioutil.ReadFile(cfg.Meta)
+	if err != nil {
+		return err
 	}
 
-	rs := make(map[string]*router.Router)
-	rs["db"] = &router.Router{
-		DB: "db",
-		Rules: map[string]*router.Rule{
-			"tb": &router.Rule{
-				DB:    "db",
-				Table: "tb",
-				Key:   "id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"tt": &router.Rule{
-				DB:    "db",
-				Table: "tt",
-				Key:   "id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"ttt": &router.Rule{
-				DB:    "db",
-				Table: "ttt",
-				Key:   "id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-		},
-		DefaultRule: router.NewDefaultRule("db", ""),
+	m := &meta.Meta{}
+	if err = json.Unmarshal(data, &m.Routers); err != nil {
+		return err
 	}
 
-	rs["sbtest"] = &router.Router{
-		DB: "sbtest",
-		Rules: map[string]*router.Rule{
-			"sbtest1": &router.Rule{
-				DB:    "sbtest",
-				Table: "sbtest1",
-				Key:   "id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
+	for db, r := range m.Routers {
+		log.Debug(r.Rules)
+		for tb, rule := range r.Rules {
+			rule.DB = db
+			rule.Table = tb
 
-			"sbtest2": &router.Rule{
-				DB:    "sbtest",
-				Table: "sbtest2",
-				Key:   "id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-		},
-		DefaultRule: router.NewDefaultRule("db", ""),
-	}
-
-	rs["tpccmysql"] = &router.Router{
-		DB: "tpccmysql",
-		Rules: map[string]*router.Rule{
-			"item": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "item",
-				Key:   "i_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"warehouse": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "warehouse",
-				Key:   "w_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"stock": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "stock",
-				Key:   "s_i_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"district": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "district",
-				Key:   "d_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"customer": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "customer",
-				Key:   "c_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"history": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "history",
-				Key:   "h_c_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"new_orders": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "new_orders",
-				Key:   "no_o_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"order_line": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "order_line",
-				Key:   "ol_o_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-			"orders": &router.Rule{
-				DB:    "tpccmysql",
-				Table: "orders",
-				Key:   "o_id",
-				Type:  "hash",
-				Nodes: []string{"1", "2"},
-				Shard: &router.HashShard{2},
-			},
-		},
-	}
-
-	meta.SetMetas(&meta.Meta{
-		NodeAddrs:    nodeAddrs,
-		FullNodeIdxs: fullNodeIdx,
-		Routers:      rs,
-	})
-
-	/*
-
-		for _, schemaCfg := range s.cfg.Schemas {
-			if _, ok := s.schemas[schemaCfg.DB]; ok {
-				return fmt.Errorf("duplicate schema [%s].", schemaCfg.DB)
-			}
-			if len(schemaCfg.Nodes) == 0 {
-				return fmt.Errorf("schema [%s] must have a node.", schemaCfg.DB)
+			switch rule.Type {
+			case "hash":
+				rule.Shard = &router.HashShard{len(rule.Nodes)}
+			default:
+				return errors.New2("unsupported shard type: " + rule.Type)
 			}
 
-			nodes := make(map[string]*Node)
-			for _, n := range schemaCfg.Nodes {
-				if s.getNode(n) == nil {
-					return fmt.Errorf("schema [%s] node [%s] config is not exists.", schemaCfg.DB, n)
-				}
-
-				if _, ok := nodes[n]; ok {
-					return fmt.Errorf("schema [%s] node [%s] duplicate.", schemaCfg.DB, n)
-				}
-
-				nodes[n] = s.getNode(n)
-			}
-
-			rule, err := router.NewRouter(&schemaCfg)
-			if err != nil {
-				return err
-			}
-
-			s.schemas[schemaCfg.DB] = &Schema{
-				db:    schemaCfg.DB,
-				nodes: nodes,
-				rule:  rule,
-			}
+			r.Rules[tb] = rule
 		}
-	*/
 
+		m.Routers[db] = r
+	}
+
+	m.FullNodeIdxs = make([]int, len(cfg.Nodes))
+	for idx, _ := range cfg.Nodes {
+		m.FullNodeIdxs[idx] = idx
+	}
+	m.FullNodeIdxs = []int{0, 1}
+	meta.SetMetas(m)
 	return nil
 }
 

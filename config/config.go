@@ -43,6 +43,8 @@ type Conf struct {
 	BackMaxIdleSize uint32 `yaml:"BackMaxIdleSize"`
 	BackMaxSize     uint32 `yaml:"BackMaxSize"`
 
+	Meta string `yaml:"Meta"`
+
 	VerSeqAddr string  `yaml:"VerSeqAddr"`
 	MaxSize    int     `yaml:"MaxSize"`
 	InitSize   int     `yaml:"InitSize"`

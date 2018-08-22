@@ -1,0 +1,48 @@
+{
+  "db":{
+    "Rules": {
+      "tb": {
+        "Key": "id",
+        "Type": "hash",
+        "KeyType": "int",
+        "Nodes": [
+          "0",
+          "1"
+        ]
+      },
+      "tt": {
+        "Key": "id",
+        "Type": "hash",
+        "KeyType": "int",
+        "Nodes": [
+          "0",
+          "1"
+        ]
+      }
+    }
+  },
+
+
+  "sbtest": {
+    "Rules": {
+      "sbtest1": {
+        "Key": "id",
+        "Type": "hash",
+        "KeyType": "int",
+        "Nodes": [
+          "0",
+          "1"
+        ]
+      },
+      "sbtest2": {
+        "Key": "id",
+        "Type": "hash",
+        "KeyType": "int",
+        "Nodes": [
+          "0",
+          "1"
+        ]
+      }
+    }
+  }
+}
