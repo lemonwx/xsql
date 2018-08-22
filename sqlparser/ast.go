@@ -12,6 +12,12 @@ import (
 	"github.com/lemonwx/xsql/sqltypes"
 )
 
+func handleError(err *error) {
+	if x := recover(); x != nil {
+		*err = x.(error)
+	}
+}
+
 // Instructions for creating new types: If a type
 // needs to satisfy an interface, declare that function
 // along with that interface. This will help users

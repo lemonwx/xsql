@@ -6,11 +6,12 @@
 package midconn
 
 import (
+	"strings"
+
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/meta"
+	"github.com/lemonwx/xsql/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
-	"strings"
 )
 
 func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {

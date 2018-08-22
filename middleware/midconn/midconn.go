@@ -18,9 +18,10 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/config"
-	"github.com/lemonwx/xsql/middleware/meta"
+	"github.com/lemonwx/xsql/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
+	"github.com/lemonwx/xsql/router"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -443,7 +444,7 @@ func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
 		log.Errorf("[%d] get router failed: %v", conn.ConnectionId, err)
 		return nil, err
 	} else {
-		return sqlparser.GeneralShardList(r, stmt)
+		return router.GeneralShardList(r, stmt)
 	}
 }
 

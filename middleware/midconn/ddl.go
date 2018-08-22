@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/meta"
+	"github.com/lemonwx/xsql/meta"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 

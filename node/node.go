@@ -63,6 +63,7 @@ func (node *Node) Connect() error {
 	conn, err := net.Dial("tcp", node.addr)
 	if err != nil {
 		log.Errorf("dial to backend mysqld [%v] failed %v", node, err)
+		return err
 	}
 
 	tcpConn := conn.(*net.TCPConn)
