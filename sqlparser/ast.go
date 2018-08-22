@@ -241,9 +241,11 @@ func (node *Set) Format(buf *TrackedBuffer) {
 // Table is set for AST_ALTER, AST_DROP, AST_RENAME.
 // NewName is set for AST_ALTER, AST_CREATE, AST_RENAME.
 type DDL struct {
-	Action  string
-	Table   []byte
-	NewName []byte
+	Action    string
+	Type      int
+	Table     []byte
+	NewName   []byte
+	TableName *TableName
 }
 
 const (

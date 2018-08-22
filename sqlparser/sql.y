@@ -213,7 +213,7 @@ select_statement:
 insert_statement:
   INSERT comment_opt INTO dml_table_expression column_list_opt row_list on_dup_opt
   {
-    $$ = &Insert{Comments: Comments($2), Table: $4, Columns: $5, Rows: $6, OnDup: OnDup($7)}
+    $$ = &Insert{Comments: Comments($2), Table: $4, Columns: $5, Rows: NewIstRows($6), OnDup: OnDup($7)}
   }
 | INSERT comment_opt INTO dml_table_expression SET update_list on_dup_opt
   {
@@ -325,11 +325,11 @@ show_statement:
 create_statement:
   CREATE DATABASE not_exists_opt ID force_eof
   {
-    $$ = &DDL{Action: AST_CREATE, NewName: $4}
+    $$ = &DDL{Action: AST_CREATE, NewName: $4, Type: DATABASE}
   }
-| CREATE TABLE not_exists_opt ID force_eof
+| CREATE TABLE not_exists_opt dml_table_expression '(' force_eof
   {
-    $$ = &DDL{Action: AST_CREATE, NewName: $4}
+    $$ = &DDL{Action: AST_CREATE, TableName: $4, Type: TABLE}
   }
 | CREATE constraint_opt INDEX sql_id using_opt ON ID force_eof
   {
