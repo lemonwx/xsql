@@ -14,33 +14,39 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/errors"
+	"github.com/lemonwx/xsql/meta"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
 func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
-	// show only send to one node
-	back, err := conn.pools[0].GetConn(conn.db)
-	if err != nil {
-		return err
-	}
-	defer conn.pools[0].PutConn(back)
+	defer conn.clearExecNodes([]byte("rollback"))
 
-	ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
-	if err != nil {
+	if err := conn.getMultiBackConn(meta.GetFullNodeIdxs()); err != nil {
 		return err
 	}
-	return conn.HandleSelRets([]*mysql.Result{ret})
-	/*
-		rets, err := conn.ExecuteMultiNode(mysql.COM_QUERY, []byte(sql), []int{0})
+
+	var rets []*mysql.Result
+	for _, back := range conn.execNodes {
+		ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
 		if err != nil {
-			log.Errorf("execute in multi node failed: %v", err)
 			return err
 		}
 
-		return conn.HandleSelRets(rets)
-	*/
+		ret.Fields = append(ret.Fields, &mysql.Field{Name: []byte("node")})
+		val := back.String()
+		col := make([]byte, len(val)+1)
+		col[0] = byte(len(val))
+		copy(col[1:], val)
 
+		for idx, _ := range ret.RowDatas {
+			ret.RowDatas[idx] = append(ret.RowDatas[idx], col...)
+		}
+
+		rets = append(rets, ret)
+	}
+
+	return conn.HandleSelRets(rets)
 }
 
 func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string) error {
