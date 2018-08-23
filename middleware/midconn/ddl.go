@@ -15,7 +15,7 @@ import (
 
 func (conn *MidConn) handleDDL(stmt *sqlparser.DDL, sql string) error {
 	// ddl send to all nodes
-	log.Debugf("[%d]: recv ddl sql: %s: %v", conn.ConnectionId, sql, stmt)
+	log.Debugf("[%d]: recv ddl sql: %s", conn.ConnectionId, sql)
 	sql = conn.addExtraCol(sql)
 
 	defer func() {
@@ -30,22 +30,6 @@ func (conn *MidConn) handleDDL(stmt *sqlparser.DDL, sql string) error {
 	rs, err := conn.ExecuteOnNodePool([]byte(sql), meta.GetFullNodeIdxs())
 	if err != nil {
 		return err
-	}
-
-	if stmt.Action == sqlparser.AST_CREATE {
-		if stmt.Type == sqlparser.DATABASE {
-			meta.AddDatabase(string(stmt.NewName))
-		}
-
-		if stmt.Type == sqlparser.TABLE {
-			db := conn.db
-			tb := string(stmt.TableName.Name)
-
-			if stmt.TableName.Qualifier != nil {
-				db = string(stmt.TableName.Qualifier)
-			}
-			meta.AddTable(db, tb)
-		}
 	}
 
 	return conn.HandleExecRets(rs)
