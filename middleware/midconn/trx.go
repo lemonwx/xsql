@@ -21,6 +21,8 @@ import (
 
 	"sync"
 
+	"time"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
@@ -87,23 +89,25 @@ func (conn *MidConn) handleCommit(sql string) error {
 	}
 
 	if commit {
-		log.Debugf("[%d] need exec: %s", conn.ConnectionId, sql)
 
+		if err := conn.clearExecNodes([]byte(sql)); err != nil {
+			// roll back with binlog
+			return err
+		}
+
+		log.Debugf("[%d] need exec: %s", conn.ConnectionId, sql)
 		if conn.NextVersion != 0 {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
-			err := version.ReleaseVersion(conn.NextVersion)
-			if err != nil {
-				log.Errorf("[%d] release version failed: %v", conn.ConnectionId, err)
-				return mysql.NewDefaultError(mysql.MID_ER_RELEASE_VERSION_FAILED)
+			for {
+				// retry until release success, then response to client
+				if err := version.ReleaseVersion(conn.NextVersion); err == nil {
+					break
+				}
+				time.Sleep(time.Second * 3)
 			}
 		}
+
 		conn.NextVersion = 0
-		conn.VersionsInUse = nil
-
-		if commitErr := conn.clearExecNodes([]byte(sql)); commitErr != nil {
-			return mysql.NewDefaultError(mysql.MID_ER_EXEC_COMMIT_ROLLBACK_FAILED)
-		}
-
 		conn.status[0] = conn.defaultStatus
 		conn.status[1] = conn.defaultStatus
 	}
@@ -119,6 +123,7 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 				delete(conn.execNodes, nodeIdx)
 				return err
 			}
+
 			conn.pools[nodeIdx].PutConn(back)
 			delete(conn.execNodes, nodeIdx)
 		}
