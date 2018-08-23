@@ -34,7 +34,9 @@ const (
 )
 
 const (
-	ERR_UNSUPPORTED_SHARD = 10001
+	ERR_UNSUPPORTED_SHARD     = 10001
+	ERR_UNSUPPORTED_MULTI_SET = 10002
+
 	ERR_SHARD_PANIC
 	ROWS_IN_USE_BY_OTHER_SESSION
 	SQL_ONLY_SUCCESS_IN_PARTLY_OF_NODE
@@ -42,5 +44,6 @@ const (
 )
 
 var MySQLErrName = map[uint16]string{
-	ERR_UNSUPPORTED_SHARD: "unsupported shard for this sql",
+	ERR_UNSUPPORTED_SHARD:     "unsupported shard for this sql",
+	ERR_UNSUPPORTED_MULTI_SET: "unsupported multi set",
 }
