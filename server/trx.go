@@ -63,9 +63,10 @@ func (conn *MidConn) handleBegin(isBegin bool) {
 			conn.handleTrxFinish("commit")
 		}
 		conn.status = mysql.SERVER_STATUS_IN_TRANS
-	} else {
-		conn.status = mysql.SERVER_STATUS_IN_TRANS
 	}
+	/* else {
+		conn.status = mysql.SERVER_STATUS_AUTOCOMMIT
+	} */
 }
 
 func (conn *MidConn) handleTrxFinish(sql string) error {
@@ -74,7 +75,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 	commit := false
 
 	switch {
-	case conn.status == mysql.SERVER_STATUS_IN_TRANS:
+	case conn.status == mysql.SERVER_STATUS_AUTOCOMMIT:
 		commit = true
 		sql = "commit"
 	case sql == "commit":
