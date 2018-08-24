@@ -14,20 +14,27 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	"sync"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/errors"
 	"github.com/lemonwx/xsql/meta"
-	"github.com/lemonwx/xsql/middleware/midconn"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/router"
 )
+
+type conns struct {
+	midConns map[string]*MidConn // key is client's addr
+	sync.Mutex
+}
 
 type Server struct {
 	lis   net.Listener
 	addr  string
 	cfg   *config.Conf
 	pools map[int]*node.Pool
+	cos   *conns
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {
@@ -36,6 +43,9 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 	s := new(Server)
 	s.cfg = cfg
 	s.addr = cfg.Addr
+	s.cos = &conns{
+		midConns: map[string]*MidConn{},
+	}
 
 	if err = s.parseSchemas(cfg); err != nil {
 		return nil, err
@@ -62,7 +72,24 @@ func (s *Server) Run() error {
 			fmt.Println("xsql server accept failed")
 		}
 
-		go s.ServeConn(conn)
+		//go s.ServeConn(conn)
+
+		midConn, err := NewMidConn(conn, s.cfg, s.pools)
+		if err != nil {
+			log.Errorf("new mid conn failed: %v", err)
+		}
+
+		go func() {
+			midConn.Serve()
+			midConn.Close()
+			s.cos.Lock()
+			delete(s.cos.midConns, midConn.RemoteAddr)
+			s.cos.Unlock()
+
+		}()
+
+		s.cos.midConns[midConn.RemoteAddr] = midConn
+
 	}
 	return nil
 }
@@ -70,7 +97,7 @@ func (s *Server) Run() error {
 // serve for mysql client conn(get by lis.Accept)
 func (s *Server) ServeConn(conn net.Conn) {
 	// init and connect with back mysql server
-	if midConn, err := midconn.NewMidConn(conn, s.cfg, s.pools); err != nil {
+	if midConn, err := NewMidConn(conn, s.cfg, s.pools); err != nil {
 		log.Errorf("new mid conn failed: %v", err)
 		return
 	} else {

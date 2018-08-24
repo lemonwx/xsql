@@ -3,7 +3,7 @@
  *  data  : 18-3-24 下午4:35
  */
 
-package midconn
+package server
 
 import (
 	"bytes"
@@ -33,7 +33,7 @@ type MidConn struct {
 	db            string
 	closed        bool
 	ConnectionId  uint32
-	RemoteAddr    net.Addr
+	RemoteAddr    string
 	status        uint16
 	defaultStatus uint16
 
@@ -109,7 +109,7 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool) (*Mid
 	midConn.pools = pools
 	midConn.execNodes = make(map[int]*node.Node)
 	midConn.closed = false
-	midConn.RemoteAddr = conn.RemoteAddr()
+	midConn.RemoteAddr = conn.RemoteAddr().String()
 	midConn.defaultStatus = mysql.SERVER_STATUS_AUTOCOMMIT
 	midConn.status = midConn.defaultStatus
 

@@ -3,7 +3,7 @@
  *  data  : 18-4-6 下午6:27
  */
 
-package midconn
+package server
 
 import (
 	"errors"

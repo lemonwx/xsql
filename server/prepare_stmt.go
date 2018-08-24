@@ -3,10 +3,11 @@
  *  data  : 18-5-6 下午8:56
  */
 
-package midconn
+package server
 
 import (
 	"fmt"
+
 	"github.com/lemonwx/xsql/sqlparser"
 )
 

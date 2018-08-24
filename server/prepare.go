@@ -3,7 +3,7 @@
  *  data  : 18-4-24 下午9:57
  */
 
-package midconn
+package server
 
 import (
 	"encoding/binary"

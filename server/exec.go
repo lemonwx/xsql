@@ -3,7 +3,7 @@
  *  data  : 18-4-9 下午12:45
  */
 
-package midconn
+package server
 
 import (
 	"fmt"
@@ -11,8 +11,8 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/errors"
-	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
+	"github.com/lemonwx/xsql/server/version"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 

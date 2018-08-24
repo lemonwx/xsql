@@ -6,8 +6,8 @@ import (
 
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
-	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/server"
+	"github.com/lemonwx/xsql/server/version"
 )
 
 var cfg *config.Conf

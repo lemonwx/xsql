@@ -3,7 +3,7 @@
  *  data  : 18-8-8 下午9:10
  */
 
-package midconn
+package server
 
 import (
 	"database/sql"

@@ -10,7 +10,7 @@
 // 		proxy default is autocommit,
 // 			[[[ --- for mysqld used to --- ]]]
 
-package midconn
+package server
 
 import (
 	"fmt"
@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"github.com/lemonwx/log"
-	"github.com/lemonwx/xsql/middleware/version"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
+	"github.com/lemonwx/xsql/server/version"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
