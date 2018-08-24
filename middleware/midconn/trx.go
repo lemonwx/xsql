@@ -89,13 +89,22 @@ func (conn *MidConn) handleCommit(sql string) error {
 	}
 
 	if commit {
-
-		if err := conn.clearExecNodes([]byte(sql)); err != nil {
-			// roll back with binlog
-			return err
+		reset := func() {
+			conn.NextVersion = 0
+			conn.status[0] = conn.defaultStatus
+			conn.status[1] = conn.defaultStatus
 		}
 
 		log.Debugf("[%d] need exec: %s", conn.ConnectionId, sql)
+		if err := conn.clearExecNodes([]byte(sql)); err != nil {
+			/*
+				roll back with binlog, release conn.NextVersion when finish
+			*/
+			log.Errorf("[%d] clear exec nodes failed:%v", conn.ConnectionId, err)
+			reset()
+			return err
+		}
+
 		if conn.NextVersion != 0 {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
 			for {
@@ -107,9 +116,7 @@ func (conn *MidConn) handleCommit(sql string) error {
 			}
 		}
 
-		conn.NextVersion = 0
-		conn.status[0] = conn.defaultStatus
-		conn.status[1] = conn.defaultStatus
+		reset()
 	}
 	return nil
 }
@@ -129,16 +136,17 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 		}
 		return nil
 	} else {
-		var retErr error
+		retErrs := make([]error, len(conn.execNodes))
 		var wg sync.WaitGroup
 		wg.Add(len(conn.execNodes))
 
 		for nodeIdx, back := range conn.execNodes {
 			go func(idx int, backNode *node.Node) {
-				_, retErr = backNode.Execute(mysql.COM_QUERY, sql)
+				_, retErr := backNode.Execute(mysql.COM_QUERY, sql)
 				if retErr != nil {
 					backNode.Close()
 				}
+				retErrs[idx] = retErr
 				conn.pools[idx].PutConn(backNode)
 				wg.Done()
 			}(nodeIdx, back)
@@ -146,7 +154,12 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 		}
 		wg.Wait()
 
-		return retErr
+		for _, retErr := range retErrs {
+			if err, ok := retErr.(error); ok {
+				return err
+			}
+		}
+		return nil
 	}
 }
 
@@ -192,8 +205,14 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 		execErr = mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
 	}
 
-	handleCommitErr = conn.handleCommit("")
+	if execErr != nil {
+		// exec error, rollback then response
+		conn.handleCommit("rollback")
+		conn.status[0], conn.status[1] = conn.defaultStatus, conn.defaultStatus
+		return execErr
+	}
 
+	handleCommitErr = conn.handleCommit("")
 	err := conn.myHandleErr(execErr, handleCommitErr)
 	if err != nil {
 		return err
