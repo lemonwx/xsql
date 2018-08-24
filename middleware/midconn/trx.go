@@ -33,7 +33,7 @@ import (
 func (conn *MidConn) handleServerNotServe(data []byte) {
 	log.Debugf("[%d] midconn is under not serve status, and recv is %s", conn.ConnectionId, string(data[1:]))
 	if utils.StringIn(strings.ToLower(hack.String(data[1:])), "rollback", "commit") {
-		err := conn.handleCommit(hack.String(data[1:]))
+		err := conn.handleTrxFinish(hack.String(data[1:]))
 		if err != nil {
 			log.Errorf("[%d] handle commit faild: %v", conn.ConnectionId, err)
 			if err := conn.cli.WriteError(err); err != nil {
@@ -60,7 +60,7 @@ func (conn *MidConn) handleBegin(isBegin bool) {
 		// 显式 begin / start transaction
 		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
 			// current is in trx, so need commit first
-			conn.handleCommit("commit")
+			conn.handleTrxFinish("commit")
 		}
 		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
 	} else {
@@ -70,7 +70,7 @@ func (conn *MidConn) handleBegin(isBegin bool) {
 	}
 }
 
-func (conn *MidConn) handleCommit(sql string) error {
+func (conn *MidConn) handleTrxFinish(sql string) error {
 	log.Debugf("[%d] mid conn's status: %v", conn.ConnectionId, conn.status)
 
 	commit := false
@@ -176,7 +176,7 @@ func (conn *MidConn) handleStmtTrx(data []byte) error {
 		return err
 	}
 
-	return conn.handleCommit("")
+	return conn.handleTrxFinish("")
 }
 
 func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
@@ -207,12 +207,12 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 
 	if execErr != nil {
 		// exec error, rollback then response
-		conn.handleCommit("rollback")
+		conn.handleTrxFinish("rollback")
 		conn.status[0], conn.status[1] = conn.defaultStatus, conn.defaultStatus
 		return execErr
 	}
 
-	handleCommitErr = conn.handleCommit("")
+	handleCommitErr = conn.handleTrxFinish("")
 	err := conn.myHandleErr(execErr, handleCommitErr)
 	if err != nil {
 		return err

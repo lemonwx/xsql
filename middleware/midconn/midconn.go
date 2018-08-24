@@ -177,7 +177,7 @@ func (conn *MidConn) handleQuery(sql string) error {
 		conn.handleBegin(true)
 		return conn.cli.WriteOK(nil)
 	case *sqlparser.Commit, *sqlparser.Rollback:
-		err = conn.handleCommit(sqlparser.String(v))
+		err = conn.handleTrxFinish(sqlparser.String(v))
 		if err != nil {
 			if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
 				conn.status[0] = mysql.SERVER_NOT_SERVE
