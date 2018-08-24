@@ -46,9 +46,10 @@ type MidConn struct {
 
 	pools     map[int]*node.Pool
 	execNodes map[int]*node.Node
+	svr       *Server
 }
 
-func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool) (*MidConn, error) {
+func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool, s *Server) (*MidConn, error) {
 
 	var err error
 	midConn := new(MidConn)
@@ -117,6 +118,7 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool) (*Mid
 	midConn.NextVersion = 0
 
 	midConn.stmts = make(map[uint32]*Stmt)
+	midConn.svr = s
 
 	return midConn, nil
 }
@@ -189,7 +191,8 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Select, *sqlparser.Insert, *sqlparser.Update, *sqlparser.Delete:
 		log.Debugf("[%d] sql:[%s] need to execute in trx", conn.ConnectionId, sql)
 		return conn.handleTrx(stmt, sql)
-
+	case *sqlparser.Admin:
+		return conn.handleAdmin(v, sql)
 	default:
 		return errors.New("not support this sql")
 	}

@@ -26,7 +26,7 @@ import (
 
 type conns struct {
 	midConns map[string]*MidConn // key is client's addr
-	sync.Mutex
+	sync.RWMutex
 }
 
 type Server struct {
@@ -74,7 +74,7 @@ func (s *Server) Run() error {
 
 		//go s.ServeConn(conn)
 
-		midConn, err := NewMidConn(conn, s.cfg, s.pools)
+		midConn, err := NewMidConn(conn, s.cfg, s.pools, s)
 		if err != nil {
 			log.Errorf("new mid conn failed: %v", err)
 		}
@@ -97,7 +97,7 @@ func (s *Server) Run() error {
 // serve for mysql client conn(get by lis.Accept)
 func (s *Server) ServeConn(conn net.Conn) {
 	// init and connect with back mysql server
-	if midConn, err := NewMidConn(conn, s.cfg, s.pools); err != nil {
+	if midConn, err := NewMidConn(conn, s.cfg, s.pools, s); err != nil {
 		log.Errorf("new mid conn failed: %v", err)
 		return
 	} else {
