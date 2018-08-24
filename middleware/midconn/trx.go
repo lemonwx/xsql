@@ -58,15 +58,13 @@ func (conn *MidConn) handleServerNotServe(data []byte) {
 func (conn *MidConn) handleBegin(isBegin bool) {
 	if isBegin {
 		// 显式 begin / start transaction
-		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
-			// current is in trx, so need commit first
+		if conn.status == mysql.SERVER_STATUS_IN_TRANS {
+			// current is in trx, so need rollback first
 			conn.handleTrxFinish("commit")
 		}
-		conn.status = []uint16{mysql.SERVER_STATUS_IN_TRANS, ^mysql.SERVER_STATUS_AUTOCOMMIT}
+		conn.status = mysql.SERVER_STATUS_IN_TRANS
 	} else {
-		if conn.status[0] == conn.defaultStatus {
-			conn.status[0] = mysql.SERVER_STATUS_IN_TRANS
-		}
+		conn.status = mysql.SERVER_STATUS_IN_TRANS
 	}
 }
 
@@ -76,8 +74,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 	commit := false
 
 	switch {
-	case conn.status[0] == mysql.SERVER_STATUS_IN_TRANS &&
-		conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT:
+	case conn.status == mysql.SERVER_STATUS_IN_TRANS:
 		commit = true
 		sql = "commit"
 	case sql == "commit":
@@ -91,8 +88,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 	if commit {
 		reset := func() {
 			conn.NextVersion = 0
-			conn.status[0] = conn.defaultStatus
-			conn.status[1] = conn.defaultStatus
+			conn.status = conn.defaultStatus
 		}
 
 		log.Debugf("[%d] need exec: %s", conn.ConnectionId, sql)
@@ -169,10 +165,6 @@ func (conn *MidConn) handleStmtTrx(data []byte) error {
 	err := conn.handleStmtExecute(data)
 
 	if err != nil {
-		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
-			conn.status[0] = mysql.SERVER_NOT_SERVE
-		}
-
 		return err
 	}
 
@@ -208,7 +200,7 @@ func (conn *MidConn) handleTrx(stmt sqlparser.Statement, sql string) error {
 	if execErr != nil {
 		// exec error, rollback then response
 		conn.handleTrxFinish("rollback")
-		conn.status[0], conn.status[1] = conn.defaultStatus, conn.defaultStatus
+		conn.status = conn.defaultStatus
 		return execErr
 	}
 
@@ -230,16 +222,10 @@ func (conn *MidConn) myHandleErr(execErr, handleCommitErr error) error {
 	case execErr == nil && handleCommitErr == nil:
 		return nil
 	case execErr == nil && handleCommitErr != nil:
-		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS && conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
-			conn.status[0] = mysql.SERVER_NOT_SERVE
-		}
 		return handleCommitErr
 	case execErr != nil && handleCommitErr == nil:
 		return execErr
 	case execErr != nil && handleCommitErr != nil:
-		if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS && conn.status[1] == mysql.SERVER_STATUS_AUTOCOMMIT {
-			conn.status[0] = mysql.SERVER_NOT_SERVE
-		}
 		return fmt.Errorf("%v -- %v", execErr, handleCommitErr)
 	default:
 		return mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)

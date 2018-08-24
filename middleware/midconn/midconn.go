@@ -34,7 +34,7 @@ type MidConn struct {
 	closed        bool
 	ConnectionId  uint32
 	RemoteAddr    net.Addr
-	status        []uint16 // 0:trx status, 1:defaultStatus at trx begin
+	status        uint16
 	defaultStatus uint16
 
 	VersionsInUse map[uint64]uint8
@@ -111,7 +111,7 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool) (*Mid
 	midConn.closed = false
 	midConn.RemoteAddr = conn.RemoteAddr()
 	midConn.defaultStatus = mysql.SERVER_STATUS_AUTOCOMMIT
-	midConn.status = []uint16{midConn.defaultStatus, midConn.defaultStatus}
+	midConn.status = midConn.defaultStatus
 
 	midConn.VersionsInUse = nil
 	midConn.NextVersion = 0
@@ -129,9 +129,7 @@ func (conn *MidConn) Serve() {
 			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
 			break
 		}
-		if conn.status[0] == mysql.SERVER_NOT_SERVE {
-			conn.handleServerNotServe(data)
-		} else if err = conn.dispatch(data); err != nil {
+		if err = conn.dispatch(data); err != nil {
 			conn.cli.WriteError(err)
 			conn.cli.SetPktSeq(0)
 		}
@@ -179,9 +177,6 @@ func (conn *MidConn) handleQuery(sql string) error {
 	case *sqlparser.Commit, *sqlparser.Rollback:
 		err = conn.handleTrxFinish(sqlparser.String(v))
 		if err != nil {
-			if conn.status[0] == mysql.SERVER_STATUS_IN_TRANS {
-				conn.status[0] = mysql.SERVER_NOT_SERVE
-			}
 			return err
 		}
 		return conn.cli.WriteOK(nil)
@@ -221,7 +216,7 @@ func (conn *MidConn) handleFieldList(data []byte) error {
 		log.Errorf("node 0 execute fieldList failed: %v", err)
 		return err
 	} else {
-		return conn.cli.WriteFieldList(conn.status[0], fs)
+		return conn.cli.WriteFieldList(conn.status, fs)
 	}
 }
 
@@ -351,7 +346,7 @@ func (conn *MidConn) HandleSelRets(rets []*mysql.Result) error {
 		rs[idx] = ret.Resultset
 	}
 
-	return conn.cli.WriteResultsets(conn.status[0], rs)
+	return conn.cli.WriteResultsets(conn.status, rs)
 }
 
 func (conn *MidConn) mergeExecResult(rets []*mysql.Result) (*mysql.Result, error) {

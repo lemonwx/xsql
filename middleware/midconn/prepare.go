@@ -53,7 +53,7 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 			}
 		}
 
-		if err := conn.cli.WriteEOF(conn.status[0]); err != nil {
+		if err := conn.cli.WriteEOF(conn.status); err != nil {
 			return err
 		}
 	}
@@ -68,7 +68,7 @@ func (conn *MidConn) writePrepare(s *Stmt) error {
 			}
 		}
 
-		if err := conn.cli.WriteEOF(conn.status[0]); err != nil {
+		if err := conn.cli.WriteEOF(conn.status); err != nil {
 			return err
 		}
 

@@ -188,7 +188,7 @@ func (conn *MidConn) ExecuteOnMultiPool(sql []byte, nodeIdxs []int) ([]*mysql.Re
 	case len(rets) == shardSize:
 		return rets, nil
 	default:
-		return nil, fmt.Errorf("unexpected multi node return not equal")
+		return nil, fmt.Errorf("unexpected multi node response not equal")
 	}
 }
 
