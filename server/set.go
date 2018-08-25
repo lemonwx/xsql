@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/errors"
 	"github.com/lemonwx/xsql/meta"
+	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -19,6 +21,26 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 	// default
 	if len(stmt.Exprs) != 2 {
 		return conn.NewMySQLErr(ERR_UNSUPPORTED_MULTI_SET)
+	}
+
+	var cvtExprs sqlparser.UpdateExprs
+	for _, expr := range stmt.Exprs {
+		field := string(expr.Name.Name)
+		if string(field) == "autocommit" {
+			if val, ok := expr.Expr.(sqlparser.NumVal); ok {
+				if string(val) == "1" {
+					conn.status = mysql.SERVER_STATUS_AUTOCOMMIT
+				} else if string(val) == "0" {
+					conn.status = mysql.SERVER_STATUS_IN_TRANS
+				} else {
+					return errors.New2("unsupported autocommit value")
+				}
+			} else {
+				return errors.New2("unsupported autocommit value")
+			}
+		} else {
+			cvtExprs = append(cvtExprs, expr)
+		}
 	}
 
 	if !strings.Contains(strings.ToLower(sql), "autocommit") {
