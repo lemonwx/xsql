@@ -77,19 +77,17 @@ func (s *Server) Run() error {
 		midConn, err := NewMidConn(conn, s.cfg, s.pools, s)
 		if err != nil {
 			log.Errorf("new mid conn failed: %v", err)
+		} else {
+			go func() {
+				midConn.Serve()
+				midConn.Close()
+				s.cos.Lock()
+				delete(s.cos.midConns, midConn.RemoteAddr)
+				s.cos.Unlock()
+
+			}()
+			s.cos.midConns[midConn.RemoteAddr] = midConn
 		}
-
-		go func() {
-			midConn.Serve()
-			midConn.Close()
-			s.cos.Lock()
-			delete(s.cos.midConns, midConn.RemoteAddr)
-			s.cos.Unlock()
-
-		}()
-
-		s.cos.midConns[midConn.RemoteAddr] = midConn
-
 	}
 	return nil
 }
