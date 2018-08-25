@@ -710,7 +710,7 @@ func GeneralPlanForInsert(r *Router, ist *sqlparser.Insert) (plan *Plan, err err
 	var vals sqlparser.Values
 	plan = &Plan{}
 
-	if plan.rule, ok = r.Rules[String(ist.Table)]; !ok {
+	if plan.rule, ok = r.Rules[string(ist.Table.Name)]; !ok {
 		panic(errors.New2("can't shard for this table: " + String(ist.Table)))
 	}
 
