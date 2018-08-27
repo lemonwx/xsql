@@ -33,6 +33,7 @@ func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 			return err
 		}
 
+		ret.FieldNames["node"] = 2
 		ret.Fields = append(ret.Fields, &mysql.Field{Name: []byte("node")})
 		val := back.String()
 		col := make([]byte, len(val)+1)
@@ -97,17 +98,47 @@ func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysq
 		return nil, exeErr
 	}
 
-	for idx, ret := range rets {
-		ret.Fields = ret.Fields[extraSz:]
-		for rowIdx, _ := range ret.RowDatas {
-			if err := conn.hideExtraCols(&ret.RowDatas[rowIdx], extraSz, vInUse); err != nil {
-				return nil, err
-			}
-		}
-		rets[idx] = ret
+	if err := conn.chkInUse(&rets, extraSz, vInUse); err != nil {
+		return nil, err
 	}
 
 	return rets, nil
+}
+
+func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]uint8) error {
+	for idx, ret := range *rets {
+		ret.Fields = ret.Fields[extraSz:]
+		for rowIdx, _ := range ret.RowDatas {
+			if err := conn.hideExtraCols(&ret.RowDatas[rowIdx], extraSz, vInUse); err != nil {
+				return err
+			}
+		}
+		(*rets)[idx] = ret
+	}
+	return nil
+}
+
+func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]uint8) error {
+	idx := uint8(0)
+	for count := 0; count < size; count += 1 {
+		s := idx + 1
+		e := s + (*data)[idx]
+
+		vStr := string((*data)[s:e])
+		res, err := strconv.ParseUint(vStr, 10, 64)
+		if err != nil {
+			log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
+			return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
+		}
+		if _, ok := vs[res]; ok {
+			err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
+			log.Errorf("[%d] hide extra col failed: %v", conn.ConnectionId, err)
+			return err
+		}
+		idx = (*data)[idx] + idx + 1
+	}
+	(*data) = (*data)[idx:]
+	return nil
 }
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
@@ -198,29 +229,6 @@ func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Res
 	} else {
 		return conn.ExecuteOnMultiPool(sql, nodeIdxs)
 	}
-}
-
-func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]uint8) error {
-	idx := uint8(0)
-	for count := 0; count < size; count += 1 {
-		s := idx + 1
-		e := s + (*data)[idx]
-
-		vStr := string((*data)[s:e])
-		res, err := strconv.ParseUint(vStr, 10, 64)
-		if err != nil {
-			log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
-			return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
-		}
-		if _, ok := vs[res]; ok {
-			err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
-			log.Errorf("[%d] hide extra col failed: %v", conn.ConnectionId, err)
-			return err
-		}
-		idx = (*data)[idx] + idx + 1
-	}
-	(*data) = (*data)[idx:]
-	return nil
 }
 
 func (conn *MidConn) handleLimit(rets []*mysql.Result, limit *sqlparser.Limit) ([]*mysql.Result, error) {
