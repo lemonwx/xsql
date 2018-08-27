@@ -49,6 +49,34 @@ type MidConn struct {
 	svr       *Server
 }
 
+type MultiExecSyncer struct {
+	sync.Mutex
+	sync.WaitGroup
+	errs []error
+	rets []*mysql.Result
+}
+
+func NewMS(size int) *MultiExecSyncer {
+	ms := &MultiExecSyncer{
+		errs: make([]error, 0, size),
+		rets: make([]*mysql.Result, 0, size),
+	}
+	ms.Add(size)
+	return ms
+}
+
+func (ms *MultiExecSyncer) appendErr(err error) {
+	ms.Lock()
+	ms.errs = append(ms.errs, err)
+	ms.Unlock()
+}
+
+func (ms *MultiExecSyncer) appendRet(ret *mysql.Result) {
+	ms.Lock()
+	ms.rets = append(ms.rets, ret)
+	ms.Unlock()
+}
+
 func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool, s *Server) (*MidConn, error) {
 
 	var err error
