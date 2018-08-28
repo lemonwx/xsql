@@ -8,7 +8,6 @@ package server
 import (
 	"fmt"
 	"strconv"
-
 	"sync"
 
 	"github.com/lemonwx/log"
@@ -21,7 +20,161 @@ import (
 
 var String = sqlparser.String
 
-func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
+func (conn *MidConn) execSingle(stmt *sqlparser.Update, idx int, delSql string) ([]*mysql.Result, error) {
+	back, err := conn.getSingleBackConn(idx)
+	if err != nil {
+		return nil, err
+	}
+
+	var vInUse map[uint64]uint8
+	var vErr error
+	var chkRet *mysql.Result
+	var chkErr error
+	var cvtSql string
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		vInUse, vErr = conn.getCurVInUse(UPDATE_OR_DELETE)
+		stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
+		cvtSql = sqlparser.String(stmt)
+		wg.Done()
+	}()
+
+	go func() {
+		selSql := fmt.Sprintf("select version from %s %s for update", String(stmt.Table), String(stmt.Where))
+		chkRet, chkErr = back.Execute(mysql.COM_QUERY, []byte(selSql))
+		wg.Done()
+	}()
+	wg.Wait()
+
+	if vErr != nil {
+		return nil, vErr
+	}
+	if chkErr != nil {
+		return nil, chkErr
+	}
+
+	if len(chkRet.RowDatas) == 0 {
+		return nil, nil
+	}
+
+	if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse); err != nil {
+		return nil, err
+	}
+
+	if delSql != "" {
+		// for delete
+		if _, err := back.Execute(mysql.COM_QUERY, []byte(cvtSql)); err != nil {
+			return nil, err
+		}
+
+		if ret, err := back.Execute(mysql.COM_QUERY, []byte(delSql)); err != nil {
+			return nil, err
+		} else {
+			return []*mysql.Result{ret}, nil
+		}
+	} else {
+		// for update
+		if ret, err := back.Execute(mysql.COM_QUERY, []byte(cvtSql)); err != nil {
+			return nil, err
+		} else {
+			return []*mysql.Result{ret}, nil
+		}
+	}
+}
+
+func (conn *MidConn) execMulti(stmt *sqlparser.Update, delsql string) ([]*mysql.Result, error) {
+	if err := conn.getMultiBackConn(conn.nodeIdx); err != nil {
+		return nil, err
+	}
+
+	var updateSql string
+	shardSize := len(conn.nodeIdx)
+	ch := make(chan map[uint64]uint8, shardSize)
+
+	go func() {
+		// assume the row want to update not used by other, so get next version as the same time
+		vInUse, err := conn.getCurVInUse(UPDATE_OR_DELETE)
+		if err != nil { // notify all the executor get failed
+			close(ch)
+		} else { // send to executor, setup cvt sql
+			stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
+			updateSql = sqlparser.String(stmt)
+			for _ = range conn.execNodes {
+				ch <- vInUse
+			}
+		}
+	}()
+
+	selSql := fmt.Sprintf("select version from %s %s for update", String(stmt.Table), String(stmt.Where))
+	ms := NewMS(shardSize)
+
+	for _, back := range conn.execNodes {
+		go func(back *node.Node) {
+			defer ms.Done()
+			// first exec chk in use sql and lock the rows
+			chkRet, err := back.Execute(mysql.COM_QUERY, []byte(selSql))
+			if err != nil {
+				ms.appendErr(err)
+				return
+			}
+
+			// wait for get active versions, if ch closed, may get failed, response to client
+			vInUse, ok := <-ch
+			if !ok {
+				ms.appendErr(errors.New2("get version in use failed"))
+				return
+			}
+
+			// if result empty, direct response to client, affect rows: 0
+			if len(chkRet.RowDatas) == 0 {
+				ms.appendRet(&mysql.Result{AffectedRows: 0})
+				return
+			}
+
+			// if chk in use failed, response to client
+			if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse); err != nil {
+				ms.appendErr(err)
+				return
+			}
+
+			// exec is from handle delete
+			if delsql != "" {
+				// for delete, update rows with cur version, for tx_iso
+				if _, err := back.Execute(mysql.COM_QUERY, []byte(updateSql)); err != nil {
+					ms.appendErr(err)
+					return
+				}
+				if execRet, err := back.Execute(mysql.COM_QUERY, []byte(delsql)); err != nil {
+					ms.appendErr(err)
+					return
+				} else {
+					ms.appendRet(execRet)
+				}
+			} else {
+				if execRet, err := back.Execute(mysql.COM_QUERY, []byte(updateSql)); err != nil {
+					ms.appendErr(err)
+					return
+				} else {
+					ms.appendRet(execRet)
+				}
+			}
+		}(back)
+	}
+	ms.Wait()
+
+	switch {
+	case len(ms.rets) == shardSize:
+		return ms.rets, nil
+	case len(ms.errs) == shardSize:
+		return nil, ms.errs[0]
+	default:
+		return nil, errors.New2("unexpected multi node response not equal")
+	}
+}
+
+func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.Result, error) {
 	var err error
 
 	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
@@ -29,34 +182,44 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 		return nil, conn.NewMySQLErr(ERR_UNSUPPORTED_SHARD)
 	}
 
-	if len(conn.nodeIdx) == 0 {
+	switch len(conn.nodeIdx) {
+	case 0:
+		return nil, nil
+	case 1:
+		return conn.execSingle(stmt, conn.nodeIdx[0], "")
+	default:
+		return conn.execMulti(stmt, "")
+	}
+}
+
+func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.Result, error) {
+	var err error
+	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
+		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
+		return nil, conn.NewMySQLErr(ERR_UNSUPPORTED_SHARD)
+	}
+
+	shardSize := len(conn.nodeIdx)
+	if shardSize == 0 {
 		return nil, nil
 	}
 
-	table := sqlparser.String(stmt.Table)
-	where := sqlparser.String(stmt.Where)
-	beContinue, err := conn.chkAndLockRows(table, where)
-	if err != nil {
-		return nil, err
+	update := &sqlparser.Update{
+		Table: stmt.Table,
+		Exprs: sqlparser.UpdateExprs{
+			&sqlparser.UpdateExpr{
+				Name: &sqlparser.ColName{Name: []byte("version")},
+				Expr: sqlparser.NumVal{}}},
+		Where:   stmt.Where,
+		OrderBy: stmt.OrderBy,
+		Limit:   stmt.Limit,
 	}
 
-	if !beContinue {
-		return nil, nil
+	if shardSize == 1 {
+		return conn.execSingle(update, conn.nodeIdx[0], sql)
+	} else {
+		return conn.execMulti(update, sql)
 	}
-
-	if err := conn.getNextVersion(); err != nil {
-		return nil, err
-	}
-
-	updateSql := fmt.Sprintf("update %s set version = %d %s", table, conn.NextVersion, where)
-	log.Debugf("[%d] update version sql: %s", conn.ConnectionId, updateSql)
-
-	if _, err := conn.ExecuteOnNodePool([]byte(updateSql), conn.nodeIdx); err != nil {
-		return nil, err
-	}
-
-	newSql := sqlparser.String(stmt)
-	return conn.ExecuteOnNodePool([]byte(newSql), conn.nodeIdx)
 }
 
 func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.Result, error) {
@@ -102,168 +265,6 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 	}
 
 	return []*mysql.Result{ret}, nil
-}
-
-func (conn *MidConn) execSingleUpdate(stmt *sqlparser.Update, idx int) ([]*mysql.Result, error) {
-	back, err := conn.getSingleBackConn(idx)
-	if err != nil {
-		return nil, err
-	}
-
-	var vInUse map[uint64]uint8
-	var vErr error
-	var chkRet *mysql.Result
-	var chkErr error
-	var cvtSql string
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		vInUse, vErr = conn.getCurVInUse(UPDATE_OR_DELETE)
-		stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
-		cvtSql = sqlparser.String(stmt)
-		wg.Done()
-	}()
-
-	go func() {
-		selSql := fmt.Sprintf("select version from %s %s for update", String(stmt.Table), String(stmt.Where))
-		chkRet, chkErr = back.Execute(mysql.COM_QUERY, []byte(selSql))
-		wg.Done()
-	}()
-	wg.Wait()
-
-	if vErr != nil {
-		return nil, vErr
-	}
-	if chkErr != nil {
-		return nil, chkErr
-	}
-
-	if len(chkRet.RowDatas) == 0 {
-		return nil, nil
-	}
-
-	if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse); err != nil {
-		return nil, err
-	}
-
-	ret, err := back.Execute(mysql.COM_QUERY, []byte(cvtSql))
-	if err != nil {
-		return nil, err
-	}
-	return []*mysql.Result{ret}, nil
-}
-
-func (conn *MidConn) execMultiUpdate(stmt *sqlparser.Update) ([]*mysql.Result, error) {
-	if err := conn.getMultiBackConn(conn.nodeIdx); err != nil {
-		return nil, err
-	}
-
-	var newSql string
-	shardSize := len(conn.nodeIdx)
-	ch := make(chan map[uint64]uint8, shardSize)
-
-	go func() {
-		// assume the row want to update not used by other, so get next version as the same time
-		vInUse, err := conn.getCurVInUse(UPDATE_OR_DELETE)
-		if err != nil {
-			// notify all the executor get failed
-			close(ch)
-		} else {
-			// send to executor, setup cvt sql
-			stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
-			newSql = sqlparser.String(stmt)
-			for _ = range conn.execNodes {
-				ch <- vInUse
-			}
-			log.Debugf("[%d] cvt sql and send to executor done.", conn.ConnectionId)
-		}
-	}()
-
-	selSql := fmt.Sprintf("select version from %s %s for update", String(stmt.Table), String(stmt.Where))
-	ms := NewMS(shardSize)
-
-	for _, back := range conn.execNodes {
-		go func(back *node.Node) {
-			defer ms.Done()
-			// first exec chk in use sql and lock the rows
-			chkRet, err := back.Execute(mysql.COM_QUERY, []byte(selSql))
-			if err != nil {
-				ms.appendErr(err)
-				return
-			}
-
-			// wait for get active versions, if ch closed, may get failed, response to client
-			vInUse, ok := <-ch
-			if !ok {
-				ms.appendErr(errors.New2("get version in use failed"))
-				return
-			}
-
-			// if result empty, direct response to client, affect rows: 0
-			if len(chkRet.RowDatas) == 0 {
-				ms.appendRet(&mysql.Result{AffectedRows: 0})
-				return
-			}
-
-			// if chk in use failed, response to client
-			if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse); err != nil {
-				ms.appendErr(err)
-				return
-			}
-
-			// final exec cvt sql
-			if execRet, err := back.Execute(mysql.COM_QUERY, []byte(newSql)); err != nil {
-				ms.appendErr(err)
-				return
-			} else {
-				ms.appendRet(execRet)
-			}
-		}(back)
-	}
-	ms.Wait()
-
-	switch {
-	case len(ms.rets) == shardSize:
-		return ms.rets, nil
-	case len(ms.errs) == shardSize:
-		return nil, ms.errs[0]
-	default:
-		return nil, errors.New2("unexpected multi node response not equal")
-	}
-}
-
-func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.Result, error) {
-	var err error
-
-	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
-		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(ERR_UNSUPPORTED_SHARD)
-	}
-
-	switch len(conn.nodeIdx) {
-	case 0:
-		return nil, nil
-	case 1:
-		return conn.execSingleUpdate(stmt, conn.nodeIdx[0])
-	default:
-		return conn.execMultiUpdate(stmt)
-	}
-}
-
-func (conn *MidConn) chkAndLockRows(table, where string) (bool, error) {
-	selSql := fmt.Sprintf("select version from %s %s for update", table, where)
-	rets, err := conn.executeSelect(selSql, 1, UPDATE_OR_DELETE)
-	if err != nil {
-		return false, err
-	}
-
-	for _, ret := range rets {
-		if len(ret.RowDatas) != 0 {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 func (conn *MidConn) getNextVersion() error {
