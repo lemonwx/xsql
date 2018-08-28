@@ -11,7 +11,7 @@ import (
 	"rpcpool"
 	"sync"
 
-	"github.com/lemonwx/VSequence/base"
+	"github.com/lemonwx/TxMgr/base"
 )
 
 const (

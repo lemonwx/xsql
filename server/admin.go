@@ -70,6 +70,14 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 			phases["execT"] += conn.stat.execT
 		}
 
+		for _, stat := range conn.svr.stats {
+			phases["routeT"] += stat.routeT
+			phases["sqlparseT"] += stat.sqlparseT
+			phases["versionT"] += stat.versionT
+			phases["chkInuseT"] += stat.chkInuseT
+			phases["execT"] += stat.execT
+		}
+
 		for _, phase := range []string{"execT", "versionT", "sqlparseT", "routeT", "chkInuseT"} {
 			t := phases[phase]
 			lens := len(phase)

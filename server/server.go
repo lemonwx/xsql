@@ -35,6 +35,8 @@ type Server struct {
 	cfg   *config.Conf
 	pools map[int]*node.Pool
 	cos   *conns
+	stats []*Stat
+	lock  sync.Mutex
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {
@@ -84,6 +86,10 @@ func (s *Server) Run() error {
 				s.cos.Lock()
 				delete(s.cos.midConns, midConn.RemoteAddr)
 				s.cos.Unlock()
+
+				s.lock.Lock()
+				s.stats = append(s.stats, midConn.stat)
+				s.lock.Unlock()
 
 			}()
 			s.cos.midConns[midConn.RemoteAddr] = midConn
