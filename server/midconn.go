@@ -22,6 +22,7 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/router"
+	"github.com/lemonwx/xsql/server/version"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -506,4 +507,87 @@ func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
 
 func (conn *MidConn) NewMySQLErr(errCode uint16) *mysql.SqlError {
 	return mysql.NewError(errCode, MySQLErrName[errCode])
+}
+
+func (conn *MidConn) getNextVersion() error {
+	// get next version
+	var err error
+
+	if conn.NextVersion == 0 {
+		conn.NextVersion, err = version.NextVersion()
+		if err != nil {
+			log.Debugf("[%d] conn next version is nil, but get failed %v", conn.ConnectionId, conn.NextVersion)
+			return err
+		}
+		log.Debugf("[%d] conn next version is nil, get one: %v", conn.ConnectionId, conn.NextVersion)
+	} else {
+		log.Debugf("[%d] use next version get from pre sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
+	}
+	return nil
+}
+
+func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]uint8, error) {
+	var err error
+	var ret map[uint64]uint8
+
+	if flag == UPDATE_OR_DELETE && conn.NextVersion == 0 {
+		log.Debugf("[%d] chk v in use for update, get next version at the same time", conn.ConnectionId)
+		base, err := version.InUseAndNext()
+		if err != nil {
+			return nil, err
+		}
+		conn.NextVersion = base.Next
+		ret = conn.VersionsInUse
+	} else {
+		ret, err = version.VersionsInUse()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if _, ok := ret[conn.NextVersion]; ok {
+		delete(ret, conn.NextVersion)
+	}
+
+	return ret, nil
+}
+
+func (conn *MidConn) getVInUse() error {
+	// get v in use by other session
+	var err error
+
+	if conn.VersionsInUse == nil {
+		conn.VersionsInUse, err = version.VersionsInUse()
+		if err != nil {
+			log.Debugf("[%d] conn's vInuse in use is nil, but get v in user failed %v", conn.ConnectionId, err)
+			return err
+		}
+
+		if _, ok := conn.VersionsInUse[conn.NextVersion]; ok {
+			delete(conn.VersionsInUse, conn.NextVersion)
+			log.Debugf("[%d] delete pre sql's next version %s in the same trx", conn.ConnectionId, conn.NextVersion)
+		}
+		log.Debugf("[%d] get vInuse: %v", conn.ConnectionId, conn.VersionsInUse)
+	} else {
+		log.Debugf("[%d] use vInuse get from pre sel sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
+	}
+	return nil
+}
+
+func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]interface{}) error {
+	var err error
+	if conn.db == "" {
+		err = mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+		return err
+	}
+
+	conn.nodeIdx, err = conn.getShardList(stmt)
+
+	if err != nil {
+		log.Debugf("[%d] get node idxs failed: %v", conn.ConnectionId, err)
+		return err
+	}
+	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId, conn.nodeIdx)
+
+	return nil
 }
