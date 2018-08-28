@@ -12,6 +12,8 @@ import (
 
 	"fmt"
 
+	"time"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/errors"
 	"github.com/lemonwx/xsql/meta"
@@ -28,7 +30,7 @@ func (conn *MidConn) handleShow(stmt *sqlparser.Show, sql string) error {
 
 	var rets []*mysql.Result
 	for _, back := range conn.execNodes {
-		ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
+		ret, err := conn.execute(back, mysql.COM_QUERY, []byte(sql))
 		if err != nil {
 			return err
 		}
@@ -59,7 +61,7 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 	}
 	defer conn.pools[0].PutConn(back)
 
-	ret, err := back.Execute(mysql.COM_QUERY, []byte(sql))
+	ret, err := conn.execute(back, mysql.COM_QUERY, []byte(sql))
 	if err != nil {
 		return err
 	}
@@ -106,6 +108,11 @@ func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysq
 }
 
 func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]uint8) error {
+	ts := time.Now()
+	defer func() {
+		conn.stat.chkInuseT += time.Since(ts)
+	}()
+
 	for idx, ret := range *rets {
 		ret.Fields = ret.Fields[extraSz:]
 		for rowIdx, _ := range ret.RowDatas {
@@ -170,7 +177,7 @@ func (conn *MidConn) ExecuteOnSinglePool(sql []byte, nodeIdxs []int) ([]*mysql.R
 		return nil, err
 	}
 
-	ret, err := back.Execute(mysql.COM_QUERY, sql)
+	ret, err := conn.execute(back, mysql.COM_QUERY, sql)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +207,7 @@ func (conn *MidConn) ExecuteOnMultiPool(sql []byte, nodeIdxs []int) ([]*mysql.Re
 				wg.Done()
 				return
 			}
-			ret, err := back.Execute(mysql.COM_QUERY, sql)
+			ret, err := conn.execute(back, mysql.COM_QUERY, sql)
 			lock.Lock()
 			if err != nil {
 				errs = append(errs, err)

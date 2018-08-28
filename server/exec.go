@@ -42,7 +42,7 @@ func (conn *MidConn) execSingle(stmt *sqlparser.Update, idx int, delSql string) 
 
 	go func() {
 		selSql := fmt.Sprintf("select version from %s %s for update", String(stmt.Table), String(stmt.Where))
-		chkRet, chkErr = back.Execute(mysql.COM_QUERY, []byte(selSql))
+		chkRet, chkErr = conn.execute(back, mysql.COM_QUERY, []byte(selSql))
 		wg.Done()
 	}()
 	wg.Wait()
@@ -64,18 +64,18 @@ func (conn *MidConn) execSingle(stmt *sqlparser.Update, idx int, delSql string) 
 
 	if delSql != "" {
 		// for delete
-		if _, err := back.Execute(mysql.COM_QUERY, []byte(cvtSql)); err != nil {
+		if _, err := conn.execute(back, mysql.COM_QUERY, []byte(cvtSql)); err != nil {
 			return nil, err
 		}
 
-		if ret, err := back.Execute(mysql.COM_QUERY, []byte(delSql)); err != nil {
+		if ret, err := conn.execute(back, mysql.COM_QUERY, []byte(delSql)); err != nil {
 			return nil, err
 		} else {
 			return []*mysql.Result{ret}, nil
 		}
 	} else {
 		// for update
-		if ret, err := back.Execute(mysql.COM_QUERY, []byte(cvtSql)); err != nil {
+		if ret, err := conn.execute(back, mysql.COM_QUERY, []byte(cvtSql)); err != nil {
 			return nil, err
 		} else {
 			return []*mysql.Result{ret}, nil
@@ -114,7 +114,7 @@ func (conn *MidConn) execMulti(stmt *sqlparser.Update, delsql string) ([]*mysql.
 		go func(back *node.Node) {
 			defer ms.Done()
 			// first exec chk in use sql and lock the rows
-			chkRet, err := back.Execute(mysql.COM_QUERY, []byte(selSql))
+			chkRet, err := conn.execute(back, mysql.COM_QUERY, []byte(selSql))
 			if err != nil {
 				ms.appendErr(err)
 				return
@@ -142,18 +142,18 @@ func (conn *MidConn) execMulti(stmt *sqlparser.Update, delsql string) ([]*mysql.
 			// exec is from handle delete
 			if delsql != "" {
 				// for delete, update rows with cur version, for tx_iso
-				if _, err := back.Execute(mysql.COM_QUERY, []byte(updateSql)); err != nil {
+				if _, err := conn.execute(back, mysql.COM_QUERY, []byte(updateSql)); err != nil {
 					ms.appendErr(err)
 					return
 				}
-				if execRet, err := back.Execute(mysql.COM_QUERY, []byte(delsql)); err != nil {
+				if execRet, err := conn.execute(back, mysql.COM_QUERY, []byte(delsql)); err != nil {
 					ms.appendErr(err)
 					return
 				} else {
 					ms.appendRet(execRet)
 				}
 			} else {
-				if execRet, err := back.Execute(mysql.COM_QUERY, []byte(updateSql)); err != nil {
+				if execRet, err := conn.execute(back, mysql.COM_QUERY, []byte(updateSql)); err != nil {
 					ms.appendErr(err)
 					return
 				} else {
@@ -258,7 +258,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 		return nil, err
 	}
 
-	ret, err := back.Execute(mysql.COM_QUERY, []byte(newSql))
+	ret, err := conn.execute(back, mysql.COM_QUERY, []byte(newSql))
 	if err != nil {
 		return nil, err
 	}

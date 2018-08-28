@@ -104,6 +104,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 
 		if conn.NextVersion != 0 {
 			log.Debugf("[%d] release %v", conn.ConnectionId, conn.NextVersion)
+			ts := time.Now()
 			for {
 				// retry until release success, then response to client
 				if err := version.ReleaseVersion(conn.NextVersion); err == nil {
@@ -111,6 +112,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 				}
 				time.Sleep(time.Second * 3)
 			}
+			conn.stat.versionT += time.Since(ts)
 		}
 
 		reset()
@@ -121,7 +123,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 func (conn *MidConn) clearExecNodes(sql []byte) error {
 	if len(conn.execNodes) == 1 {
 		for nodeIdx, back := range conn.execNodes {
-			if _, err := back.Execute(mysql.COM_QUERY, sql); err != nil {
+			if _, err := conn.execute(back, mysql.COM_QUERY, sql); err != nil {
 				back.Close()
 				conn.pools[nodeIdx].PutConn(back)
 				delete(conn.execNodes, nodeIdx)
@@ -139,7 +141,7 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 
 		for nodeIdx, back := range conn.execNodes {
 			go func(idx int, backNode *node.Node) {
-				_, retErr := backNode.Execute(mysql.COM_QUERY, sql)
+				_, retErr := conn.execute(backNode, mysql.COM_QUERY, sql)
 				if retErr != nil {
 					backNode.Close()
 				}

@@ -15,6 +15,8 @@ import (
 
 	"hack"
 
+	"time"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/client"
 	"github.com/lemonwx/xsql/config"
@@ -27,28 +29,6 @@ import (
 )
 
 var baseConnId uint32 = 1000
-
-type MidConn struct {
-	cli           *client.CliConn
-	nodes         []*node.Node
-	db            string
-	closed        bool
-	ConnectionId  uint32
-	RemoteAddr    string
-	status        uint16
-	defaultStatus uint16
-
-	VersionsInUse map[uint64]uint8
-	NextVersion   uint64
-
-	nodeIdx []int // node that has exec sql in the trx
-
-	stmts map[uint32]*Stmt
-
-	pools     map[int]*node.Pool
-	execNodes map[int]*node.Node
-	svr       *Server
-}
 
 type MultiExecSyncer struct {
 	sync.Mutex
@@ -76,6 +56,29 @@ func (ms *MultiExecSyncer) appendRet(ret *mysql.Result) {
 	ms.Lock()
 	ms.rets = append(ms.rets, ret)
 	ms.Unlock()
+}
+
+type MidConn struct {
+	cli           *client.CliConn
+	nodes         []*node.Node
+	db            string
+	closed        bool
+	ConnectionId  uint32
+	RemoteAddr    string
+	status        uint16
+	defaultStatus uint16
+
+	VersionsInUse map[uint64]uint8
+	NextVersion   uint64
+
+	nodeIdx []int // node that has exec sql in the trx
+
+	stmts map[uint32]*Stmt
+
+	pools     map[int]*node.Pool
+	execNodes map[int]*node.Node
+	svr       *Server
+	stat      *Stat
 }
 
 func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool, s *Server) (*MidConn, error) {
@@ -148,6 +151,7 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool, s *Se
 
 	midConn.stmts = make(map[uint32]*Stmt)
 	midConn.svr = s
+	midConn.stat = &Stat{}
 
 	return midConn, nil
 }
@@ -193,7 +197,9 @@ func (conn *MidConn) dispatch(sql []byte) error {
 func (conn *MidConn) handleQuery(sql string) error {
 
 	sql = strings.TrimRight(sql, ";")
+	ts := time.Now()
 	stmt, err := sqlparser.Parse(sql)
+	conn.stat.sqlparseT += time.Since(ts)
 	if err != nil {
 		log.Errorf("[%d] parse [%s] failed: %v", conn.ConnectionId, sql, err)
 		return err
@@ -461,6 +467,11 @@ func (conn *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset 
 }
 
 func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
+	ts := time.Now()
+	defer func() {
+		conn.stat.routeT += time.Since(ts)
+	}()
+
 	if conn.db == "" {
 		err := mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 		log.Errorf("[%d] get conn.db failed: %v", conn.ConnectionId, err)
@@ -510,9 +521,12 @@ func (conn *MidConn) NewMySQLErr(errCode uint16) *mysql.SqlError {
 }
 
 func (conn *MidConn) getNextVersion() error {
-	// get next version
-	var err error
+	ts := time.Now()
+	defer func() {
+		conn.stat.versionT += time.Since(ts)
+	}()
 
+	var err error
 	if conn.NextVersion == 0 {
 		conn.NextVersion, err = version.NextVersion()
 		if err != nil {
@@ -527,9 +541,13 @@ func (conn *MidConn) getNextVersion() error {
 }
 
 func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]uint8, error) {
+	ts := time.Now()
+	defer func() {
+		conn.stat.versionT += time.Since(ts)
+	}()
+
 	var err error
 	var ret map[uint64]uint8
-
 	if flag == UPDATE_OR_DELETE && conn.NextVersion == 0 {
 		log.Debugf("[%d] chk v in use for update, get next version at the same time", conn.ConnectionId)
 		base, err := version.InUseAndNext()
@@ -544,11 +562,9 @@ func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]uint8, error) {
 			return nil, err
 		}
 	}
-
 	if _, ok := ret[conn.NextVersion]; ok {
 		delete(ret, conn.NextVersion)
 	}
-
 	return ret, nil
 }
 
@@ -590,4 +606,12 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]i
 	log.Debugf("[%d] get node idxs: %v", conn.ConnectionId, conn.nodeIdx)
 
 	return nil
+}
+
+func (conn *MidConn) execute(back *node.Node, opt uint8, data []byte) (*mysql.Result, error) {
+	ts := time.Now()
+	defer func() {
+		conn.stat.execT += time.Since(ts)
+	}()
+	return back.Execute(opt, data)
 }
