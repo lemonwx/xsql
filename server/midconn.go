@@ -172,6 +172,10 @@ func (conn *MidConn) Serve() {
 }
 
 func (conn *MidConn) dispatch(sql []byte) error {
+	ts := time.Now()
+	defer func() {
+		conn.stat.Dispatch.add(time.Since(ts))
+	}()
 	opt, sql := sql[0], sql[1:]
 	log.Debugf("[%d] general: %d:%s", conn.ConnectionId, opt, sql)
 	switch opt {

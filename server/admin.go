@@ -80,6 +80,16 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 			}
 		}
 
+		for _, stat := range conn.svr.stats {
+			sVal := reflect.ValueOf(*stat)
+			for i := 0; i < t.NumField(); i++ {
+				sField := sVal.Field(i).Interface().(*field)
+				tField := v.Field(i).Interface().(*field)
+				tField.t += sField.t
+				tField.c += sField.c
+			}
+		}
+
 		rs.RowDatas = make([]mysql.RowData, 0, t.NumField()+1)
 		for i := 0; i < t.NumField(); i++ {
 			phase := t.Field(i).Name
@@ -102,6 +112,18 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 			row = append(row, avg...)
 			rs.RowDatas = append(rs.RowDatas, row)
 		}
+
+		row := []byte{}
+		row = append(row, byte(len("theory")))
+		row = append(row, "theory"...)
+		row = append(row, 1)
+		row = append(row, 32)
+		row = append(row, 1)
+		row = append(row, 32)
+		theory := ret.getTheoryAvg().String()
+		row = append(row, byte(len(theory)))
+		row = append(row, theory...)
+		rs.RowDatas = append(rs.RowDatas, row)
 		return conn.writeResultset(conn.status, rs)
 	default:
 		return fmt.Errorf("unsupported this is admin sql")

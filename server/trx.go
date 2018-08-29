@@ -130,12 +130,11 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 		for nodeIdx, back := range conn.execNodes {
 			if _, err := conn.execute(back, mysql.COM_QUERY, sql); err != nil {
 				back.Close()
-				conn.pools[nodeIdx].PutConn(back)
+				conn.putConn(nodeIdx, back)
 				delete(conn.execNodes, nodeIdx)
 				return err
 			}
-
-			conn.pools[nodeIdx].PutConn(back)
+			conn.putConn(nodeIdx, back)
 			delete(conn.execNodes, nodeIdx)
 		}
 		return nil
@@ -151,7 +150,7 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 					backNode.Close()
 				}
 				retErrs[idx] = retErr
-				conn.pools[idx].PutConn(backNode)
+				conn.putConn(idx, backNode)
 				wg.Done()
 			}(nodeIdx, back)
 			delete(conn.execNodes, nodeIdx)

@@ -33,6 +33,7 @@ type Stat struct {
 	ClearT    *field
 	GetConn   *field
 	PutConn   *field
+	Dispatch  *field
 }
 
 func newStat() *Stat {
@@ -45,5 +46,19 @@ func newStat() *Stat {
 		ClearT:    &field{},
 		GetConn:   &field{},
 		PutConn:   &field{},
+		Dispatch:  &field{},
 	}
+}
+
+func (s *Stat) getTheoryAvg() time.Duration {
+	max := time.Duration(0)
+	vt := s.VersionT.avg()
+	et := s.ExecT.avg()
+	if vt > et {
+		max = vt
+	} else {
+		max = et
+	}
+
+	return s.SqlparseT.avg() + s.RouteT.avg() + max + s.ChkInuseT.avg() + s.ClearT.avg()
 }
