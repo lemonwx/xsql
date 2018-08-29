@@ -112,7 +112,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 				}
 				time.Sleep(time.Second * 3)
 			}
-			conn.stat.versionT += time.Since(ts)
+			conn.stat.VersionT.add(time.Since(ts))
 		}
 
 		reset()
@@ -121,6 +121,11 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 }
 
 func (conn *MidConn) clearExecNodes(sql []byte) error {
+	ts := time.Now()
+	defer func() {
+		conn.stat.ClearT.add(time.Since(ts))
+	}()
+
 	if len(conn.execNodes) == 1 {
 		for nodeIdx, back := range conn.execNodes {
 			if _, err := conn.execute(back, mysql.COM_QUERY, sql); err != nil {
