@@ -6,20 +6,12 @@
 package server
 
 import (
+	"common"
+	"net"
 	"time"
 
-	"common"
-
-	"net"
-
+	"github.com/lemonwx/TxMgr/proto"
 	"github.com/lemonwx/log"
-)
-
-const (
-	C uint8 = iota
-	D
-	Q
-	Q_C
 )
 
 type req struct {
@@ -40,6 +32,7 @@ var (
 )
 
 func InitGtidPool(addr string) {
+	log.Debug(addr)
 	var err error
 	pool, err = common.NewPool(10, 10, 10,
 		func() (common.Conn, error) {
@@ -51,11 +44,24 @@ func InitGtidPool(addr string) {
 	}
 }
 
-func encode(cmds []uint8) []byte {
-	pktLen := len(cmds)
-	pkt := make([]uint8, 0, pktLen+4)
+func encode(cmds []uint8, gtids []uint64) []byte {
+	log.Debug(gtids)
+	size := len(cmds)
+	data := make([]uint8, 0, size+4+size*8)
+	data = append(data, byte(size), byte(size>>8), byte(size>>16), byte(size>>24))
+	data = append(data, cmds...)
+
+	for _, gtid := range gtids {
+		data = append(data,
+			byte(gtid), byte(gtid>>8), byte(gtid>>16), byte(gtid>>24),
+			byte(gtid>>32), byte(gtid>>40), byte(gtid>>48), byte(gtid>>56),
+		)
+	}
+
+	pktLen := len(data) + 4
+	pkt := make([]uint8, 0, pktLen)
 	pkt = append(pkt, byte(pktLen), byte(pktLen>>8), byte(pktLen>>16), byte(pktLen>>24))
-	pkt = append(pkt, cmds...)
+	pkt = append(pkt, data...)
 	return pkt
 }
 
@@ -65,14 +71,14 @@ func ret(cmds []byte) map[int]*response {
 	hasQ := false
 	for idx, cmd := range cmds {
 		switch cmd {
-		case Q_C:
+		case proto.C_Q:
 			resps[idx] = &response{Max: 1001}
 			hasQ = true
-		case C:
+		case proto.C:
 			resps[idx] = &response{Max: 1001}
-		case D:
+		case proto.D:
 			resps[idx] = &response{}
-		case Q:
+		case proto.Q:
 			hasQ = true
 		}
 	}
@@ -88,38 +94,43 @@ func sendall(exReq *req) {
 
 	cmds := make([]byte, 0, size)
 	cos := make([]*MidConn, 0, size)
+	gtidTodel := make([]uint64, 0, size)
+
 	log.Debugf("%d request merge to send", size)
 	for i := 0; i < size-1; i++ {
 		req := <-maxQueue
 		cmds = append(cmds, req.cmd)
 		cos = append(cos, req.co)
+		if req.cmd == proto.D {
+			gtidTodel = append(gtidTodel, req.co.NextVersion)
+		}
 	}
+	log.Debug(cmds, gtidTodel)
+
 	cmds = append(cmds, exReq.cmd)
 	cos = append(cos, exReq.co)
+	if exReq.cmd == proto.D {
+		gtidTodel = append(gtidTodel, exReq.co.NextVersion)
+	}
 
-	pkt := encode(cmds)
+	pkt := encode(cmds, gtidTodel)
 	log.Debug(cmds, pkt)
 	resps := ret(cmds)
 
 	log.Debugf("response: ")
 	for idx, co := range cos {
 		if resp, ok := resps[idx]; ok {
-			if cmds[idx] == Q_C {
+			if cmds[idx] == proto.C_Q {
 				resp.Active = resps[size].Active
 			}
-			//log.Debugf("%d, %d, %v, %v", idx, co.ConnectionId, cmds[idx], resp)
+			log.Debugf("%d, %d, %v, %v", idx, co.ConnectionId, cmds[idx], resp)
 			co.resp <- resp
 		} else {
+			log.Debugf("%d, %d, %v, %v", idx, co.ConnectionId, cmds[idx], resps[size])
+			log.Debug(co.resp)
 			co.resp <- resps[size]
-			//log.Debugf("%d, %d, %v, %v", idx, co.ConnectionId, cmds[idx], resps[mergeSize])
 		}
 	}
-
-	conn, err := pool.Get()
-	if err != nil {
-		panic(err)
-	}
-	conn.Write(pkt)
 }
 
 func RequestSender() {
@@ -137,14 +148,16 @@ func Push(cmd uint8, co *MidConn) {
 	defer func() {
 		log.Debug("push", len(maxQueue))
 	}()
-	select {
-	case <-ticker:
-		// send all and cur
-		log.Debug("send all by ticker")
-		sendall(&req{cmd, co})
-		return
-	default:
-	}
+
+	/*
+		select {
+		case <-ticker:
+			// send all and cur
+			log.Debug("send all by ticker")
+			sendall(&req{cmd, co})
+			return
+		default:
+		}*/
 
 	select {
 	case maxQueue <- &req{cmd, co}:

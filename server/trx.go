@@ -23,6 +23,7 @@ import (
 
 	"time"
 
+	"github.com/lemonwx/TxMgr/proto"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
@@ -107,6 +108,9 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 			ts := time.Now()
 			for {
 				// retry until release success, then response to client
+				Push(proto.D, conn)
+				r := <-conn.resp
+				log.Debugf("get from async gtid: %v", r)
 				if err := version.ReleaseVersion(conn.NextVersion); err == nil {
 					break
 				}
