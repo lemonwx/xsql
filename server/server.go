@@ -68,6 +68,8 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 
 func (s *Server) Run() error {
 
+	go Sender()
+
 	for {
 		conn, err := s.lis.Accept()
 		if err != nil {
