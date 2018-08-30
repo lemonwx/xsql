@@ -24,7 +24,6 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/router"
-	"github.com/lemonwx/xsql/server/proto"
 	"github.com/lemonwx/xsql/server/version"
 	"github.com/lemonwx/xsql/sqlparser"
 )
@@ -547,7 +546,7 @@ func (conn *MidConn) NewMySQLErr(errCode uint16) *mysql.SqlError {
 }
 
 func (conn *MidConn) getNextVersion() error {
-	Push(proto.C, conn)
+	Push(C, conn)
 	r := <-conn.resp
 	log.Debugf("get from async gtid: %v", r)
 	ts := time.Now()
@@ -578,7 +577,7 @@ func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]uint8, error) {
 	var err error
 	var ret map[uint64]uint8
 	if flag == UPDATE_OR_DELETE && conn.NextVersion == 0 {
-		Push(proto.Q_C, conn)
+		Push(Q_C, conn)
 		r := <-conn.resp
 		log.Debugf("get from async gtid: %v", r)
 		log.Debugf("[%d] chk v in use for update, get next version at the same time", conn.ConnectionId)
@@ -589,7 +588,7 @@ func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]uint8, error) {
 		conn.NextVersion = base.Next
 		ret = conn.VersionsInUse
 	} else {
-		Push(proto.Q, conn)
+		Push(Q, conn)
 		r := <-conn.resp
 		log.Debugf("get from async gtid: %v", r)
 		ret, err = version.VersionsInUse()

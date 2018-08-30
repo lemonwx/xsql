@@ -67,8 +67,8 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 }
 
 func (s *Server) Run() error {
-
-	go Sender()
+	InitGtidPool(s.cfg.VerSeqAddr)
+	go RequestSender()
 
 	for {
 		conn, err := s.lis.Accept()

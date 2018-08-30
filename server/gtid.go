@@ -8,6 +8,10 @@ package server
 import (
 	"time"
 
+	"common"
+
+	"net"
+
 	"github.com/lemonwx/log"
 )
 
@@ -16,12 +20,6 @@ const (
 	D
 	Q
 	Q_C
-)
-
-var (
-	maxT     = time.Duration(time.Second * 3)
-	maxQueue = make(chan *req, 1024)
-	ticker   = time.Tick(maxT)
 )
 
 type req struct {
@@ -34,8 +32,26 @@ type response struct {
 	Active map[uint64]bool
 }
 
-func encode(cmds []uint8) []byte {
+var (
+	maxT     = time.Duration(time.Second * 3)
+	maxQueue = make(chan *req, 1024)
+	ticker   = time.Tick(maxT)
+	pool     *common.Pool
+)
 
+func InitGtidPool(addr string) {
+	var err error
+	pool, err = common.NewPool(10, 10, 10,
+		func() (common.Conn, error) {
+			return net.Dial("tcp", addr)
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func encode(cmds []uint8) []byte {
 	pktLen := len(cmds)
 	pkt := make([]uint8, 0, pktLen+4)
 	pkt = append(pkt, byte(pktLen), byte(pktLen>>8), byte(pktLen>>16), byte(pktLen>>24))
@@ -98,9 +114,15 @@ func sendall(exReq *req) {
 			//log.Debugf("%d, %d, %v, %v", idx, co.ConnectionId, cmds[idx], resps[mergeSize])
 		}
 	}
+
+	conn, err := pool.Get()
+	if err != nil {
+		panic(err)
+	}
+	conn.Write(pkt)
 }
 
-func Sender() {
+func RequestSender() {
 	for {
 		<-ticker
 		log.Debugf("send all by demon ticker")
