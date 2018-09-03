@@ -44,9 +44,10 @@ func NewPool(initSize, idleSize, maxSize uint32, f func() (*rpc.Client, error)) 
 	count := uint32(0)
 	for count < initSize {
 		if conn, err := p.New(); err != nil {
+			log.Errorf("conn to version server failed: %v", err)
 			failedSize++
 			if failedSize > MaxInitFailedSize {
-				return nil, fmt.Errorf("too many errors when connect to backend")
+				return nil, fmt.Errorf("too many errors when connect to version server")
 			}
 		} else {
 			p.idleConns <- conn

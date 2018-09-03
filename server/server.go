@@ -63,12 +63,12 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 
 	//go s.dumpPoolsInfo()
 
+	go RequestSender()
+
 	return s, nil
 }
 
 func (s *Server) Run() error {
-	InitGtidPool(s.cfg.VerSeqAddr)
-	go RequestSender()
 
 	for {
 		conn, err := s.lis.Accept()

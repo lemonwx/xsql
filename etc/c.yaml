@@ -5,16 +5,21 @@ loglevel : 5
 nodelay: false
 XA: true
 
-BackInitSize: 4
-BackMaxIdleSize: 8
-BackMaxSize: 12
+BackInitSize: 128
+BackMaxIdleSize: 128
+BackMaxSize: 128
 
 Meta: ../etc/meta.json
 
 VerSeqAddr: 192.168.1.2:1235
-InitSize: 100
-MaxSize: 400
-Batch: 10
+VInitSize: 100
+VIdleSize: 100
+VMaxSize: 100
+
+VWaitBatchTime: 1
+VWaitBatchCount: 256
+
+
 
 nodes:
 -

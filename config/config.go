@@ -45,11 +45,15 @@ type Conf struct {
 
 	Meta string `yaml:"Meta"`
 
-	VerSeqAddr string  `yaml:"VerSeqAddr"`
-	MaxSize    int     `yaml:"MaxSize"`
-	InitSize   int     `yaml:"InitSize"`
-	Batch      int     `yaml:"Batch"`
-	Auths      []*Auth `yaml:"auth"`
+	VerSeqAddr string `yaml:"VerSeqAddr"`
+	VInitSize  uint32 `yaml:"VInitSize"`
+	VIdleSize  uint32 `yaml:"VIdleSize"`
+	VMaxSize   uint32 `yaml:"VMaxSize"`
+
+	VWaitBatchTime  uint32 `yaml:"VWaitBatchTime"`
+	VWaitBatchCount uint32 `yaml:"VWaitBatchCount"`
+
+	Auths []*Auth `yaml:"auth"`
 }
 
 func ReadConf() *Conf {

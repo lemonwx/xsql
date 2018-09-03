@@ -41,6 +41,11 @@ func main() {
 	fmt.Println("init cfg done.")
 	setupLogger()
 
+	server.SetVars(cfg)
+	if err := server.InitVPool(cfg); err != nil {
+		log.Fatalf("new v conn pool faild: %v", err)
+	}
+
 	s, err := server.NewServer(cfg)
 	if err != nil {
 		log.Fatalf("new server failed: %v", err)

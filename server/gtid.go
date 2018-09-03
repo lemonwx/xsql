@@ -13,6 +13,7 @@ import (
 
 	"github.com/lemonwx/TxMgr/proto"
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/config"
 )
 
 type req struct {
@@ -28,24 +29,32 @@ type response struct {
 }
 
 var (
-	maxT     = time.Duration(time.Millisecond * 300)
-	maxQueue = make(chan *req, 1024)
-	ticker   = time.Tick(maxT)
+	maxT     time.Duration
+	maxQueue chan *req
+	ticker   <-chan time.Time
 	pool     *common.Pool
-	ql       = quicklock.NewQL()
+	ql       *quicklock.QuickLock
 )
 
-func InitGtidPool(addr string) {
-	log.Debug(addr)
+func SetVars(cfg *config.Conf) {
+	maxT = time.Duration(time.Millisecond * time.Duration(cfg.VWaitBatchTime))
+	maxQueue = make(chan *req, cfg.VWaitBatchCount)
+	ticker = time.Tick(maxT)
+	ql = quicklock.NewQL()
+	log.Debugf("wait time: %v, wait count: %d", maxT, cfg.VWaitBatchCount)
+}
+
+func InitVPool(cfg *config.Conf) error {
 	var err error
-	pool, err = common.NewPool(10, 10, 10,
+	pool, err = common.NewPool(cfg.VInitSize, cfg.VIdleSize, cfg.VMaxSize,
 		func() (*rpc.Client, error) {
-			return rpc.DialHTTP("tcp", addr)
+			return rpc.DialHTTP("tcp", cfg.VerSeqAddr)
 		},
 	)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func sendall(exReq *req) {
