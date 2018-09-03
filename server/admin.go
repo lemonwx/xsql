@@ -18,6 +18,7 @@ import (
 const (
 	UseVersions = "versions"
 	TimeStat    = "time"
+	Clear       = "clear"
 )
 
 func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
@@ -111,6 +112,12 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 		row = append(row, theory...)
 		rs.RowDatas = append(rs.RowDatas, row)
 		return conn.writeResultset(conn.status, rs)
+	case Clear:
+		conn.svr.stats = []*Stat{}
+		for _, co := range conn.svr.cos.midConns {
+			co.stat.clear()
+		}
+		return conn.cli.WriteOK(nil)
 	default:
 		return fmt.Errorf("unsupported this is admin sql")
 	}

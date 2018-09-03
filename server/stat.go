@@ -15,6 +15,7 @@ type field interface {
 	add(int64)
 	plus(ff field)
 	fmt() []byte
+	clear()
 }
 
 type timeField struct {
@@ -58,6 +59,11 @@ func (f *timeField) fmt() []byte {
 	return ret
 }
 
+func (f *timeField) clear() {
+	f.c = 0
+	f.t = 0
+}
+
 type countField struct {
 	count int64
 	c     int64
@@ -79,6 +85,11 @@ func (f *countField) plus(ff field) {
 	field := ff.(*countField)
 	f.c += field.c
 	f.count += field.count
+}
+
+func (f *countField) clear() {
+	f.c = 0
+	f.count = 0
 }
 
 func (f *countField) fmt() []byte {
@@ -145,4 +156,21 @@ func (s *Stat) getTheoryAvg() time.Duration {
 	}
 
 	return time.Duration(s.SqlparseT.avg() + s.RouteT.avg() + max + s.ChkInuseT.avg() + s.ClearT.avg())
+}
+
+func (s *Stat) clear() {
+	s.SqlparseT.clear()
+	s.RouteT.clear()
+	s.VersionT.clear()
+	s.ExecT.clear()
+	s.ChkInuseT.clear()
+	s.ClearT.clear()
+	s.GetConn.clear()
+	s.PutConn.clear()
+	s.Dispatch.clear()
+	s.VWaitBatchT.clear()
+	s.VWaitRespT.clear()
+	s.BatchReqCount.clear()
+	s.FullReqCount.clear()
+	s.TickerReqCount.clear()
 }
