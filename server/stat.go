@@ -42,9 +42,9 @@ func (f *timeField) plus(ff field) {
 
 func (f *timeField) fmt() []byte {
 	ret := []byte{}
-	t := f.t.String()
+	t := time.Duration(f.t).String()
 	c := strconv.FormatInt(f.c, 10)
-	avg := strconv.FormatInt(f.avg(), 10)
+	avg := time.Duration(f.avg()).String()
 
 	ret = append(ret, byte(len(t)))
 	ret = append(ret, t...)
@@ -108,6 +108,8 @@ type Stat struct {
 	GetConn        *timeField
 	PutConn        *timeField
 	Dispatch       *timeField
+	VWaitBatchT    *timeField
+	VWaitRespT     *timeField
 	BatchReqCount  *countField
 	FullReqCount   *countField
 	TickerReqCount *countField
@@ -124,6 +126,8 @@ func newStat() *Stat {
 		GetConn:        &timeField{},
 		PutConn:        &timeField{},
 		Dispatch:       &timeField{},
+		VWaitBatchT:    &timeField{},
+		VWaitRespT:     &timeField{},
 		BatchReqCount:  &countField{},
 		FullReqCount:   &countField{},
 		TickerReqCount: &countField{},

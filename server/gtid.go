@@ -7,11 +7,9 @@ package server
 
 import (
 	"common"
-	"time"
-
 	"net/rpc"
-
 	"quicklock"
+	"time"
 
 	"github.com/lemonwx/TxMgr/proto"
 	"github.com/lemonwx/log"
@@ -20,6 +18,7 @@ import (
 type req struct {
 	cmd uint8
 	co  *MidConn
+	ts  time.Time
 }
 
 type response struct {
@@ -65,6 +64,7 @@ func sendall(exReq *req) {
 				if req.cmd == proto.D {
 					gtidTodel = append(gtidTodel, req.co.NextVersion)
 				}
+				req.co.stat.VWaitBatchT.add(int64(time.Since(req.ts)))
 			default:
 				req = nil
 			}
@@ -79,15 +79,15 @@ func sendall(exReq *req) {
 		if exReq.cmd == proto.D {
 			gtidTodel = append(gtidTodel, exReq.co.NextVersion)
 		}
+		exReq.co.stat.VWaitBatchT.add(int64(time.Since(exReq.ts)))
+		exReq.co.stat.BatchReqCount.add(int64(len(cmds)))
 
 		req := proto.Request{
 			Cmds:   cmds,
 			ToDels: gtidTodel,
 			Ts:     time.Now(),
 		}
-
 		log.Debugf("%d request merge to send", len(req.Cmds))
-		exReq.co.stat.BatchReqCount.add(int64(len(req.Cmds)))
 
 		cli, err := pool.Get()
 		if err != nil {
@@ -101,10 +101,9 @@ func sendall(exReq *req) {
 		}
 
 		pool.Put(cli)
+		exReq.co.stat.VWaitRespT.add(int64(time.Since(req.Ts)))
 
-		log.Debug(resp.Maxs, resp.Active)
-
-		log.Debugf("response: ")
+		log.Debugf("resps: %v, %v", resp.Maxs, resp.Active)
 		for idx, co := range cos {
 			switch cmds[idx] {
 			case proto.Q:
@@ -144,11 +143,11 @@ func RequestSender() {
 
 func Push(cmd uint8, co *MidConn) {
 	select {
-	case maxQueue <- &req{cmd, co}:
+	case maxQueue <- &req{cmd, co, time.Now()}:
 	default:
 		log.Debug("send all by full queue")
 		co.stat.FullReqCount.add(1)
-		sendall(&req{cmd, co})
+		sendall(&req{cmd, co, time.Now()})
 		return
 	}
 }
