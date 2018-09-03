@@ -25,7 +25,7 @@ func (conn *MidConn) execSingle(stmt *sqlparser.Update, idx int, delSql string) 
 		return nil, err
 	}
 
-	var vInUse map[uint64]uint8
+	var vInUse map[uint64]bool
 	var vErr error
 	var chkRet *mysql.Result
 	var chkErr error
@@ -90,7 +90,7 @@ func (conn *MidConn) execMulti(stmt *sqlparser.Update, delsql string) ([]*mysql.
 
 	var updateSql string
 	shardSize := len(conn.nodeIdx)
-	ch := make(chan map[uint64]uint8, shardSize)
+	ch := make(chan map[uint64]bool, shardSize)
 
 	go func() {
 		// assume the row want to update not used by other, so get next version as the same time

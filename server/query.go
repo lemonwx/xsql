@@ -77,7 +77,7 @@ func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysq
 	wg.Add(2)
 
 	var vErr error
-	var vInUse map[uint64]uint8
+	var vInUse map[uint64]bool
 	go func() {
 		vInUse, vErr = conn.getCurVInUse(flag)
 		wg.Done()
@@ -107,7 +107,7 @@ func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysq
 	return rets, nil
 }
 
-func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]uint8) error {
+func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]bool) error {
 	ts := time.Now()
 	defer func() {
 		conn.stat.ChkInuseT.add(time.Since(ts))
@@ -125,7 +125,7 @@ func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uin
 	return nil
 }
 
-func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]uint8) error {
+func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]bool) error {
 	idx := uint8(0)
 	for count := 0; count < size; count += 1 {
 		s := idx + 1
@@ -273,7 +273,7 @@ func (conn *MidConn) handleLimit(rets []*mysql.Result, limit *sqlparser.Limit) (
 	return rets, nil
 }
 
-func (conn *MidConn) setupNodeStatus(vInUse map[uint64]byte, hide bool, isStmt bool, extraSize int) {
+func (conn *MidConn) setupNodeStatus(vInUse map[uint64]bool, hide bool, isStmt bool, extraSize int) {
 	for idx, _ := range conn.nodes {
 		conn.nodes[idx].VersionsInUse = vInUse
 		conn.nodes[idx].NeedHide = hide

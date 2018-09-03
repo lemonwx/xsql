@@ -8,6 +8,7 @@ package common
 import (
 	"fmt"
 	"net"
+	"net/rpc"
 
 	"github.com/lemonwx/log"
 )
@@ -21,13 +22,13 @@ type Conn interface {
 }
 
 type Pool struct {
-	idleConns chan Conn
-	freeConns chan Conn
+	idleConns chan *rpc.Client
+	freeConns chan *rpc.Client
 
-	New func() (Conn, error)
+	New func() (*rpc.Client, error)
 }
 
-func NewPool(initSize, idleSize, maxSize uint32, f func() (Conn, error)) (*Pool, error) {
+func NewPool(initSize, idleSize, maxSize uint32, f func() (*rpc.Client, error)) (*Pool, error) {
 	if initSize > idleSize {
 		return nil, fmt.Errorf("pool's init size must < idle size")
 	}
@@ -36,8 +37,8 @@ func NewPool(initSize, idleSize, maxSize uint32, f func() (Conn, error)) (*Pool,
 	}
 
 	p := &Pool{New: f}
-	p.idleConns = make(chan Conn, idleSize)
-	p.freeConns = make(chan Conn, maxSize-idleSize)
+	p.idleConns = make(chan *rpc.Client, idleSize)
+	p.freeConns = make(chan *rpc.Client, maxSize-idleSize)
 
 	failedSize := 0
 	count := uint32(0)
@@ -65,15 +66,17 @@ func NewPool(initSize, idleSize, maxSize uint32, f func() (Conn, error)) (*Pool,
 	return p, nil
 }
 
-func (p *Pool) tryReuse(conn Conn) (Conn, error) {
+func (p *Pool) tryReuse(conn *rpc.Client) (*rpc.Client, error) {
+	log.Debug(conn)
 	if conn != nil {
+		log.Debugf("return conn")
 		return conn, nil
 	}
 	return p.New()
 }
 
-func (p *Pool) GetConnFromIdle() (Conn, error) {
-	var conn Conn
+func (p *Pool) GetConnFromIdle() (*rpc.Client, error) {
+	var conn *rpc.Client
 	select {
 	case conn = <-p.idleConns:
 		return p.tryReuse(conn)
@@ -82,7 +85,7 @@ func (p *Pool) GetConnFromIdle() (Conn, error) {
 	}
 }
 
-func (p *Pool) Get() (Conn, error) {
+func (p *Pool) Get() (*rpc.Client, error) {
 	// first try get conn from idle
 	if conn, err := p.GetConnFromIdle(); err == nil {
 		return conn, nil
@@ -92,7 +95,7 @@ func (p *Pool) Get() (Conn, error) {
 	//      1. may some conn put back to idle list, we expect all conn get from idle list
 	//   or 2. may free empty and idle not empty
 	// so try get conn from both idle and free
-	var conn Conn
+	var conn *rpc.Client
 	select {
 	case conn = <-p.idleConns:
 	case conn = <-p.freeConns:
@@ -100,7 +103,7 @@ func (p *Pool) Get() (Conn, error) {
 	return p.tryReuse(conn)
 }
 
-func (p *Pool) freeConn(conn Conn) {
+func (p *Pool) freeConn(conn *rpc.Client) {
 	conn.Close()
 	conn = nil
 	select {
@@ -112,7 +115,8 @@ func (p *Pool) freeConn(conn Conn) {
 	}
 }
 
-func (p *Pool) Put(conn Conn) {
+func (p *Pool) Put(conn *rpc.Client) {
+	log.Debug(len(p.idleConns), len(p.freeConns))
 	select {
 	case p.idleConns <- conn:
 		return

@@ -7,7 +7,6 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/server"
-	"github.com/lemonwx/xsql/server/version"
 )
 
 var cfg *config.Conf
@@ -41,7 +40,6 @@ func main() {
 
 	fmt.Println("init cfg done.")
 	setupLogger()
-	version.NewRpcPool(cfg.InitSize, cfg.MaxSize, cfg.VerSeqAddr)
 
 	s, err := server.NewServer(cfg)
 	if err != nil {

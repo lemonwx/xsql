@@ -47,7 +47,7 @@ func (node *Node) node2cliNullMask(data []byte, fieldCount int) ([]byte, error) 
 	return cliNullMask, nil
 }
 
-func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]uint8) error {
+func (node *Node) hideExtraCols(rs *mysql.Result, data *[]byte, vs map[uint64]bool) error {
 
 	if node.IsStmt {
 		pos := 1 + ((len(rs.Fields) + node.ExtraSize + 7 + 2) >> 3)

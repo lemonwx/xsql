@@ -32,7 +32,7 @@ type Node struct {
 	charset      string
 	salt         []byte
 
-	VersionsInUse map[uint64]uint8
+	VersionsInUse map[uint64]bool
 	NextVersion   uint64
 	NeedHide      bool
 	IsStmt        bool
@@ -445,7 +445,7 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 		switch vv := v.(type) {
 		case error:
 			return vv
-		case map[uint64]uint8:
+		case map[uint64]bool:
 			node.VersionsInUse = vv
 		default:
 			return fmt.Errorf("unexpect type recv: %v", vv)

@@ -27,7 +27,6 @@ import (
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
-	"github.com/lemonwx/xsql/server/version"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -111,7 +110,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 				Push(proto.D, conn)
 				r := <-conn.resp
 				log.Debugf("get from async gtid: %v", r)
-				if err := version.ReleaseVersion(conn.NextVersion); err == nil {
+				if r.Err == nil {
 					break
 				}
 				time.Sleep(time.Second * 3)

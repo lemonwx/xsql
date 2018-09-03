@@ -25,7 +25,6 @@ import (
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/node"
 	"github.com/lemonwx/xsql/router"
-	"github.com/lemonwx/xsql/server/version"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -69,7 +68,7 @@ type MidConn struct {
 	status        uint16
 	defaultStatus uint16
 
-	VersionsInUse map[uint64]uint8
+	VersionsInUse map[uint64]bool
 	NextVersion   uint64
 
 	nodeIdx []int // node that has exec sql in the trx
@@ -547,82 +546,52 @@ func (conn *MidConn) NewMySQLErr(errCode uint16) *mysql.SqlError {
 }
 
 func (conn *MidConn) getNextVersion() error {
-	Push(proto.C, conn)
-	r := <-conn.resp
-	log.Debugf("get from async gtid: %v", r)
 	ts := time.Now()
 	defer func() {
 		conn.stat.VersionT.add(time.Since(ts))
 	}()
 
-	var err error
 	if conn.NextVersion == 0 {
-		conn.NextVersion, err = version.NextVersion()
-		if err != nil {
-			log.Debugf("[%d] conn next version is nil, but get failed %v", conn.ConnectionId, conn.NextVersion)
-			return err
-		}
-		log.Debugf("[%d] conn next version is nil, get one: %v", conn.ConnectionId, conn.NextVersion)
-	} else {
-		log.Debugf("[%d] use next version get from pre sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
+		Push(proto.C, conn)
+		r := <-conn.resp
+		log.Debugf("get from async gtid: %v", r)
+
+		conn.NextVersion = r.Max
 	}
 	return nil
 }
 
-func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]uint8, error) {
+func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]bool, error) {
 	ts := time.Now()
 	defer func() {
 		conn.stat.VersionT.add(time.Since(ts))
 	}()
 
-	var err error
-	var ret map[uint64]uint8
+	var cmd uint8
 	if flag == UPDATE_OR_DELETE && conn.NextVersion == 0 {
-		Push(proto.C_Q, conn)
-		r := <-conn.resp
-		log.Debugf("get from async gtid: %v", r)
-		log.Debugf("[%d] chk v in use for update, get next version at the same time", conn.ConnectionId)
-		base, err := version.InUseAndNext()
-		if err != nil {
-			return nil, err
-		}
-		conn.NextVersion = base.Next
-		ret = conn.VersionsInUse
+		cmd = proto.C_Q
 	} else {
-		Push(proto.Q, conn)
-		log.Debug(conn.resp)
-		r := <-conn.resp
-		log.Debugf("get from async gtid: %v", r)
-		ret, err = version.VersionsInUse()
-		if err != nil {
-			return nil, err
-		}
+		cmd = proto.Q
 	}
-	if _, ok := ret[conn.NextVersion]; ok {
-		delete(ret, conn.NextVersion)
+
+	Push(cmd, conn)
+	r := <-conn.resp
+
+	if cmd == proto.C_Q {
+		conn.NextVersion = r.Max
 	}
-	return ret, nil
+
+	if _, ok := r.Active[r.Max]; ok {
+		delete(r.Active, r.Max)
+	}
+
+	return r.Active, nil
 }
 
 func (conn *MidConn) getVInUse() error {
-	// get v in use by other session
-	var err error
-
-	if conn.VersionsInUse == nil {
-		conn.VersionsInUse, err = version.VersionsInUse()
-		if err != nil {
-			log.Debugf("[%d] conn's vInuse in use is nil, but get v in user failed %v", conn.ConnectionId, err)
-			return err
-		}
-
-		if _, ok := conn.VersionsInUse[conn.NextVersion]; ok {
-			delete(conn.VersionsInUse, conn.NextVersion)
-			log.Debugf("[%d] delete pre sql's next version %s in the same trx", conn.ConnectionId, conn.NextVersion)
-		}
-		log.Debugf("[%d] get vInuse: %v", conn.ConnectionId, conn.VersionsInUse)
-	} else {
-		log.Debugf("[%d] use vInuse get from pre sel sql in this trx: %v", conn.ConnectionId, conn.NextVersion)
-	}
+	Push(proto.Q, conn)
+	r := <-conn.resp
+	conn.VersionsInUse = r.Active
 	return nil
 }
 
