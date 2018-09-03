@@ -115,7 +115,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 				}
 				time.Sleep(time.Second * 3)
 			}
-			conn.stat.VersionT.add(time.Since(ts))
+			conn.stat.VersionT.add(int64(time.Since(ts)))
 		}
 
 		reset()
@@ -126,7 +126,7 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 func (conn *MidConn) clearExecNodes(sql []byte) error {
 	ts := time.Now()
 	defer func() {
-		conn.stat.ClearT.add(time.Since(ts))
+		conn.stat.ClearT.add(int64(time.Since(ts)))
 	}()
 
 	if len(conn.execNodes) == 1 {

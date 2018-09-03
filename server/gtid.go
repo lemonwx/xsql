@@ -87,6 +87,7 @@ func sendall(exReq *req) {
 		}
 
 		log.Debugf("%d request merge to send", len(req.Cmds))
+		exReq.co.stat.BatchReqCount.add(int64(len(req.Cmds)))
 
 		cli, err := pool.Get()
 		if err != nil {
@@ -135,6 +136,7 @@ func RequestSender() {
 		<-ticker
 		log.Debugf("send all by demon ticker")
 		req := <-maxQueue
+		req.co.stat.TickerReqCount.add(1)
 		sendall(req)
 	}
 
@@ -145,6 +147,7 @@ func Push(cmd uint8, co *MidConn) {
 	case maxQueue <- &req{cmd, co}:
 	default:
 		log.Debug("send all by full queue")
+		co.stat.FullReqCount.add(1)
 		sendall(&req{cmd, co})
 		return
 	}

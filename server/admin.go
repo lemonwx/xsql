@@ -10,8 +10,6 @@ import (
 
 	"reflect"
 
-	"strconv"
-
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
@@ -63,7 +61,7 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 				{Name: []byte("avg")},
 			},
 			FieldNames: map[string]int{
-				"phase": 0, "cost": 1, "counts": 2, "avg": 3},
+				"phase": 0, "all": 1, "counts": 2, "avg": 3},
 		}
 
 		ret := newStat()
@@ -73,43 +71,31 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 		for _, co := range conn.svr.cos.midConns {
 			sVal := reflect.ValueOf(*co.stat)
 			for i := 0; i < t.NumField(); i++ {
-				sField := sVal.Field(i).Interface().(*field)
-				tField := v.Field(i).Interface().(*field)
-				tField.t += sField.t
-				tField.c += sField.c
+				sField := sVal.Field(i).Interface().(field)
+				tField := v.Field(i).Interface().(field)
+				tField.plus(sField)
 			}
 		}
 
 		for _, stat := range conn.svr.stats {
 			sVal := reflect.ValueOf(*stat)
 			for i := 0; i < t.NumField(); i++ {
-				sField := sVal.Field(i).Interface().(*field)
-				tField := v.Field(i).Interface().(*field)
-				tField.t += sField.t
-				tField.c += sField.c
+				sField := sVal.Field(i).Interface().(field)
+				tField := v.Field(i).Interface().(field)
+				tField.plus(sField)
 			}
 		}
 
 		rs.RowDatas = make([]mysql.RowData, 0, t.NumField()+1)
 		for i := 0; i < t.NumField(); i++ {
 			phase := t.Field(i).Name
-			stat := v.Field(i).Interface().(*field)
+			field := v.Field(i).Interface().(field)
 			row := make([]byte, 0, len(phase)*4)
 
 			row = append(row, byte(len(phase)))
 			row = append(row, phase...)
 
-			t := stat.t.String()
-			row = append(row, byte(len(t)))
-			row = append(row, t...)
-
-			c := strconv.FormatInt(stat.c, 10)
-			row = append(row, byte(len(c)))
-			row = append(row, c...)
-
-			avg := stat.avg().String()
-			row = append(row, byte(len(avg)))
-			row = append(row, avg...)
+			row = append(row, field.fmt()...)
 			rs.RowDatas = append(rs.RowDatas, row)
 		}
 

@@ -176,7 +176,7 @@ func (conn *MidConn) Serve() {
 func (conn *MidConn) dispatch(sql []byte) error {
 	ts := time.Now()
 	defer func() {
-		conn.stat.Dispatch.add(time.Since(ts))
+		conn.stat.Dispatch.add(int64(time.Since(ts)))
 	}()
 	opt, sql := sql[0], sql[1:]
 	log.Debugf("[%d] general: %d:%s", conn.ConnectionId, opt, sql)
@@ -205,7 +205,7 @@ func (conn *MidConn) handleQuery(sql string) error {
 	sql = strings.TrimRight(sql, ";")
 	ts := time.Now()
 	stmt, err := sqlparser.Parse(sql)
-	conn.stat.SqlparseT.add(time.Since(ts))
+	conn.stat.SqlparseT.add(int64(time.Since(ts)))
 	if err != nil {
 		log.Errorf("[%d] parse [%s] failed: %v", conn.ConnectionId, sql, err)
 		return err
@@ -475,7 +475,7 @@ func (conn *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset 
 func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
 	ts := time.Now()
 	defer func() {
-		conn.stat.RouteT.add(time.Since(ts))
+		conn.stat.RouteT.add(int64(time.Since(ts)))
 	}()
 
 	if conn.db == "" {
@@ -495,7 +495,7 @@ func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
 func (conn *MidConn) getMultiBackConn(idxs []int) error {
 	ts := time.Now()
 	defer func() {
-		conn.stat.GetConn.add(time.Since(ts))
+		conn.stat.GetConn.add(int64(time.Since(ts)))
 	}()
 
 	for _, idx := range idxs {
@@ -516,7 +516,7 @@ func (conn *MidConn) getMultiBackConn(idxs []int) error {
 func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
 	ts := time.Now()
 	defer func() {
-		conn.stat.GetConn.add(time.Since(ts))
+		conn.stat.GetConn.add(int64(time.Since(ts)))
 	}()
 
 	back, ok := conn.execNodes[idx]
@@ -535,7 +535,7 @@ func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
 func (conn *MidConn) putConn(idx int, back *node.Node) {
 	ts := time.Now()
 	defer func() {
-		conn.stat.PutConn.add(time.Since(ts))
+		conn.stat.PutConn.add(int64(time.Since(ts)))
 	}()
 
 	conn.pools[idx].PutConn(back)
@@ -548,7 +548,7 @@ func (conn *MidConn) NewMySQLErr(errCode uint16) *mysql.SqlError {
 func (conn *MidConn) getNextVersion() error {
 	ts := time.Now()
 	defer func() {
-		conn.stat.VersionT.add(time.Since(ts))
+		conn.stat.VersionT.add(int64(time.Since(ts)))
 	}()
 
 	if conn.NextVersion == 0 {
@@ -564,7 +564,7 @@ func (conn *MidConn) getNextVersion() error {
 func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]bool, error) {
 	ts := time.Now()
 	defer func() {
-		conn.stat.VersionT.add(time.Since(ts))
+		conn.stat.VersionT.add(int64(time.Since(ts)))
 	}()
 
 	var cmd uint8
@@ -616,7 +616,7 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]i
 func (conn *MidConn) execute(back *node.Node, opt uint8, data []byte) (*mysql.Result, error) {
 	ts := time.Now()
 	defer func() {
-		conn.stat.ExecT.add(time.Since(ts))
+		conn.stat.ExecT.add(int64(time.Since(ts)))
 	}()
 	return back.Execute(opt, data)
 }

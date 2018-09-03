@@ -110,7 +110,7 @@ func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysq
 func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]bool) error {
 	ts := time.Now()
 	defer func() {
-		conn.stat.ChkInuseT.add(time.Since(ts))
+		conn.stat.ChkInuseT.add(int64(time.Since(ts)))
 	}()
 
 	for idx, ret := range *rets {
