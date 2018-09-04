@@ -16,6 +16,11 @@ import (
 	"github.com/lemonwx/xsql/config"
 )
 
+const (
+	SendByDemonTicker uint8 = iota
+	SendByFullQueue
+)
+
 type req struct {
 	cmd uint8
 	co  *MidConn
@@ -29,18 +34,25 @@ type response struct {
 }
 
 var (
-	maxT     time.Duration
-	maxQueue chan *req
-	ticker   <-chan time.Time
-	pool     *common.Pool
-	ql       *quicklock.QuickLock
+	maxT      time.Duration
+	maxQueue  chan *req
+	ticker    <-chan time.Time
+	pool      *common.Pool
+	ql        *quicklock.QuickLock
+	cmds      []uint8
+	cos       []*MidConn
+	gtidTodel []uint64
 )
 
 func SetVars(cfg *config.Conf) {
-	maxT = time.Duration(time.Millisecond * time.Duration(cfg.VWaitBatchTime))
-	maxQueue = make(chan *req, cfg.VWaitBatchCount)
+	// max wait time for an version request
+	maxT = time.Duration(time.Microsecond * time.Duration(cfg.VWaitBatchTime))
 	ticker = time.Tick(maxT)
+	// queue of request
+	maxQueue = make(chan *req, cfg.VWaitBatchCount)
+	// only one receiver consume from maxQueue
 	ql = quicklock.NewQL()
+	// for every request
 	log.Debugf("wait time: %v, wait count: %d", maxT, cfg.VWaitBatchCount)
 }
 
@@ -57,78 +69,98 @@ func InitVPool(cfg *config.Conf) error {
 	return nil
 }
 
-func sendall(exReq *req) {
+func sendall(flag uint8) {
 
 	send := func() {
-		size := len(maxQueue)
-		cmds := make([]uint8, 0, size)
-		cos := make([]*MidConn, 0, size)
-		gtidTodel := make([]uint64, 0, size)
+		reqs := &proto.Request{
+			Ts: time.Now(),
+		}
+		cos := []*MidConn{}
+		//hasSleep := false
+		b := false
 		for {
-			var req *req
 			select {
-			case req = <-maxQueue:
-				cmds = append(cmds, req.cmd)
+			case req := <-maxQueue:
+				reqs.Cmds = append(reqs.Cmds, req.cmd)
 				cos = append(cos, req.co)
 				if req.cmd == proto.D {
-					gtidTodel = append(gtidTodel, req.co.NextVersion)
+					reqs.ToDels = append(reqs.ToDels, req.co.NextVersion)
 				}
 				req.co.stat.VWaitBatchT.add(int64(time.Since(req.ts)))
 			default:
-				req = nil
+				/*
+				if ! hasSleep {
+					time.Sleep(maxT)
+					hasSleep = true
+				} else {
+					b = true
+				}*/
+				b = true
 			}
 
-			if req == nil {
+			if b {
 				break
 			}
 		}
 
-		cmds = append(cmds, exReq.cmd)
-		cos = append(cos, exReq.co)
-		if exReq.cmd == proto.D {
-			gtidTodel = append(gtidTodel, exReq.co.NextVersion)
-		}
-		exReq.co.stat.VWaitBatchT.add(int64(time.Since(exReq.ts)))
-		exReq.co.stat.BatchReqCount.add(int64(len(cmds)))
-
-		req := proto.Request{
-			Cmds:   cmds,
-			ToDels: gtidTodel,
-			Ts:     time.Now(),
-		}
-		log.Debugf("%d request merge to send", len(req.Cmds))
-
-		cli, err := pool.Get()
-		if err != nil {
-			panic(err)
+		if len(reqs.Cmds) == 0 {
+			return
 		}
 
-		resp := &proto.Response{}
-		err = cli.Call("VSeq.PushReq", req, &resp)
-		if err != nil {
-			panic(err)
-		}
+		go func(request *proto.Request, cos []*MidConn) {
+			resp := proto.Response{}
 
-		pool.Put(cli)
-		exReq.co.stat.VWaitRespT.add(int64(time.Since(req.Ts)))
+			log.Debugf("%d requests merge to send", len(request.Cmds))
 
-		log.Debugf("resps: %v, %v", resp.Maxs, resp.Active)
-		for idx, co := range cos {
-			switch cmds[idx] {
-			case proto.Q:
-				co.resp <- &response{Active: resp.Active}
-			case proto.C:
-				max := resp.Maxs[0]
-				resp.Maxs = resp.Maxs[1:]
-				co.resp <- &response{Max: max}
-			case proto.D:
-				co.resp <- &response{Err: nil}
-			case proto.C_Q:
-				max := resp.Maxs[0]
-				resp.Maxs = resp.Maxs[1:]
-				co.resp <- &response{Max: max}
+			cli, err := pool.Get()
+			if err != nil {
+				panic(err)
 			}
-		}
+
+			defer pool.Put(cli)
+
+			err = cli.Call("VSeq.PushReq", request, &resp)
+			if err != nil {
+				panic(err)
+			}
+
+			cos[0].stat.VWaitRespT.add(int64(time.Since(request.Ts)))
+			cos[0].stat.BatchReqCount.add(int64(len(request.Cmds)))
+
+			active := make(map[uint64]bool)
+			for _, v := range resp.Maxs {
+				active[v] = false
+			}
+
+			for _, v := range resp.Active {
+				active[v] = false
+			}
+
+			r := &response{Err: nil}
+			for idx, co := range cos {
+				switch request.Cmds[idx] {
+				case proto.Q:
+					r.Active = active
+					r.Max = 0
+					co.resp <- r
+				case proto.C:
+					r.Active = nil
+					r.Max = resp.Maxs[0]
+					resp.Maxs = resp.Maxs[1:]
+					co.resp <- r
+				case proto.D:
+					r.Active = nil
+					r.Max = 0
+					co.resp <- r
+				case proto.C_Q:
+					r.Active = active
+					r.Max = resp.Maxs[0]
+					resp.Maxs = resp.Maxs[1:]
+					co.resp <- r
+				}
+			}
+
+		}(reqs, cos)
 	}
 
 	if ql.Lock() {
@@ -142,10 +174,8 @@ func sendall(exReq *req) {
 func RequestSender() {
 	for {
 		<-ticker
-		log.Debugf("send all by demon ticker")
-		req := <-maxQueue
-		req.co.stat.TickerReqCount.add(1)
-		sendall(req)
+		log.Debugf("demon ticker")
+		sendall(SendByDemonTicker)
 	}
 
 }
@@ -155,8 +185,8 @@ func Push(cmd uint8, co *MidConn) {
 	case maxQueue <- &req{cmd, co, time.Now()}:
 	default:
 		log.Debug("send all by full queue")
-		co.stat.FullReqCount.add(1)
-		sendall(&req{cmd, co, time.Now()})
+		sendall(SendByFullQueue)
+		maxQueue <- &req{cmd, co, time.Now()}
 		return
 	}
 }
