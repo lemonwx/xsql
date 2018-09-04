@@ -87,6 +87,13 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 			}
 		}
 
+		sVal := reflect.ValueOf(*conn.svr.svrStat)
+		for i := 0; i < t.NumField(); i++ {
+			sField := sVal.Field(i).Interface().(field)
+			tField := v.Field(i).Interface().(field)
+			tField.plus(sField)
+		}
+
 		rs.RowDatas = make([]mysql.RowData, 0, t.NumField()+1)
 		for i := 0; i < t.NumField(); i++ {
 			phase := t.Field(i).Name

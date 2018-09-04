@@ -124,6 +124,8 @@ type Stat struct {
 	BatchReqCount  *countField
 	FullReqCount   *countField
 	TickerReqCount *countField
+	BlockRequestCount *countField
+	SendT *timeField
 }
 
 func newStat() *Stat {
@@ -142,6 +144,8 @@ func newStat() *Stat {
 		BatchReqCount:  &countField{},
 		FullReqCount:   &countField{},
 		TickerReqCount: &countField{},
+		BlockRequestCount: &countField{},
+		SendT: &timeField{},
 	}
 }
 

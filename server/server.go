@@ -35,6 +35,7 @@ type Server struct {
 	cfg   *config.Conf
 	pools map[int]*node.Pool
 	cos   *conns
+	svrStat *Stat
 	stats []*Stat
 	lock  sync.Mutex
 }
@@ -48,6 +49,8 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 	s.cos = &conns{
 		midConns: map[string]*MidConn{},
 	}
+
+	s.svrStat = newStat()
 
 	if err = s.parseSchemas(cfg); err != nil {
 		return nil, err
@@ -63,7 +66,7 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 
 	//go s.dumpPoolsInfo()
 
-	go RequestSender()
+	go RequestSender(s.svrStat)
 
 	return s, nil
 }
