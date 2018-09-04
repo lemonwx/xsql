@@ -69,113 +69,107 @@ func InitVPool(cfg *config.Conf) error {
 	return nil
 }
 
-func sendall(flag uint8) {
+func batchSend(request *proto.Request, cos []*MidConn) {
+	resp := proto.Response{}
 
-	send := func() {
-		reqs := &proto.Request{
-			Ts: time.Now(),
-		}
-		cos := []*MidConn{}
-		//hasSleep := false
-		b := false
-		for {
-			select {
-			case req := <-maxQueue:
-				reqs.Cmds = append(reqs.Cmds, req.cmd)
-				cos = append(cos, req.co)
-				if req.cmd == proto.D {
-					reqs.ToDels = append(reqs.ToDels, req.co.NextVersion)
-				}
-				req.co.stat.VWaitBatchT.add(int64(time.Since(req.ts)))
-			default:
-				/*
-				if ! hasSleep {
-					time.Sleep(maxT)
-					hasSleep = true
-				} else {
-					b = true
-				}*/
-				b = true
-			}
+	log.Debugf("%d requests merge to send", len(request.Cmds))
 
-			if b {
-				break
-			}
-		}
-
-		if len(reqs.Cmds) == 0 {
-			return
-		}
-
-		go func(request *proto.Request, cos []*MidConn) {
-			resp := proto.Response{}
-
-			log.Debugf("%d requests merge to send", len(request.Cmds))
-
-			cli, err := pool.Get()
-			if err != nil {
-				panic(err)
-			}
-
-			defer pool.Put(cli)
-
-			err = cli.Call("VSeq.PushReq", request, &resp)
-			if err != nil {
-				panic(err)
-			}
-
-			cos[0].stat.VWaitRespT.add(int64(time.Since(request.Ts)))
-			cos[0].stat.BatchReqCount.add(int64(len(request.Cmds)))
-
-			active := make(map[uint64]bool)
-			for _, v := range resp.Maxs {
-				active[v] = false
-			}
-
-			for _, v := range resp.Active {
-				active[v] = false
-			}
-
-			r := &response{Err: nil}
-			for idx, co := range cos {
-				switch request.Cmds[idx] {
-				case proto.Q:
-					r.Active = active
-					r.Max = 0
-					co.resp <- r
-				case proto.C:
-					r.Active = nil
-					r.Max = resp.Maxs[0]
-					resp.Maxs = resp.Maxs[1:]
-					co.resp <- r
-				case proto.D:
-					r.Active = nil
-					r.Max = 0
-					co.resp <- r
-				case proto.C_Q:
-					r.Active = active
-					r.Max = resp.Maxs[0]
-					resp.Maxs = resp.Maxs[1:]
-					co.resp <- r
-				}
-			}
-
-		}(reqs, cos)
+	cli, err := pool.Get()
+	if err != nil {
+		panic(err)
 	}
 
+	defer pool.Put(cli)
+
+	err = cli.Call("VSeq.PushReq", request, &resp)
+	if err != nil {
+		panic(err)
+	}
+
+	cos[0].stat.VWaitRespT.add(int64(time.Since(request.Ts)))
+	cos[0].stat.BatchReqCount.add(int64(len(request.Cmds)))
+
+	active := make(map[uint64]bool)
+	for _, v := range resp.Maxs {
+		active[v] = false
+	}
+
+	for _, v := range resp.Active {
+		active[v] = false
+	}
+
+	r := &response{Err: nil}
+	for idx, co := range cos {
+		switch request.Cmds[idx] {
+		case proto.Q:
+			r.Active = active
+			r.Max = 0
+			co.resp <- r
+		case proto.C:
+			r.Active = nil
+			r.Max = resp.Maxs[0]
+			resp.Maxs = resp.Maxs[1:]
+			co.resp <- r
+		case proto.D:
+			r.Active = nil
+			r.Max = 0
+			co.resp <- r
+		case proto.C_Q:
+			r.Active = active
+			r.Max = resp.Maxs[0]
+			resp.Maxs = resp.Maxs[1:]
+			co.resp <- r
+		}
+	}
+
+}
+
+func send() {
+	size := len(maxQueue)
+	reqs := &proto.Request{Cmds: make([]uint8, 0, size), Ts: time.Now()}
+	cos := make([]*MidConn, 0, size)
+	b := false
+	for {
+		select {
+		case req := <-maxQueue:
+			reqs.Cmds = append(reqs.Cmds, req.cmd)
+			cos = append(cos, req.co)
+			if req.cmd == proto.D {
+				reqs.ToDels = append(reqs.ToDels, req.co.NextVersion)
+			}
+			req.co.stat.VWaitBatchT.add(int64(time.Since(req.ts)))
+		default:
+			b = true
+		}
+
+		if b {
+			break
+		}
+	}
+
+	if len(reqs.Cmds) == 0 {
+		return
+	}
+	go batchSend(reqs, cos)
+	cos[0].stat.BlockRequestCount.add(int64(len(maxQueue)))
+}
+
+func sendall(flag uint8) {
 	if ql.Lock() {
 		send()
 		ql.UnLock()
-	} else {
-		log.Debugf("another send all executing, return")
 	}
 }
 
-func RequestSender() {
+func RequestSender(stat *Stat) {
 	for {
 		<-ticker
-		log.Debugf("demon ticker")
+		ts := time.Now()
 		sendall(SendByDemonTicker)
+		cost := time.Since(ts)
+		if cost >= time.Microsecond * 100 {
+			stat.SendT.add(int64(time.Since(ts)))
+		}
 	}
 
 }
