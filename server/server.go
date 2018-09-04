@@ -30,14 +30,14 @@ type conns struct {
 }
 
 type Server struct {
-	lis   net.Listener
-	addr  string
-	cfg   *config.Conf
-	pools map[int]*node.Pool
-	cos   *conns
+	lis     net.Listener
+	addr    string
+	cfg     *config.Conf
+	pools   map[int]*node.Pool
+	cos     *conns
 	svrStat *Stat
-	stats []*Stat
-	lock  sync.Mutex
+	stats   []*Stat
+	lock    sync.Mutex
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {

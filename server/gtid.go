@@ -34,14 +34,14 @@ type response struct {
 }
 
 var (
-	maxT      time.Duration
-	maxQueue  chan *req
-	ticker    <-chan time.Time
-	pool      *common.Pool
-	ql        *quicklock.QuickLock
-	cmds      []uint8
-	cos       []*MidConn
-	gtidTodel []uint64
+	maxT     time.Duration
+	maxQueue chan *req
+	ticker   <-chan time.Time
+	pool     *common.Pool
+	ql       *quicklock.QuickLock
+	cmds     []uint8
+	cos      []*MidConn
+	toDels   []uint64
 )
 
 func SetVars(cfg *config.Conf) {
@@ -52,6 +52,10 @@ func SetVars(cfg *config.Conf) {
 	maxQueue = make(chan *req, cfg.VWaitBatchCount)
 	// only one receiver consume from maxQueue
 	ql = quicklock.NewQL()
+	//
+	cmds = make([]uint8, 0, cfg.VWaitBatchCount)
+	cos = make([]*MidConn, 0, cfg.VWaitBatchCount)
+	toDels = make([]uint64, 0, cfg.VWaitBatchCount)
 	// for every request
 	log.Debugf("wait time: %v, wait count: %d", maxT, cfg.VWaitBatchCount)
 }
@@ -121,37 +125,45 @@ func batchSend(request *proto.Request, cos []*MidConn) {
 			co.resp <- r
 		}
 	}
-
 }
 
 func send() {
-	size := len(maxQueue)
-	reqs := &proto.Request{Cmds: make([]uint8, 0, size), Ts: time.Now()}
-	cos := make([]*MidConn, 0, size)
-	b := false
-	for {
+	bContinue := true
+	cmds = cmds[:0]
+	cos = cos[:0]
+	toDels = toDels[:0]
+
+	for bContinue {
+		var req *req
 		select {
-		case req := <-maxQueue:
-			reqs.Cmds = append(reqs.Cmds, req.cmd)
+		case req = <-maxQueue:
+			cmds = append(cmds, req.cmd)
 			cos = append(cos, req.co)
 			if req.cmd == proto.D {
-				reqs.ToDels = append(reqs.ToDels, req.co.NextVersion)
+				toDels = append(toDels, req.co.NextVersion)
 			}
-			req.co.stat.VWaitBatchT.add(int64(time.Since(req.ts)))
 		default:
-			b = true
-		}
-
-		if b {
-			break
+			bContinue = false
 		}
 	}
 
-	if len(reqs.Cmds) == 0 {
+	if len(cmds) == 0 {
 		return
 	}
-	go batchSend(reqs, cos)
+
+	reqs := &proto.Request{
+		Cmds:   make([]uint8, len(cmds)),
+		ToDels: make([]uint64, len(toDels)),
+		Ts:     time.Now(),
+	}
+	midCos := make([]*MidConn, len(cos))
+
+	copy(reqs.Cmds, cmds)
+	copy(reqs.ToDels, toDels)
+	copy(midCos, cos)
+
 	cos[0].stat.BlockRequestCount.add(int64(len(maxQueue)))
+	go batchSend(reqs, midCos)
 }
 
 func sendall(flag uint8) {
@@ -167,8 +179,8 @@ func RequestSender(stat *Stat) {
 		ts := time.Now()
 		sendall(SendByDemonTicker)
 		cost := time.Since(ts)
-		if cost >= time.Microsecond * 100 {
-			stat.SendT.add(int64(time.Since(ts)))
+		if cost > time.Microsecond*100 {
+			stat.SendT.add(int64(cost))
 		}
 	}
 

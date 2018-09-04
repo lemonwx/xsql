@@ -110,42 +110,42 @@ func (f *countField) fmt() []byte {
 }
 
 type Stat struct {
-	SqlparseT      *timeField
-	RouteT         *timeField
-	VersionT       *timeField
-	ExecT          *timeField
-	ChkInuseT      *timeField
-	ClearT         *timeField
-	GetConn        *timeField
-	PutConn        *timeField
-	Dispatch       *timeField
-	VWaitBatchT    *timeField
-	VWaitRespT     *timeField
-	BatchReqCount  *countField
-	FullReqCount   *countField
-	TickerReqCount *countField
+	SqlparseT         *timeField
+	RouteT            *timeField
+	VersionT          *timeField
+	ExecT             *timeField
+	ChkInuseT         *timeField
+	ClearT            *timeField
+	GetConn           *timeField
+	PutConn           *timeField
+	Dispatch          *timeField
+	VWaitBatchT       *timeField
+	VWaitRespT        *timeField
+	BatchReqCount     *countField
+	FullReqCount      *countField
+	TickerReqCount    *countField
 	BlockRequestCount *countField
-	SendT *timeField
+	SendT             *timeField
 }
 
 func newStat() *Stat {
 	return &Stat{
-		SqlparseT:      &timeField{},
-		RouteT:         &timeField{},
-		VersionT:       &timeField{},
-		ExecT:          &timeField{},
-		ChkInuseT:      &timeField{},
-		ClearT:         &timeField{},
-		GetConn:        &timeField{},
-		PutConn:        &timeField{},
-		Dispatch:       &timeField{},
-		VWaitBatchT:    &timeField{},
-		VWaitRespT:     &timeField{},
-		BatchReqCount:  &countField{},
-		FullReqCount:   &countField{},
-		TickerReqCount: &countField{},
+		SqlparseT:         &timeField{},
+		RouteT:            &timeField{},
+		VersionT:          &timeField{},
+		ExecT:             &timeField{},
+		ChkInuseT:         &timeField{},
+		ClearT:            &timeField{},
+		GetConn:           &timeField{},
+		PutConn:           &timeField{},
+		Dispatch:          &timeField{},
+		VWaitBatchT:       &timeField{},
+		VWaitRespT:        &timeField{},
+		BatchReqCount:     &countField{},
+		FullReqCount:      &countField{},
+		TickerReqCount:    &countField{},
 		BlockRequestCount: &countField{},
-		SendT: &timeField{},
+		SendT:             &timeField{},
 	}
 }
 
