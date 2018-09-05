@@ -121,7 +121,7 @@ func batchSend(request *proto.Request, cos []*MidConn) {
 	}
 }
 
-func send() {
+func send(flag uint8) {
 	bContinue := true
 	cmds = cmds[:0]
 	cos = cos[:0]
@@ -157,12 +157,18 @@ func send() {
 	copy(midCos, cos)
 
 	cos[0].stat.BlockRequestCount.add(int64(len(maxQueue)))
+	if flag == SendByDemonTicker {
+		cos[0].stat.TickerReqCount.add(1)
+	} else {
+		cos[0].stat.FullReqCount.add(1)
+	}
+
 	go batchSend(reqs, midCos)
 }
 
 func sendall(flag uint8) {
 	if ql.Lock() {
-		send()
+		send(flag)
 		ql.UnLock()
 	}
 }
