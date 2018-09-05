@@ -102,27 +102,21 @@ func batchSend(request *proto.Request, cos []*MidConn) {
 		active[v] = false
 	}
 
-	r := &response{Err: nil}
+	r := &response{Active: active, Err: nil}
 	for idx, co := range cos {
 		switch request.Cmds[idx] {
 		case proto.Q:
-			r.Active = active
-			r.Max = 0
 			co.resp <- r
 		case proto.C:
-			r.Active = nil
-			r.Max = resp.Maxs[0]
+			max := resp.Maxs[0]
 			resp.Maxs = resp.Maxs[1:]
-			co.resp <- r
+			co.resp <- &response{Max: max, Err: nil}
 		case proto.D:
-			r.Active = nil
-			r.Max = 0
 			co.resp <- r
 		case proto.C_Q:
-			r.Active = active
-			r.Max = resp.Maxs[0]
+			max := resp.Maxs[0]
 			resp.Maxs = resp.Maxs[1:]
-			co.resp <- r
+			co.resp <- &response{Max: max, Active: active, Err: nil}
 		}
 	}
 }
