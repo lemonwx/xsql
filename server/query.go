@@ -130,6 +130,7 @@ func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]
 	for count := 0; count < size; count += 1 {
 		s := idx + 1
 		e := s + (*data)[idx]
+		idx = (*data)[idx] + idx + 1
 
 		vStr := string((*data)[s:e])
 		res, err := strconv.ParseUint(vStr, 10, 64)
@@ -137,12 +138,16 @@ func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]
 			log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
 			return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
 		}
+
+		if res == conn.NextVersion {
+			continue
+		}
+
 		if _, ok := vs[res]; ok {
 			err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
 			log.Errorf("[%d] hide extra col failed: %v", conn.ConnectionId, err)
 			return err
 		}
-		idx = (*data)[idx] + idx + 1
 	}
 	(*data) = (*data)[idx:]
 	return nil

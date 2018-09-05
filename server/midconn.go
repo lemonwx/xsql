@@ -581,10 +581,6 @@ func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]bool, error) {
 		conn.NextVersion = r.Max
 	}
 
-	if _, ok := r.Active[r.Max]; ok {
-		delete(r.Active, r.Max)
-	}
-
 	return r.Active, nil
 }
 
