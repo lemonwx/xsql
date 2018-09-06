@@ -36,6 +36,9 @@ const (
 const (
 	ERR_UNSUPPORTED_SHARD     = 10001
 	ERR_UNSUPPORTED_MULTI_SET = 10002
+	ERR_INTERNAL              = 10003
+	ERR_UNEXPECTED            = 10004
+	ERR_UNSUPPORTED_SQL       = 10005
 
 	ERR_SHARD_PANIC
 	ROWS_IN_USE_BY_OTHER_SESSION
@@ -46,4 +49,7 @@ const (
 var MySQLErrName = map[uint16]string{
 	ERR_UNSUPPORTED_SHARD:     "unsupported shard for this sql",
 	ERR_UNSUPPORTED_MULTI_SET: "unsupported multi set",
+	ERR_INTERNAL:              "internal error: %v",
+	ERR_UNEXPECTED:            "unexpected midconn error",
+	ERR_UNSUPPORTED_SQL:       "unsupported for this sql",
 }

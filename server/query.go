@@ -68,9 +68,9 @@ func (conn *MidConn) handleSimpleSelect(stmt *sqlparser.SimpleSelect, sql string
 	return conn.HandleSelRets([]*mysql.Result{ret})
 }
 
-func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysql.Result, error) {
+func (conn *MidConn) executeSelect(sql string, flag uint8) ([]*mysql.Result, map[uint64]bool, error) {
 	if len(conn.nodeIdx) == 0 {
-		return nil, errors.New2("can't execute sql under empty node idxs")
+		return nil, nil, errors.New2("can't execute sql under empty node idxs")
 	}
 
 	var wg sync.WaitGroup
@@ -93,18 +93,16 @@ func (conn *MidConn) executeSelect(sql string, extraSz int, flag uint8) ([]*mysq
 	wg.Wait()
 
 	if vErr != nil {
-		return nil, vErr
+		log.Errorf("[%d] get version failed: %v", conn.ConnectionId, vErr)
+		return nil, nil, vErr
 	}
 
 	if exeErr != nil {
-		return nil, exeErr
+		log.Errorf("[%d] execute sql failed: %v", conn.ConnectionId, exeErr)
+		return nil, nil, exeErr
 	}
 
-	if err := conn.chkInUse(&rets, extraSz, vInUse); err != nil {
-		return nil, err
-	}
-
-	return rets, nil
+	return rets, vInUse, nil
 }
 
 func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]bool) error {
@@ -167,8 +165,20 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 		return []*mysql.Result{ret}, nil
 	}
 
-	rets, err := conn.executeSelect(sqlparser.String(stmt), len(stmt.ExtraCols), SELECT)
-	return rets, err
+	rets, vInUse, err := conn.executeSelect(sqlparser.String(stmt), SELECT)
+	if err != nil {
+		return nil, mysql.NewDefaultError(ERR_UNEXPECTED)
+	}
+
+	if err := conn.handleLimit(&rets, stmt.Limit); err != nil {
+		log.Debug(err)
+		return nil, err
+	}
+
+	if err := conn.chkInUse(&rets, len(stmt.ExtraCols), vInUse); err != nil {
+		return nil, err
+	}
+	return rets, nil
 }
 
 func (conn *MidConn) ExecuteOnSinglePool(sql []byte, nodeIdxs []int) ([]*mysql.Result, error) {
@@ -243,39 +253,44 @@ func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Res
 	}
 }
 
-func (conn *MidConn) handleLimit(rets []*mysql.Result, limit *sqlparser.Limit) ([]*mysql.Result, error) {
-
-	if len(rets) == 0 {
+func (conn *MidConn) handleLimit(rets *[]*mysql.Result, limit *sqlparser.Limit) error {
+	if len(*rets) == 0 {
 		log.Errorf("[%d] handle limit rets's len == 0, unexpected err", conn.ConnectionId)
-		return nil, mysql.NewDefaultError(mysql.MID_ER_UNEXPECTED)
+		return conn.NewMySQLErr(ERR_UNEXPECTED)
 	}
 
 	if limit != nil {
 		if limit.Offset != nil {
 			log.Errorf("[%d] offset : %v not nil, not support this sql now", conn.ConnectionId, limit.Offset)
-			return nil, mysql.NewDefaultError(mysql.MID_ER_UNSUPPORTED_SQL)
+			return conn.NewMySQLErr(ERR_UNSUPPORTED_SQL)
 		}
-		log.Debugf("[%d] offset: %v, rows count: %d", conn.ConnectionId, limit.Offset, limit.Rowcount)
 
 		limitCount, err := strconv.ParseUint(string(limit.Rowcount.(sqlparser.NumVal)), 10, 64)
 		if err != nil {
 			log.Errorf("[%d] parse limit count failed: %v", conn.ConnectionId, err)
-			return nil, err
+			return conn.NewMySQLErr(ERR_UNSUPPORTED_SQL)
 		}
+
+		log.Debugf("[%d] offset: %v, rows count: %d, %d", conn.ConnectionId, limit.Offset, limit.Rowcount, limitCount)
 
 		allCount := uint64(0)
-		for idx, ret := range rets {
-			tmp := uint64(len(ret.RowDatas))
-			if allCount+tmp >= limitCount {
-
-				rets[idx].RowDatas = rets[idx].RowDatas[:limitCount-allCount]
-				return rets[:idx+1], nil
+		// finally, should response to cli size
+		finIdx := 0
+		for idx, ret := range *rets {
+			finIdx = idx
+			curSize := uint64(len(ret.RowDatas))
+			if allCount+curSize >= limitCount {
+				(*rets)[idx].RowDatas = (*rets)[idx].RowDatas[:limitCount-allCount]
+				break
 			}
-			allCount += tmp
+			allCount += curSize
 		}
-	}
 
-	return rets, nil
+		log.Debug(finIdx)
+		*rets = (*rets)[:finIdx+1]
+
+	}
+	return nil
 }
 
 func (conn *MidConn) setupNodeStatus(vInUse map[uint64]bool, hide bool, isStmt bool, extraSize int) {
