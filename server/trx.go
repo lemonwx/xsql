@@ -75,13 +75,13 @@ func (conn *MidConn) handleTrxFinish(sql string) error {
 	commit := false
 
 	switch {
-	case conn.status == mysql.SERVER_STATUS_AUTOCOMMIT:
-		commit = true
-		sql = "commit"
 	case sql == "commit":
 		commit = true
 	case sql == "rollback":
 		commit = true
+	case conn.status == mysql.SERVER_STATUS_AUTOCOMMIT:
+		commit = true
+		sql = "commit"
 	default:
 		commit = false
 	}
