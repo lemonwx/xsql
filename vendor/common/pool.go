@@ -68,12 +68,17 @@ func NewPool(initSize, idleSize, maxSize uint32, f func() (*rpc.Client, error)) 
 }
 
 func (p *Pool) tryReuse(conn *rpc.Client) (*rpc.Client, error) {
-	log.Debug(conn)
 	if conn != nil {
 		log.Debugf("return conn")
 		return conn, nil
 	}
-	return p.New()
+	log.Debugf("get a closed conn, reconnect")
+
+	cli, err := p.New()
+	if err != nil {
+		p.Put(cli, err)
+	}
+	return cli, err
 }
 
 func (p *Pool) GetConnFromIdle() (*rpc.Client, error) {
@@ -105,8 +110,10 @@ func (p *Pool) Get() (*rpc.Client, error) {
 }
 
 func (p *Pool) freeConn(conn *rpc.Client) {
-	conn.Close()
-	conn = nil
+	if conn != nil {
+		conn.Close()
+		conn = nil
+	}
 	select {
 	case p.freeConns <- conn:
 		return
@@ -116,8 +123,14 @@ func (p *Pool) freeConn(conn *rpc.Client) {
 	}
 }
 
-func (p *Pool) Put(conn *rpc.Client) {
-	log.Debug(len(p.idleConns), len(p.freeConns))
+func (p *Pool) Put(conn *rpc.Client, err error) {
+	if err != nil {
+		log.Debugf("conn use err: %v, close and put it back", err)
+		if conn != nil {
+			conn.Close()
+			conn = nil
+		}
+	}
 	select {
 	case p.idleConns <- conn:
 		return

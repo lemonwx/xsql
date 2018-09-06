@@ -164,6 +164,7 @@ func (conn *MidConn) Serve() {
 		data, err := conn.cli.ReadPacket()
 		if err != nil {
 			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
+			conn.Close()
 			break
 		}
 		if err = conn.dispatch(data); err != nil {
@@ -441,7 +442,7 @@ func (conn *MidConn) mergeSelResult(rets []*mysql.Result) (*mysql.Result, error)
 func (conn *MidConn) Close() {
 	conn.closed = true
 	conn.cli.Close()
-
+	conn.cli.Close()
 	conn.clearExecNodes([]byte("rollback"))
 }
 
@@ -554,8 +555,10 @@ func (conn *MidConn) getNextVersion() error {
 	if conn.NextVersion == 0 {
 		Push(proto.C, conn)
 		r := <-conn.resp
-		log.Debugf("get from async gtid: %v", r)
-
+		if r.Err != nil {
+			log.Debugf("[%d] get from async version failed: %v", conn.ConnectionId, r.Err)
+		}
+		log.Debugf("[%d] get from async gtid: %v", conn.ConnectionId, r.Max)
 		conn.NextVersion = r.Max
 	}
 	return nil
@@ -576,6 +579,10 @@ func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]bool, error) {
 
 	Push(cmd, conn)
 	r := <-conn.resp
+	log.Debug(r)
+	if r.Err != nil {
+		return nil, r.Err
+	}
 
 	if cmd == proto.C_Q {
 		conn.NextVersion = r.Max

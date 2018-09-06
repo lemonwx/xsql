@@ -73,25 +73,14 @@ func InitVPool(cfg *config.Conf) error {
 	return nil
 }
 
-func batchSend(request *proto.Request, cos []*MidConn) {
-	resp := proto.Response{}
-
-	log.Debugf("%d requests merge to send", len(request.Cmds))
-
-	cli, err := pool.Get()
+func responseToMidCo(request *proto.Request, resp *proto.Response, cos []*MidConn, err error) {
 	if err != nil {
-		panic(err)
+		r := &response{Err: err}
+		for _, co := range cos {
+			co.resp <- r
+		}
+		return
 	}
-
-	defer pool.Put(cli)
-
-	err = cli.Call("VSeq.PushReq", request, &resp)
-	if err != nil {
-		panic(err)
-	}
-
-	cos[0].stat.VWaitRespT.add(int64(time.Since(request.Ts)))
-	cos[0].stat.BatchReqCount.add(int64(len(request.Cmds)))
 
 	active := make(map[uint64]bool)
 	for _, v := range resp.Maxs {
@@ -119,6 +108,35 @@ func batchSend(request *proto.Request, cos []*MidConn) {
 			co.resp <- &response{Max: max, Active: active, Err: nil}
 		}
 	}
+}
+
+func batchSend(request *proto.Request, cos []*MidConn) {
+	var err error
+	var cli *rpc.Client
+	resp := proto.Response{}
+
+	log.Debugf("%d requests merge to send", len(request.Cmds))
+
+	cli, err = pool.Get()
+	if err != nil {
+		log.Debugf("get conn failed: %v, send to midconn", err)
+		responseToMidCo(nil, nil, cos, err)
+		return
+	}
+
+	err = cli.Call("VSeq.PushReq", request, &resp)
+	if err != nil {
+		log.Debugf("call version failed: %v", err)
+		responseToMidCo(nil, nil, cos, err)
+		pool.Put(cli, err)
+		return
+	}
+
+	cos[0].stat.VWaitRespT.add(int64(time.Since(request.Ts)))
+	cos[0].stat.BatchReqCount.add(int64(len(request.Cmds)))
+
+	responseToMidCo(request, &resp, cos, nil)
+	pool.Put(cli, nil)
 }
 
 func send(flag uint8) {
