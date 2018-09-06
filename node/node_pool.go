@@ -8,6 +8,8 @@ package node
 import (
 	"fmt"
 
+	"time"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/config"
 	"github.com/lemonwx/xsql/mysql"
@@ -15,6 +17,7 @@ import (
 
 const (
 	MaxInitFailedSize = 5
+	MaxUnUseTime      = time.Hour * 8
 )
 
 type Pool struct {
@@ -39,6 +42,7 @@ func (p *Pool) NewAndConnect() (*Node, error) {
 	if err := conn.Connect(); err != nil {
 		return nil, err
 	}
+	conn.lastUseTime = time.Now()
 	return conn, nil
 }
 
@@ -94,6 +98,15 @@ func NewNodePool(initSize, idleSize, maxConnSize uint32, cfg *config.Node) (*Poo
 }
 
 func (p *Pool) tryReuse(conn *Node, schema string) (*Node, error) {
+	if time.Now().Sub(conn.lastUseTime) > MaxUnUseTime {
+		log.Debugf("this conn not used more than %v", MaxUnUseTime)
+		if err := conn.Ping(); err != nil {
+			log.Debugf("execute ping use this conn failed, close it")
+			conn.Close()
+			conn.conn = nil
+		}
+	}
+
 	if conn.conn != nil {
 		if err := p.useDB(conn, schema); err != nil {
 			conn.Close()
@@ -170,6 +183,7 @@ func (p *Pool) freeConn(node *Node) {
 }
 
 func (p *Pool) PutConn(node *Node) {
+	node.lastUseTime = time.Now()
 	select {
 	case p.idleConns <- node:
 		return

@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"net"
 
+	"time"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 )
@@ -38,7 +40,8 @@ type Node struct {
 	IsStmt        bool
 	ExtraSize     int
 
-	Ch chan interface{}
+	Ch          chan interface{}
+	lastUseTime time.Time
 }
 
 func (node *Node) String() string {
@@ -95,6 +98,17 @@ func (node *Node) Connect() error {
 		return err
 	}
 
+	return nil
+}
+
+func (node *Node) Ping() error {
+	if err := node.WriteCmd(mysql.COM_PING, nil); err != nil {
+		return err
+	}
+
+	if _, err := node.readOK(); err != nil {
+		return err
+	}
 	return nil
 }
 
