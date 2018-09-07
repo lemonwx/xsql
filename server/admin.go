@@ -10,6 +10,10 @@ import (
 
 	"reflect"
 
+	"strconv"
+
+	"strings"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
@@ -19,6 +23,7 @@ const (
 	UseVersions = "versions"
 	TimeStat    = "time"
 	Clear       = "clear"
+	Process     = "process"
 )
 
 func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
@@ -125,6 +130,41 @@ func (conn *MidConn) handleAdmin(stmt *sqlparser.Admin, sql string) error {
 			co.stat.clear()
 		}
 		return conn.cli.WriteOK(nil)
+	case Process:
+		rs := &mysql.Resultset{
+			Fields:     []*mysql.Field{{Name: []byte("midConnId")}, {Name: []byte("backId")}, {Name: []byte("nodeIdx")}},
+			FieldNames: map[string]int{"midConnId": 0, "backId": 1, "nodeIdx": 2},
+		}
+
+		conn.svr.ids.RLock()
+		defer conn.svr.ids.RUnlock()
+		rows := make([]mysql.RowData, 0, len(conn.svr.ids.idsMap))
+		for midId, backIds := range conn.svr.ids.idsMap {
+			log.Debugf("%v <-> %v", midId, backIds)
+
+			row := make([]byte, 0)
+			midIdStr := strconv.FormatUint(uint64(midId), 10)
+			row = append(row, byte(len(midIdStr)))
+			row = append(row, midIdStr...)
+
+			idxs := []string{}
+			ids := []string{}
+			for nodeIdx, backId := range backIds {
+				idxs = append(idxs, strconv.FormatUint(uint64(nodeIdx), 10))
+				ids = append(ids, strconv.FormatInt(int64(backId), 10))
+			}
+
+			idxsStr := strings.Join(idxs, ", ")
+			row = append(row, byte(len(idxsStr)))
+			row = append(row, idxsStr...)
+
+			idsStr := strings.Join(ids, ", ")
+			row = append(row, byte(len(idsStr)))
+			row = append(row, idsStr...)
+			rows = append(rows, row)
+		}
+		rs.RowDatas = rows
+		return conn.writeResultset(conn.status, rs)
 	default:
 		return fmt.Errorf("unsupported this is admin sql")
 	}
