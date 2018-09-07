@@ -121,7 +121,7 @@ var keywords = map[string]int{
 	"tables":    TABLES,
 	"variables": VARIABLES,
 	"status":    STATUS,
-
+	"kill":      KILL,
 	//for mixer admin
 	"admin": ADMIN,
 	"proxy": PROXY,

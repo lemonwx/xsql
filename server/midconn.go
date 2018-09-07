@@ -235,10 +235,18 @@ func (conn *MidConn) handleQuery(sql string) error {
 		return conn.handleTrx(stmt, sql)
 	case *sqlparser.Admin:
 		return conn.handleAdmin(v, sql)
+	case *sqlparser.Kill:
+		return conn.handleKill(v)
 	default:
 		return errors.New("not support this sql")
 	}
 	return nil
+}
+
+func (conn *MidConn) handleKill(kill *sqlparser.Kill) error {
+	log.Debug(kill.Id)
+	log.Debugf("[%d] handle %s", sqlparser.String(kill))
+	return conn.cli.WriteOK(nil)
 }
 
 func (conn *MidConn) handleFieldList(data []byte) error {

@@ -94,7 +94,7 @@ var (
 %token <empty> REPLACE
 
 // Mixer admin
-%token <empty> ADMIN
+%token <empty> ADMIN KILL
 
 // Show
 %token <empty> SHOW
@@ -159,6 +159,7 @@ var (
 %type <statement> replace_statement
 %type <statement> show_statement
 %type <statement> admin_statement
+%type <statement> kill_statement
 
 %type <valExpr> from_opt
 %type <expr> like_or_where_opt
@@ -190,6 +191,7 @@ command:
 | replace_statement
 | show_statement
 | admin_statement
+| kill_statement
 
 select_statement:
   SELECT comment_opt distinct_opt select_expression_list limit_opt
@@ -290,6 +292,12 @@ admin_statement:
   ADMIN sql_id '(' value_expression_list ')'
   {
     $$ = &Admin{Name : $2, Values : $4}
+  }
+
+kill_statement:
+  KILL NUMBER
+  {
+    $$ = &Kill{Id: $2}
   }
 
 show_statement:

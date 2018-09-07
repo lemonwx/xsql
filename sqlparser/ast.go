@@ -1091,6 +1091,16 @@ func (node *Admin) Format(buf *TrackedBuffer) {
 	buf.Fprintf("admin %s(%v)", node.Name, node.Values)
 }
 
+type Kill struct {
+	Id NumVal
+}
+
+func (*Kill) IStatement() {}
+
+func (node *Kill) Format(buf *TrackedBuffer) {
+	buf.Fprintf("kill %v", node.Id)
+}
+
 type Show struct {
 	Section     string
 	Key         string
