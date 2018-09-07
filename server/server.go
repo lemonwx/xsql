@@ -29,6 +29,11 @@ type conns struct {
 	sync.RWMutex
 }
 
+type MidBakCoIdMap struct {
+	idsMap map[uint32]map[uint32]int // map[midId]map[backId]nodeId
+	sync.RWMutex
+}
+
 type Server struct {
 	lis     net.Listener
 	addr    string
@@ -38,6 +43,7 @@ type Server struct {
 	svrStat *Stat
 	stats   []*Stat
 	lock    sync.Mutex
+	ids     *MidBakCoIdMap
 }
 
 func NewServer(cfg *config.Conf) (*Server, error) {
@@ -48,6 +54,9 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 	s.addr = cfg.Addr
 	s.cos = &conns{
 		midConns: map[string]*MidConn{},
+	}
+	s.ids = &MidBakCoIdMap{
+		idsMap: map[uint32]map[uint32]int{},
 	}
 
 	s.svrStat = newStat()
@@ -117,6 +126,27 @@ func (s *Server) ServeConn(conn net.Conn) {
 		log.Errorf("[%d] conn [%s] colesed, midconn [%d]'s goroutine will exit",
 			midConn.ConnectionId, conn.RemoteAddr(), midConn.ConnectionId)
 	}
+}
+
+func (s *Server) StoreMidSession(midId, backId uint32, nodeId int) {
+	s.ids.Lock()
+	if _, ok := s.ids.idsMap[midId]; !ok {
+		s.ids.idsMap[midId] = map[uint32]int{}
+	}
+	s.ids.idsMap[midId][backId] = nodeId
+	s.ids.Unlock()
+}
+
+func (s *Server) RmMidSession(midId, backId uint32) {
+	s.ids.Lock()
+	delete(s.ids.idsMap[midId], backId)
+	s.ids.Unlock()
+}
+
+func (s *Server) GetBackIds(midId uint32) map[uint32]int {
+	s.ids.RLock()
+	defer s.ids.RUnlock()
+	return s.ids.idsMap[midId]
 }
 
 func (s *Server) parseSchemas(cfg *config.Conf) error {

@@ -17,6 +17,10 @@ import (
 
 	"time"
 
+	"fmt"
+
+	"strconv"
+
 	"github.com/lemonwx/TxMgr/proto"
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/client"
@@ -244,8 +248,25 @@ func (conn *MidConn) handleQuery(sql string) error {
 }
 
 func (conn *MidConn) handleKill(kill *sqlparser.Kill) error {
-	log.Debug(kill.Id)
-	log.Debugf("[%d] handle %s", sqlparser.String(kill))
+	log.Debugf("[%d] handle %s", conn.ConnectionId, sqlparser.String(kill))
+	killId, err := strconv.ParseUint(string(kill.Id), 10, 64)
+	if err != nil {
+		return err
+	}
+	ids := conn.svr.GetBackIds(uint32(killId))
+	log.Debugf("[%d] %v to be kill", conn.ConnectionId, ids)
+	for id, nodeIdx := range ids {
+		back, err := conn.getSingleBackConn(nodeIdx)
+		if err != nil {
+			return err
+		}
+		killSql := fmt.Sprintf("kill %d", id)
+		_, err = conn.execute(back, mysql.COM_QUERY, []byte(killSql))
+		if err != nil {
+			log.Debugf("[%d] kill %d under node: %s failed: %v", conn.ConnectionId, id, back, err)
+			return err
+		}
+	}
 	return conn.cli.WriteOK(nil)
 }
 
@@ -517,6 +538,7 @@ func (conn *MidConn) getMultiBackConn(idxs []int) error {
 			return err
 		} else {
 			back.ConnectionId = conn.ConnectionId
+			conn.svr.StoreMidSession(conn.ConnectionId, back.BackCoId, idx)
 			conn.execNodes[idx] = back
 		}
 	}
@@ -531,6 +553,7 @@ func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
 
 	back, ok := conn.execNodes[idx]
 	if ok {
+		conn.svr.StoreMidSession(conn.ConnectionId, back.BackCoId, idx)
 		return back, nil
 	}
 	back, err := conn.pools[idx].GetConn(conn.db)
@@ -540,6 +563,7 @@ func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
 
 	back.ConnectionId = conn.ConnectionId
 	conn.execNodes[idx] = back
+	conn.svr.StoreMidSession(conn.ConnectionId, back.BackCoId, idx)
 	return back, nil
 }
 
@@ -549,6 +573,7 @@ func (conn *MidConn) putConn(idx int, back *node.Node) {
 		conn.stat.PutConn.add(int64(time.Since(ts)))
 	}()
 
+	conn.svr.RmMidSession(conn.ConnectionId, back.BackCoId)
 	conn.pools[idx].PutConn(back)
 }
 
