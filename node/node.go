@@ -472,6 +472,10 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 			return err
 		}
 
+		if data[0] == mysql.ERR_HEADER {
+			return node.parseErrPkt(data)
+		}
+
 		if node.isEOFPacket(data) {
 			if node.capability&mysql.CLIENT_PROTOCOL_41 > 0 {
 				result.Status = binary.LittleEndian.Uint16(data[3:])
