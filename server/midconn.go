@@ -255,7 +255,7 @@ func (conn *MidConn) handleKill(kill *sqlparser.Kill) error {
 	}
 	ids := conn.svr.GetBackIds(uint32(killId))
 	log.Debugf("[%d] %v to be kill", conn.ConnectionId, ids)
-	for id, nodeIdx := range ids {
+	for nodeIdx, id := range ids {
 		back, err := conn.getSingleBackConn(nodeIdx)
 		if err != nil {
 			return err
@@ -573,7 +573,7 @@ func (conn *MidConn) putConn(idx int, back *node.Node) {
 		conn.stat.PutConn.add(int64(time.Since(ts)))
 	}()
 
-	conn.svr.RmMidSession(conn.ConnectionId, back.BackCoId)
+	conn.svr.RmMidSession(conn.ConnectionId, idx)
 	conn.pools[idx].PutConn(back)
 }
 

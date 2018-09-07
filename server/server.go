@@ -30,7 +30,7 @@ type conns struct {
 }
 
 type MidBakCoIdMap struct {
-	idsMap map[uint32]map[uint32]int // map[midId]map[backId]nodeId
+	idsMap map[uint32]map[int]uint32 // map[midId]map[backId]nodeId
 	sync.RWMutex
 }
 
@@ -56,7 +56,7 @@ func NewServer(cfg *config.Conf) (*Server, error) {
 		midConns: map[string]*MidConn{},
 	}
 	s.ids = &MidBakCoIdMap{
-		idsMap: map[uint32]map[uint32]int{},
+		idsMap: map[uint32]map[int]uint32{},
 	}
 
 	s.svrStat = newStat()
@@ -131,19 +131,19 @@ func (s *Server) ServeConn(conn net.Conn) {
 func (s *Server) StoreMidSession(midId, backId uint32, nodeId int) {
 	s.ids.Lock()
 	if _, ok := s.ids.idsMap[midId]; !ok {
-		s.ids.idsMap[midId] = map[uint32]int{}
+		s.ids.idsMap[midId] = map[int]uint32{}
 	}
-	s.ids.idsMap[midId][backId] = nodeId
+	s.ids.idsMap[midId][nodeId] = backId
 	s.ids.Unlock()
 }
 
-func (s *Server) RmMidSession(midId, backId uint32) {
+func (s *Server) RmMidSession(midId uint32, nodeId int) {
 	s.ids.Lock()
-	delete(s.ids.idsMap[midId], backId)
+	delete(s.ids.idsMap[midId], nodeId)
 	s.ids.Unlock()
 }
 
-func (s *Server) GetBackIds(midId uint32) map[uint32]int {
+func (s *Server) GetBackIds(midId uint32) map[int]uint32 {
 	s.ids.RLock()
 	defer s.ids.RUnlock()
 	return s.ids.idsMap[midId]
