@@ -28,11 +28,13 @@ type Node struct {
 	Db       string
 
 	ConnectionId uint32
-	capability   uint32
-	status       uint16
-	collation    mysql.CollationId
-	charset      string
-	salt         []byte
+	BackCoId     uint32
+
+	capability uint32
+	status     uint16
+	collation  mysql.CollationId
+	charset    string
+	salt       []byte
 
 	VersionsInUse map[uint64]bool
 	NextVersion   uint64
@@ -129,7 +131,10 @@ func (node *Node) readInitialHandshake() error {
 	//skip mysql version and connection id
 	//mysql version end with 0x00
 	//connection id length is 4
-	pos := 1 + bytes.IndexByte(data[1:], 0x00) + 1 + 4
+	pos := 1 + bytes.IndexByte(data[1:], 0x00) + 1
+
+	node.BackCoId = binary.LittleEndian.Uint32(data[pos : pos+4])
+	pos += 4
 
 	node.salt = append(node.salt, data[pos:pos+8]...)
 

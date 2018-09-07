@@ -516,6 +516,7 @@ func (conn *MidConn) getMultiBackConn(idxs []int) error {
 		if err != nil {
 			return err
 		} else {
+			back.ConnectionId = conn.ConnectionId
 			conn.execNodes[idx] = back
 		}
 	}
@@ -537,6 +538,7 @@ func (conn *MidConn) getSingleBackConn(idx int) (*node.Node, error) {
 		return nil, err
 	}
 
+	back.ConnectionId = conn.ConnectionId
 	conn.execNodes[idx] = back
 	return back, nil
 }
