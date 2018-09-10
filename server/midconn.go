@@ -167,9 +167,17 @@ func (conn *MidConn) Serve() {
 	wg.Add(2)
 	go func() {
 		if err := conn.cli.ReadIntoBuf(); err != nil {
-			log.Debugf(
-				"[%d] read failed, maybe client abnormal exit, kill back conn link with it", conn.ConnectionId)
-			conn.Close()
+			log.Debugf("[%d] read failed: %v, client link off %s",
+				conn.ConnectionId, err, conn.RemoteAddr)
+			go func() {
+				for {
+					time.Sleep(time.Millisecond)
+					err := conn.abnormalClose()
+					if err == nil {
+						break
+					}
+				}
+			}()
 		}
 		wg.Done()
 	}()
@@ -482,9 +490,29 @@ func (conn *MidConn) mergeSelResult(rets []*mysql.Result) (*mysql.Result, error)
 
 }
 
+func (conn *MidConn) abnormalClose() error {
+	if conn.closed {
+		return nil
+	}
+
+	log.Debugf("[%d] client may abnormal exit, kill back conn link with it", conn.ConnectionId)
+	for idx, node := range conn.execNodes {
+		back, err := conn.svr.pools[idx].GetConn("")
+		if err != nil {
+			return err
+		}
+		defer conn.svr.pools[idx].PutConn(back)
+		conn.execute(back, mysql.COM_QUERY, []byte(fmt.Sprintf("kill %d", node.BackCoId)))
+		node.Close()
+	}
+
+	conn.cli.Close()
+	conn.closed = true
+	return nil
+}
+
 func (conn *MidConn) Close() {
 	conn.closed = true
-	conn.cli.Close()
 	conn.cli.Close()
 	conn.clearExecNodes([]byte("rollback"))
 }

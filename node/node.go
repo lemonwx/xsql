@@ -340,7 +340,7 @@ func (node *Node) executeSql(opt uint8, data []byte) error {
 	send[4] = opt
 	copy(send[5:], data)
 
-	log.Debugf("[%d] send [%d:%s] to node [%s]", node.ConnectionId, send[4], send[5:], node.addr)
+	log.Debugf("[%d] send [%d:%s] to node [%d][%s]", node.ConnectionId, send[4], send[5:], node.BackCoId, node.addr)
 	return node.writePacket(send)
 }
 
