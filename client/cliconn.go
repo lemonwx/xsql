@@ -193,6 +193,14 @@ func (c *CliConn) SetPktSeq(sz uint8) {
 	c.pkt.Sequence = sz
 }
 
+func (c *CliConn) ReadIntoBuf() error {
+	return c.pkt.ReadIntoBuf()
+}
+
+func (c *CliConn) ReadFromBuf() ([]byte, error) {
+	return c.pkt.ReadFromBuf()
+}
+
 func (c *CliConn) ReadPacket() ([]byte, error) {
 	return c.pkt.ReadPacket()
 }

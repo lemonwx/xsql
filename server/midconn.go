@@ -163,19 +163,33 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool, s *Se
 }
 
 func (conn *MidConn) Serve() {
-	for {
-		conn.cli.SetPktSeq(0)
-		data, err := conn.cli.ReadPacket()
-		if err != nil {
-			log.Errorf("[%d] cli conn read packet failed: %v", conn.ConnectionId, err)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		if err := conn.cli.ReadIntoBuf(); err != nil {
+			log.Debugf(
+				"[%d] read failed, maybe client abnormal exit, kill back conn link with it", conn.ConnectionId)
 			conn.Close()
-			break
 		}
-		if err = conn.dispatch(data); err != nil {
-			conn.cli.WriteError(err)
+		wg.Done()
+	}()
+
+	go func() {
+		for {
+			data, err := conn.cli.ReadFromBuf()
+			if err != nil {
+				conn.Close()
+			}
+
+			if err = conn.dispatch(data); err != nil {
+				conn.cli.WriteError(err)
+			}
 			conn.cli.SetPktSeq(0)
 		}
-	}
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
 
 func (conn *MidConn) dispatch(sql []byte) error {

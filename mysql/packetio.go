@@ -10,15 +10,28 @@ import (
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/lemonwx/log"
 )
 
 const (
 	defaultReaderSize = 8 * 1024
 )
 
+type Buf chan uint8
+
+func (buf Buf) Read(p []byte) (int, error) {
+	for idx, _ := range p {
+		p[idx] = <-buf
+	}
+
+	return len(p), nil
+}
+
 type PacketIO struct {
-	rb *bufio.Reader
-	wb io.Writer
+	rb  *bufio.Reader
+	wb  io.Writer
+	buf Buf
 
 	Sequence uint8
 }
@@ -28,15 +41,39 @@ func NewPacketIO(conn net.Conn) *PacketIO {
 
 	p.rb = bufio.NewReaderSize(conn, defaultReaderSize)
 	p.wb = conn
+	p.buf = make(Buf, defaultReaderSize)
 
 	p.Sequence = 0
 
 	return p
 }
 
+func (p *PacketIO) ReadIntoBuf() error {
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := p.rb.Read(buf)
+		if err != nil {
+			return err
+		}
+
+		log.Debugf("read %d byte into buf", n)
+		for _, b := range buf[:n] {
+			p.buf <- b
+		}
+	}
+}
+
+func (p *PacketIO) ReadFromBuf() ([]byte, error) {
+	return p.readMysqlPkt(p.buf)
+}
+
 func (p *PacketIO) ReadPacket() ([]byte, error) {
+	return p.readMysqlPkt(p.rb)
+}
+
+func (p *PacketIO) readMysqlPkt(from io.Reader) ([]byte, error) {
 	header := []byte{0, 0, 0, 0}
-	if _, err := io.ReadFull(p.rb, header); err != nil {
+	if _, err := io.ReadFull(from, header); err != nil {
 		return nil, ErrBadConn
 	}
 
@@ -54,7 +91,7 @@ func (p *PacketIO) ReadPacket() ([]byte, error) {
 	p.Sequence++
 
 	data := make([]byte, length)
-	if _, err := io.ReadFull(p.rb, data); err != nil {
+	if _, err := io.ReadFull(from, data); err != nil {
 		return nil, ErrBadConn
 	} else {
 		if length < MaxPayloadLen {
