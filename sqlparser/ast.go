@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"strconv"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/sqltypes"
 )
@@ -713,6 +715,10 @@ type NumVal []byte
 
 func (node NumVal) Format(buf *TrackedBuffer) {
 	buf.Fprintf("%s", []byte(node))
+}
+
+func (node NumVal) GetLocalVal() (uint64, error) {
+	return strconv.ParseUint(string(node), 10, 64)
 }
 
 // ValArg represents a named bind var argument.
