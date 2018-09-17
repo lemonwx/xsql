@@ -36,12 +36,6 @@ type Node struct {
 	charset    string
 	salt       []byte
 
-	VersionsInUse map[uint64]bool
-	NextVersion   uint64
-	NeedHide      bool
-	IsStmt        bool
-	ExtraSize     int
-
 	Ch          chan interface{}
 	lastUseTime time.Time
 }
@@ -386,11 +380,6 @@ func (node *Node) readResultset(data []byte, binary bool) (*mysql.Result, error)
 	}
 
 	count, _, n := mysql.LengthEncodedInt(data)
-	if node.NeedHide {
-		log.Debugf("[%d] node [%v] read result need to hide extra col, extra size: %d", node.ConnectionId, node.addr, node.ExtraSize)
-		count -= uint64(node.ExtraSize)
-	}
-
 	if n != len(data) {
 		return nil, mysql.ErrMalformPacket
 	}
@@ -430,10 +419,6 @@ func (node *Node) readResultColumns(result *mysql.Result) error {
 			return err
 		}
 
-		if node.NeedHide && idx < node.ExtraSize {
-			continue
-		}
-
 		result.Fields[i], err = mysql.FieldData(data).Parse()
 		if err != nil {
 			return err
@@ -452,25 +437,6 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 	// pre row's version value
 	//var preRowV uint64 = 0
 
-	if node.IsStmt {
-		log.Debugf("[%d] hide extra col under stmt", node.ConnectionId)
-	} else {
-		log.Debugf("[%d] [%v] hide extra col under query", node.ConnectionId, node.addr)
-	}
-
-	if node.NeedHide {
-		v := <-node.Ch
-		log.Debug(v)
-		switch vv := v.(type) {
-		case error:
-			return vv
-		case map[uint64]bool:
-			node.VersionsInUse = vv
-		default:
-			return fmt.Errorf("unexpect type recv: %v", vv)
-		}
-	}
-
 	for {
 		data, err = node.pkt.ReadPacket()
 		if err != nil {
@@ -487,10 +453,6 @@ func (node *Node) ReadResultRows(result *mysql.Result, isBinary bool) error {
 				node.status = result.Status
 			}
 			break
-		}
-
-		if node.NeedHide {
-			retErr = node.hideExtraCols(result, &data, node.VersionsInUse)
 		}
 
 		result.RowDatas = append(result.RowDatas, data)

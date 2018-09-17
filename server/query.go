@@ -477,10 +477,4 @@ func (conn *MidConn) handleOrderBy(rets []*mysql.Result, sel *sqlparser.Select) 
 }
 
 func (conn *MidConn) setupNodeStatus(vInUse map[uint64]bool, hide bool, isStmt bool, extraSize int) {
-	for idx, _ := range conn.nodes {
-		conn.nodes[idx].VersionsInUse = vInUse
-		conn.nodes[idx].NeedHide = hide
-		conn.nodes[idx].IsStmt = isStmt
-		conn.nodes[idx].ExtraSize = extraSize
-	}
 }
