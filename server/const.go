@@ -29,27 +29,27 @@ const (
 )
 
 const (
-	UPDATE_OR_DELETE = iota
-	SELECT
+	updateOrDelete = iota
+	Select
 )
 
 const (
-	ERR_UNSUPPORTED_SHARD     = 10001
-	ERR_UNSUPPORTED_MULTI_SET = 10002
-	ERR_INTERNAL              = 10003
-	ERR_UNEXPECTED            = 10004
-	ERR_UNSUPPORTED_SQL       = 10005
+	errUnsupportedShard    = 10001
+	errUnsupportedMultiSet = 10002
+	errInternal            = 10003
+	errUnexpected          = 10004
+	errUnsupportedSql      = 10005
 
-	ERR_SHARD_PANIC
-	ROWS_IN_USE_BY_OTHER_SESSION
-	SQL_ONLY_SUCCESS_IN_PARTLY_OF_NODE
-	UNEXPECTED_MIDDLE_ERR
+	errShardPanic
+	rowsInUseByOtherSession
+	sqlOnlySuccessInPartlyOfNode
+	unexpectedMiddleErr
 )
 
 var MySQLErrName = map[uint16]string{
-	ERR_UNSUPPORTED_SHARD:     "unsupported shard for this sql",
-	ERR_UNSUPPORTED_MULTI_SET: "unsupported multi set",
-	ERR_INTERNAL:              "internal error: %v",
-	ERR_UNEXPECTED:            "unexpected midconn error",
-	ERR_UNSUPPORTED_SQL:       "unsupported for this sql",
+	errUnsupportedShard:    "unsupported shard for this sql",
+	errUnsupportedMultiSet: "unsupported multi set",
+	errInternal:            "internal error: %v",
+	errUnexpected:          "unexpected midconn error",
+	errUnsupportedSql:      "unsupported for this sql",
 }

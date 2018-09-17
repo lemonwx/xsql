@@ -34,7 +34,7 @@ func (conn *MidConn) execSingle(stmt *sqlparser.Update, idx int, delSql string) 
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
-		vInUse, vErr = conn.getCurVInUse(UPDATE_OR_DELETE)
+		vInUse, vErr = conn.getCurVInUse(updateOrDelete)
 		stmt.Exprs[0].Expr = sqlparser.NumVal(strconv.FormatUint(conn.NextVersion, 10))
 		cvtSql = sqlparser.String(stmt)
 		wg.Done()
@@ -94,7 +94,7 @@ func (conn *MidConn) execMulti(stmt *sqlparser.Update, delsql string) ([]*mysql.
 
 	go func() {
 		// assume the row want to update not used by other, so get next version as the same time
-		vInUse, err := conn.getCurVInUse(UPDATE_OR_DELETE)
+		vInUse, err := conn.getCurVInUse(updateOrDelete)
 		if err != nil { // notify all the executor get failed
 			close(ch)
 		} else { // send to executor, setup cvt sql
@@ -178,7 +178,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 	var err error
 	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(ERR_UNSUPPORTED_SHARD)
+		return nil, conn.NewMySQLErr(errUnsupportedShard)
 	}
 
 	shardSize := len(conn.nodeIdx)
@@ -195,7 +195,7 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 	var err error
 	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(ERR_UNSUPPORTED_SHARD)
+		return nil, conn.NewMySQLErr(errUnsupportedShard)
 	}
 
 	shardSize := len(conn.nodeIdx)
@@ -227,7 +227,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 
 	if shardList, err = conn.getShardList(stmt); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(ERR_UNSUPPORTED_SHARD)
+		return nil, conn.NewMySQLErr(errUnsupportedShard)
 	}
 
 	if len(shardList) != 1 {

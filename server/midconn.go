@@ -378,7 +378,7 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) ([]
 
 		// 所有节点返回的 错误内容一致
 		if err, ok := errs[0].(*mysql.SqlError); ok {
-			if err.Code == ROWS_IN_USE_BY_OTHER_SESSION {
+			if err.Code == rowsInUseByOtherSession {
 				log.Debugf("[%d] all %d nodes return error: %v", conn.ConnectionId, nodeSize, err.Message)
 				return nil, errs[0]
 			}
@@ -648,7 +648,7 @@ func (conn *MidConn) getCurVInUse(flag uint8) (map[uint64]bool, error) {
 	}()
 
 	var cmd uint8
-	if flag == UPDATE_OR_DELETE && conn.NextVersion == 0 {
+	if flag == updateOrDelete && conn.NextVersion == 0 {
 		cmd = proto.C_Q
 	} else {
 		cmd = proto.Q
