@@ -155,7 +155,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 	var err error
 	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(errUnsupportedShard)
+		return nil, newMySQLErr(errUnsupportedShard)
 	}
 
 	if len(conn.nodeIdx) == 0 {
@@ -265,19 +265,19 @@ func (conn *MidConn) ExecuteOnNodePool(sql []byte, nodeIdxs []int) ([]*mysql.Res
 func (conn *MidConn) handleLimit(rets *[]*mysql.Result, limit *sqlparser.Limit) error {
 	if len(*rets) == 0 {
 		log.Errorf("[%d] handle limit rets's len == 0, unexpected err", conn.ConnectionId)
-		return conn.NewMySQLErr(errUnexpected)
+		return newMySQLErr(errUnexpected)
 	}
 
 	if limit != nil {
 		if limit.Offset != nil {
 			log.Errorf("[%d] offset : %v not nil, not support this sql now", conn.ConnectionId, limit.Offset)
-			return conn.NewMySQLErr(errUnsupportedSql)
+			return newMySQLErr(errUnsupportedSql)
 		}
 
 		limitCount, err := strconv.ParseUint(string(limit.Rowcount.(sqlparser.NumVal)), 10, 64)
 		if err != nil {
 			log.Errorf("[%d] parse limit count failed: %v", conn.ConnectionId, err)
-			return conn.NewMySQLErr(errUnsupportedSql)
+			return newMySQLErr(errUnsupportedSql)
 		}
 
 		log.Debugf("[%d] offset: %v, rows count: %d, %d", conn.ConnectionId, limit.Offset, limit.Rowcount, limitCount)

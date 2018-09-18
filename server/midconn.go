@@ -619,10 +619,6 @@ func (conn *MidConn) putConn(idx int, back *node.Node) {
 	conn.pools[idx].PutConn(back)
 }
 
-func (conn *MidConn) NewMySQLErr(errCode uint16) *mysql.SqlError {
-	return mysql.NewError(errCode, MySQLErrName[errCode])
-}
-
 func (conn *MidConn) getNextVersion() error {
 	ts := time.Now()
 	defer func() {
@@ -699,4 +695,8 @@ func (conn *MidConn) execute(back *node.Node, opt uint8, data []byte) (*mysql.Re
 		conn.stat.ExecT.add(int64(time.Since(ts)))
 	}()
 	return back.Execute(opt, data)
+}
+
+func newMySQLErr(errCode uint16) *mysql.SqlError {
+	return mysql.NewError(errCode, MySQLErrName[errCode])
 }

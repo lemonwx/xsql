@@ -20,7 +20,7 @@ func (conn *MidConn) handleSet(stmt *sqlparser.Set, sql string) error {
 
 	// default
 	if len(stmt.Exprs) != 2 {
-		return conn.NewMySQLErr(errUnsupportedMultiSet)
+		return newMySQLErr(errUnsupportedMultiSet)
 	}
 
 	var cvtExprs sqlparser.UpdateExprs

@@ -178,7 +178,7 @@ func (conn *MidConn) handleUpdate(stmt *sqlparser.Update, sql string) ([]*mysql.
 	var err error
 	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(errUnsupportedShard)
+		return nil, newMySQLErr(errUnsupportedShard)
 	}
 
 	shardSize := len(conn.nodeIdx)
@@ -195,7 +195,7 @@ func (conn *MidConn) handleDelete(stmt *sqlparser.Delete, sql string) ([]*mysql.
 	var err error
 	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(errUnsupportedShard)
+		return nil, newMySQLErr(errUnsupportedShard)
 	}
 
 	shardSize := len(conn.nodeIdx)
@@ -227,7 +227,7 @@ func (conn *MidConn) handleInsert(stmt *sqlparser.Insert, sql string) ([]*mysql.
 
 	if shardList, err = conn.getShardList(stmt); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
-		return nil, conn.NewMySQLErr(errUnsupportedShard)
+		return nil, newMySQLErr(errUnsupportedShard)
 	}
 
 	if len(shardList) != 1 {
