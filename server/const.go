@@ -34,11 +34,14 @@ const (
 )
 
 const (
-	errUnsupportedShard    = 10001
-	errUnsupportedMultiSet = 10002
-	errInternal            = 10003
-	errUnexpected          = 10004
-	errUnsupportedSql      = 10005
+	errUnsupportedShard = 10001 + iota
+	errUnsupportedMultiSet
+	errUnexpected
+	errUnsupportedSql
+	errUnsupportedPrepare
+	errRepeatPrepare
+	errMultiPrepareNotEqual
+	errInternal
 
 	errShardPanic
 	rowsInUseByOtherSession
@@ -47,9 +50,12 @@ const (
 )
 
 var MySQLErrName = map[uint16]string{
-	errUnsupportedShard:    "unsupported shard for this sql",
-	errUnsupportedMultiSet: "unsupported multi set",
-	errInternal:            "internal error: %v",
-	errUnexpected:          "unexpected midconn error",
-	errUnsupportedSql:      "unsupported for this sql",
+	errUnsupportedShard:     "unsupported shard for this sql",
+	errUnsupportedMultiSet:  "unsupported multi set",
+	errInternal:             "internal error: %v",
+	errUnexpected:           "unexpected midConn error",
+	errUnsupportedSql:       "unsupported for this sql",
+	errUnsupportedPrepare:   "unsupported prepare for this sql",
+	errRepeatPrepare:        "repeated prepare cmd",
+	errMultiPrepareNotEqual: "multi prepare result not equal between node",
 }
