@@ -1117,5 +1117,14 @@ type Show struct {
 func (*Show) IStatement() {}
 
 func (node *Show) Format(buf *TrackedBuffer) {
-	buf.Fprintf("show %s %s %v %v", node.Section, node.Key, node.From, node.LikeOrWhere)
+	var from, likeOrWhere string
+	if node.From != nil {
+		from = fmt.Sprintf("%v", node.From)
+	}
+
+	if node.LikeOrWhere != nil {
+		likeOrWhere = fmt.Sprintf("%v", node.LikeOrWhere)
+	}
+
+	buf.Fprintf("show %s %s %s %s", node.Section, node.Key, from, likeOrWhere)
 }
