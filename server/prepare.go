@@ -168,25 +168,28 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 
 func (conn *MidConn) handlePrepare(sql string) error {
 	log.Debugf("[%d] handle prepare %s", conn.ConnectionId, sql)
-
+	var stmt myStmt
 	var err error
-
+	var s sqlparser.Statement
 	if conn.db == "" {
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
 
-	stmt := NewStmt()
-	if err = conn.myPrepare(stmt, sql, 0); err != nil {
+	if s, err = sqlparser.Parse(sql); err != nil {
 		return err
 	}
 
-	log.Debug(stmt)
-
-	// send prepare result to mysql cli
-	if err = conn.writePrepare(stmt); err != nil {
+	if stmt, err = newMyStmt(s, conn); err != nil {
 		return err
 	}
 
+	if err = stmt.prepare(0); err != nil {
+		return err
+	}
+
+	if err = stmt.response(); err != nil {
+		return err
+	}
 	return nil
 }
 
