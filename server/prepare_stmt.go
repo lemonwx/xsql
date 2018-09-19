@@ -86,6 +86,16 @@ type selStmt struct {
 	*baseStmt
 }
 
+func (sel *selStmt) prepare(idx int) error {
+	if err := sel.baseStmt.prepare(idx); err != nil {
+		return err
+	}
+
+	sel.cliArgCount = sel.svrArgCount
+	sel.cliFieldCount = sel.svrFieldCount - 1
+	return nil
+}
+
 type istStmt struct {
 	*baseStmt
 }
