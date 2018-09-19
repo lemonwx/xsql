@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/lemonwx/log"
+	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
 )
 
@@ -79,7 +80,56 @@ func (bs *baseStmt) execute(args ...interface{}) error {
 }
 
 func (bs *baseStmt) response() error {
-	return bs.mid.cli.WriteOK(nil)
+	data := make([]byte, 4, 128)
+
+	//status ok
+	data = append(data, 0)
+	//stmt id
+	data = append(data, mysql.Uint32ToBytes(bs.stmtId)...)
+	//number columns
+	data = append(data, mysql.Uint16ToBytes(uint16(bs.cliFieldCount))...)
+	//number params
+	data = append(data, mysql.Uint16ToBytes(uint16(bs.cliArgCount))...)
+	//filter [00]
+	data = append(data, 0)
+	//warning count
+	data = append(data, 0, 0)
+
+	if err := bs.mid.cli.WritePacket(data); err != nil {
+		return err
+	}
+
+	if bs.cliArgCount > 0 {
+		for i := 0; i < bs.cliArgCount; i++ {
+			data = data[0:4]
+			data = append(data, paramFieldData...)
+
+			if err := bs.mid.cli.WritePacket(data); err != nil {
+				return err
+			}
+		}
+
+		if err := bs.mid.cli.WriteEOF(bs.mid.status); err != nil {
+			return err
+		}
+	}
+
+	if bs.cliFieldCount > 0 {
+		for i := uint16(0); i < bs.cliFieldCount; i++ {
+			data = data[0:4]
+			data = append(data, columnFieldData...)
+
+			if err := bs.mid.cli.WritePacket(data); err != nil {
+				return err
+			}
+		}
+
+		if err := bs.mid.cli.WriteEOF(bs.mid.status); err != nil {
+			return err
+		}
+
+	}
+	return nil
 }
 
 type selStmt struct {
