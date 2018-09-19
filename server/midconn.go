@@ -77,7 +77,8 @@ type MidConn struct {
 
 	nodeIdx []int // node that has exec sql in the trx
 
-	stmts map[uint32]*Stmt
+	baseStmtId uint32
+	stmts      map[uint32]*Stmt
 
 	pools     map[int]*node.Pool
 	execNodes map[int]*node.Node
@@ -155,6 +156,7 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool, s *Se
 	midConn.NextVersion = 0
 
 	midConn.stmts = make(map[uint32]*Stmt)
+	midConn.baseStmtId = 1
 	midConn.svr = s
 	midConn.stat = newStat()
 	midConn.resp = make(chan *response)

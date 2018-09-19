@@ -35,10 +35,6 @@ type baseStmt struct {
 }
 
 func (bs *baseStmt) prepare(idx int) error {
-	// assign middle stmt's id
-	if bs.stmtId == 0 {
-	}
-
 	// get back conn of node[idx]
 	back, err := bs.mid.getSingleBackConn(idx)
 	if err != nil {
@@ -63,13 +59,13 @@ func (bs *baseStmt) prepare(idx int) error {
 		bs.svrStmtIds[idx] = id
 	}
 
-	if bs.svrFieldCount != 0 {
+	if bs.svrFieldCount == 0 {
 		bs.svrFieldCount = fieldCount
 	} else if bs.svrFieldCount != fieldCount {
 		return newMySQLErr(errMultiPrepareNotEqual)
 	}
 
-	if bs.svrArgCount != 0 {
+	if bs.svrArgCount == 0 {
 		bs.svrArgCount = argCount
 	} else if bs.svrArgCount != argCount {
 		return newMySQLErr(errMultiPrepareNotEqual)
@@ -105,7 +101,14 @@ type delStmt struct {
 }
 
 func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
-	stmt := &baseStmt{s: s, mid: co, sql: sqlparser.String(s)}
+	co.baseStmtId += 1
+	stmt := &baseStmt{
+		s:          s,
+		mid:        co,
+		sql:        sqlparser.String(s),
+		svrStmtIds: map[int]uint32{},
+		stmtId:     co.baseStmtId,
+	}
 	switch s.(type) {
 	case *sqlparser.Select:
 		return &selStmt{baseStmt: stmt}, nil
