@@ -54,7 +54,6 @@ func (bs *baseStmt) prepare(idx int) error {
 	if err != nil {
 		return err
 	}
-	defer bs.mid.putConn(idx, back)
 
 	// send prepare cmd to node[idx]'s svr
 	var id uint32
