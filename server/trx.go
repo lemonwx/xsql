@@ -129,6 +129,10 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 		conn.stat.ClearT.add(int64(time.Since(ts)))
 	}()
 
+	for _, stmt := range conn.myStmts {
+		stmt.close()
+	}
+
 	if len(conn.execNodes) == 1 {
 		for nodeIdx, back := range conn.execNodes {
 			if _, err := conn.execute(back, mysql.COM_QUERY, sql); err != nil {

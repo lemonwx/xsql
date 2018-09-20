@@ -512,8 +512,7 @@ func (conn *MidConn) abnormalClose() error {
 		node.Close()
 	}
 
-	conn.cli.Close()
-	conn.closed = true
+	conn.Close()
 	return nil
 }
 
