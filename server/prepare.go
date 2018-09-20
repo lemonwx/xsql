@@ -166,14 +166,21 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 	return nil
 }
 
+func (conn *MidConn) handleStmtClose(sql []byte) error {
+	stmtId := binary.LittleEndian.Uint32(sql[:4])
+	conn.myStmts[stmtId].close()
+	return nil
+}
+
 func (conn *MidConn) handlePrepare(sql string) error {
 	log.Debugf("[%d] handle prepare %s", conn.ConnectionId, sql)
-	var stmt myStmt
-	var err error
-	var s sqlparser.Statement
 	if conn.db == "" {
 		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
 	}
+
+	var stmt myStmt
+	var err error
+	var s sqlparser.Statement
 
 	if s, err = sqlparser.Parse(sql); err != nil {
 		return err

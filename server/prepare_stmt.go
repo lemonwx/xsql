@@ -17,6 +17,7 @@ type myStmt interface {
 	prepare(idx int) error
 	execute(args ...interface{}) error
 	response() error
+	close() error
 }
 
 type baseStmt struct {
@@ -70,6 +71,21 @@ func (bs *baseStmt) prepare(idx int) error {
 		bs.svrArgCount = argCount
 	} else if bs.svrArgCount != argCount {
 		return newMySQLErr(errMultiPrepareNotEqual)
+	}
+
+	return nil
+}
+
+func (bs *baseStmt) close() error {
+	for idx, stmtId := range bs.svrStmtIds {
+		back, err := bs.mid.getSingleBackConn(idx)
+		if err != nil {
+			return err
+		}
+		err = back.WriteCmd(mysql.COM_STMT_CLOSE, mysql.Uint32ToBytes(stmtId))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -143,6 +159,7 @@ func (sel *selStmt) prepare(idx int) error {
 
 	sel.cliArgCount = sel.svrArgCount
 	sel.cliFieldCount = sel.svrFieldCount - 1
+	sel.mid.myStmts[sel.stmtId] = sel
 	return nil
 }
 
@@ -169,6 +186,7 @@ func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
 		svrStmtIds: map[int]uint32{},
 		stmtId:     co.baseStmtId,
 	}
+
 	switch s.(type) {
 	case *sqlparser.Select:
 		return &selStmt{baseStmt: stmt}, nil
@@ -182,6 +200,7 @@ func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
 		log.Errorf("[%d] unsupported prepare for this sql", co.ConnectionId)
 		return nil, newMySQLErr(errUnsupportedSql)
 	}
+
 }
 
 type Stmt struct {

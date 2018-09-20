@@ -79,6 +79,7 @@ type MidConn struct {
 
 	baseStmtId uint32
 	stmts      map[uint32]*Stmt
+	myStmts    map[uint32]myStmt
 
 	pools     map[int]*node.Pool
 	execNodes map[int]*node.Node
@@ -156,6 +157,7 @@ func NewMidConn(conn net.Conn, cfg *config.Conf, pools map[int]*node.Pool, s *Se
 	midConn.NextVersion = 0
 
 	midConn.stmts = make(map[uint32]*Stmt)
+	midConn.myStmts = map[uint32]myStmt{}
 	midConn.baseStmtId = 1
 	midConn.svr = s
 	midConn.stat = newStat()
@@ -224,6 +226,8 @@ func (conn *MidConn) dispatch(sql []byte) error {
 		//return conn.handleExecute(sql)
 		//return conn.handleStmtExecute(sql)
 		return conn.handleStmtTrx(sql)
+	case mysql.COM_STMT_CLOSE:
+		return conn.handleStmtClose(sql)
 	}
 
 	return nil
