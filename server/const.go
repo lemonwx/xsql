@@ -41,7 +41,12 @@ const (
 	errUnsupportedPrepare
 	errRepeatPrepare
 	errMultiPrepareNotEqual
+	errBadProtocol
+	errUnknownStmtHandler
 	errInternal
+	errUnsupportedStmtExecCursor
+	errUnsupportedStmtFieldType
+	errUnsupportedStmtExecWithoutFieldType
 
 	errShardPanic
 	rowsInUseByOtherSession
@@ -50,12 +55,17 @@ const (
 )
 
 var MySQLErrName = map[uint16]string{
-	errUnsupportedShard:     "unsupported shard for this sql",
-	errUnsupportedMultiSet:  "unsupported multi set",
-	errInternal:             "internal error: %v",
-	errUnexpected:           "unexpected midConn error",
-	errUnsupportedSql:       "unsupported for this sql",
-	errUnsupportedPrepare:   "unsupported prepare for this sql",
-	errRepeatPrepare:        "repeated prepare cmd",
-	errMultiPrepareNotEqual: "multi prepare result not equal between node",
+	errUnsupportedShard:                    "unsupported shard for this sql",
+	errUnsupportedMultiSet:                 "unsupported multi set",
+	errInternal:                            "internal error: %v",
+	errUnexpected:                          "unexpected midConn error",
+	errUnsupportedSql:                      "unsupported for this sql",
+	errUnsupportedPrepare:                  "unsupported prepare for this sql",
+	errRepeatPrepare:                       "repeated prepare cmd",
+	errMultiPrepareNotEqual:                "multi prepare result not equal between node",
+	errBadProtocol:                         "bad protocol packet",
+	errUnknownStmtHandler:                  "Unknown prepared statement handler (%.*s) given to %s",
+	errUnsupportedStmtExecCursor:           "unsupported stmt execute use cursor",
+	errUnsupportedStmtExecWithoutFieldType: "stmt execute must with field type and flag",
+	errUnsupportedStmtFieldType:            "unsupported this type of field %v",
 }

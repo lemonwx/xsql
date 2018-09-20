@@ -706,3 +706,7 @@ func (conn *MidConn) execute(back *node.Node, opt uint8, data []byte) (*mysql.Re
 func newMySQLErr(errCode uint16) *mysql.SqlError {
 	return mysql.NewError(errCode, MySQLErrName[errCode])
 }
+
+func newDefaultMySQLError(errCode uint16, args ...interface{}) *mysql.SqlError {
+	return mysql.NewDefaultError(errCode, args)
+}

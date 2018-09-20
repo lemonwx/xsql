@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strconv"
 	"strings"
 	"time"
 	"utils"
@@ -168,7 +167,9 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 
 func (conn *MidConn) handleStmtClose(sql []byte) error {
 	stmtId := binary.LittleEndian.Uint32(sql[:4])
-	conn.myStmts[stmtId].close()
+	if err := conn.myStmts[stmtId].close(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -200,6 +201,33 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	return nil
 }
 
+func (conn *MidConn) handleStmtExecute(data []byte) error {
+	if len(data) < 9 {
+		return newMySQLErr(errBadProtocol)
+	}
+	pos := 0
+	id := binary.LittleEndian.Uint32(data[pos : pos+4])
+	pos += 4
+
+	stmt, ok := conn.myStmts[id]
+	if !ok {
+		return newDefaultMySQLError(errUnknownStmtHandler, id, "stmt execute")
+	}
+
+	flag := data[pos]
+	pos += 1
+	if flag != 0 {
+		return newMySQLErr(errUnsupportedStmtExecCursor)
+	}
+
+	//int<4> Iteration count (always 1)
+	pos += 4
+	stmt.execute(data[pos:])
+
+	return nil
+}
+
+/*
 func (conn *MidConn) handleStmtExecute(data []byte) error {
 	log.Debugf("[%d] handle stmt execute %v", conn.ConnectionId, data)
 
@@ -295,7 +323,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 		return UNEXPECT_MIDDLE_WARE_ERR
 	}
 }
-
+*/
 // func (conn *MidConn) makePkt(stmt *Stmt) []byte {
 func (conn *MidConn) makePkt(args []interface{}, id uint32) []byte {
 

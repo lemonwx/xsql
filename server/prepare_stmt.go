@@ -8,6 +8,8 @@ package server
 import (
 	"fmt"
 
+	"encoding/binary"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
@@ -15,7 +17,7 @@ import (
 
 type myStmt interface {
 	prepare(idx int) error
-	execute(args ...interface{}) error
+	execute(data []byte) error
 	response() error
 	close() error
 }
@@ -34,6 +36,16 @@ type baseStmt struct {
 	mid *MidConn
 	s   sqlparser.Statement
 	sql string
+
+	args     map[int]interface{}
+	argTypes []byte
+	argFlags []byte
+}
+
+func (bs *baseStmt) reset() {
+	bs.args = map[int]interface{}{}
+	bs.argTypes = bs.argTypes[:0]
+	bs.argFlags = bs.argFlags[:0]
 }
 
 func (bs *baseStmt) prepare(idx int) error {
@@ -91,7 +103,52 @@ func (bs *baseStmt) close() error {
 	return nil
 }
 
-func (bs *baseStmt) execute(args ...interface{}) error {
+func (bs *baseStmt) parseArgs(data []byte) error {
+	if bs.cliArgCount == 0 {
+		return nil
+	}
+	pos := 0
+	bitMapzie := (bs.cliArgCount + 7) / 8
+	nullBitMap := data[pos : pos+bitMapzie]
+	pos += bitMapzie
+	readFieldType := data[pos]
+	pos += 1
+	if readFieldType != 1 {
+		return newMySQLErr(errUnsupportedStmtExecWithoutFieldType)
+	}
+	for idx := 0; idx < bs.cliArgCount; idx += 1 {
+		bs.argTypes = append(bs.argTypes, data[pos])
+		pos += 1
+		bs.argFlags = append(bs.argFlags, data[pos])
+		pos += 1
+	}
+
+	for idx := 0; idx < bs.cliArgCount; idx += 1 {
+		if nullBitMap[idx>>3]&(1<<(uint(idx)%8)) > 0 {
+			bs.args[idx] = nil
+			continue
+		}
+
+		tp := bs.argTypes[idx]
+		isUnsigned := bs.argFlags[idx]&mysql.UNSIGNED_FLAG > 0
+		switch tp {
+		case mysql.MYSQL_TYPE_NULL:
+			bs.args[idx] = nil
+		case mysql.MYSQL_TYPE_LONGLONG:
+			if isUnsigned {
+				bs.args[idx] = binary.LittleEndian.Uint64(data[pos : pos+8])
+			} else {
+				bs.args[idx] = int64(binary.LittleEndian.Uint64(data[pos : pos+8]))
+			}
+			pos += 8
+		default:
+			return newDefaultMySQLError(errUnsupportedStmtFieldType, tp)
+		}
+	}
+	return nil
+}
+
+func (bs *baseStmt) execute(data []byte) error {
 	return nil
 }
 
@@ -160,6 +217,21 @@ func (sel *selStmt) prepare(idx int) error {
 	sel.cliArgCount = sel.svrArgCount
 	sel.cliFieldCount = sel.svrFieldCount - 1
 	sel.mid.myStmts[sel.stmtId] = sel
+	sel.args = map[int]interface{}{}
+	sel.argTypes = make([]byte, 0, sel.cliArgCount)
+	sel.argFlags = make([]byte, 0, sel.cliArgCount)
+	return nil
+}
+
+func (sel *selStmt) execute(data []byte) error {
+	if err := sel.parseArgs(data); err != nil {
+		return err
+	}
+
+	log.Debug(sel.args)
+	log.Debug(sel.argTypes)
+	log.Debug(sel.argFlags)
+
 	return nil
 }
 
