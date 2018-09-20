@@ -37,6 +37,7 @@ type Plan struct {
 
 	//for insert
 	shardKeyIdx int
+	stmtArgs    map[int]interface{}
 }
 
 func SliceEqual(s1, s2 []int) bool {
@@ -200,7 +201,7 @@ func (p *Plan) ShardForFrom(r *Router, preWhere *sqlparser.Where, froms ...sqlpa
 				case *sqlparser.SimpleSelect:
 					panic(UNSUPPORTED_SHARD_ERR)
 				case *sqlparser.Select:
-					plan, err := GeneralPlanForSelect(r, sel)
+					plan, err := GeneralPlanForSelect(r, sel, nil)
 					if err != nil {
 						panic(err)
 					}
@@ -325,7 +326,7 @@ func (p *Plan) ShardForFrom(r *Router, preWhere *sqlparser.Where, froms ...sqlpa
 					case *sqlparser.SimpleSelect:
 						panic(UNSUPPORTED_SHARD_ERR)
 					case *sqlparser.Select:
-						plan, err := GeneralPlanForSelect(r, sel)
+						plan, err := GeneralPlanForSelect(r, sel, nil)
 						if err != nil {
 							panic(err)
 						}
@@ -607,6 +608,7 @@ func (plan *Plan) getBoundValue(valExpr sqlparser.ValExpr) interface{} {
 		}
 		return val
 	case sqlparser.ValArg:
+		return plan.stmtArgs[int(node[2]-48)]
 		/*
 			key := fmt.Sprintf("v%d", plan.disKeyIdx)
 			return plan.bindVars[key]
@@ -679,10 +681,11 @@ func (plan *Plan) findInsertShard(val sqlparser.Tuple) int {
 	return plan.findShard(row[plan.shardKeyIdx])
 }
 
-func GeneralPlanForSelect(r *Router, stmt *sqlparser.Select) (plan *Plan, err error) {
+func GeneralPlanForSelect(r *Router, stmt *sqlparser.Select, args map[int]interface{}) (plan *Plan, err error) {
 
 	defer handleError(&err)
 	plan = &Plan{}
+	plan.stmtArgs = args
 
 	for _, expr := range stmt.SelectExprs {
 		switch ee := expr.(type) {
@@ -757,13 +760,13 @@ func GeneralPlanForWhere(r *Router, table string, where *sqlparser.Where) (plan 
 	return
 }
 
-func GeneralShardList(r *Router, stmt sqlparser.Statement) ([]int, error) {
+func GeneralShardList(r *Router, stmt sqlparser.Statement, args map[int]interface{}) ([]int, error) {
 	var plan *Plan
 	var err error
 
 	switch s := stmt.(type) {
 	case *sqlparser.Select:
-		plan, err = GeneralPlanForSelect(r, s)
+		plan, err = GeneralPlanForSelect(r, s, args)
 	case *sqlparser.Insert:
 		plan, err = GeneralPlanForInsert(r, s)
 	case *sqlparser.Update:

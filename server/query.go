@@ -153,7 +153,7 @@ func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]
 
 func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, error) {
 	var err error
-	if conn.nodeIdx, err = conn.getShardList(stmt); err != nil {
+	if conn.nodeIdx, err = conn.getShardList(stmt, nil); err != nil {
 		log.Errorf("[%d] get shard list failed:%v", conn.ConnectionId, err)
 		return nil, newMySQLErr(errUnsupportedShard)
 	}

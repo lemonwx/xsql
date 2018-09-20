@@ -103,6 +103,17 @@ func (bs *baseStmt) close() error {
 	return nil
 }
 
+func (bs *baseStmt) stmtChk(shardList []int) error {
+	for _, nodeIdx := range shardList {
+		if _, ok := bs.svrStmtIds[nodeIdx]; !ok {
+			if err := bs.prepare(nodeIdx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func (bs *baseStmt) parseArgs(data []byte) error {
 	if bs.cliArgCount == 0 {
 		return nil
@@ -145,6 +156,7 @@ func (bs *baseStmt) parseArgs(data []byte) error {
 			return newDefaultMySQLError(errUnsupportedStmtFieldType, tp)
 		}
 	}
+
 	return nil
 }
 
@@ -226,6 +238,51 @@ func (sel *selStmt) prepare(idx int) error {
 func (sel *selStmt) execute(data []byte) error {
 	if err := sel.parseArgs(data); err != nil {
 		return err
+	}
+
+	shardList, err := sel.mid.getShardList(sel.s, sel.args)
+	if err != nil {
+		return err
+	}
+
+	if err := sel.stmtChk(shardList); err != nil {
+		return err
+	}
+
+	mes := MultiExecSyncer{}
+	mes.Add(len(shardList))
+	for _, nodeIdx := range shardList {
+		stmtId, ok := sel.svrStmtIds[nodeIdx]
+		if !ok {
+			return newDefaultMySQLError(errInternal, "svr stmt id not exists")
+		}
+		go func(node int, id uint32) {
+			back, err := sel.mid.getSingleBackConn(node)
+			if err != nil {
+				mes.appendErr(err)
+				return
+			}
+
+			svrData := make([]byte, 0, len(data)+4+1+4)
+			svrData = append(svrData, mysql.Uint32ToBytes(id)...) //int<4> statement id
+			svrData = append(svrData, 0)                          //int<1> flags:
+			svrData = append(svrData, 1, 0, 0, 0)                 //int<4> Iteration count (always 1)
+			svrData = append(svrData, data...)
+			if ret, err := back.Execute(mysql.COM_STMT_EXECUTE, svrData); err != nil {
+				mes.appendErr(err)
+			} else {
+				mes.appendRet(ret)
+			}
+			mes.Done()
+		}(nodeIdx, stmtId)
+	}
+	mes.Wait()
+
+	switch {
+	case len(mes.errs) == len(sel.svrStmtIds):
+	case len(mes.rets) == len(sel.svrStmtIds):
+	default:
+		return newMySQLErr(errMultiStmtExecNotEqual)
 	}
 
 	log.Debug(sel.args)

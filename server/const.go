@@ -41,6 +41,7 @@ const (
 	errUnsupportedPrepare
 	errRepeatPrepare
 	errMultiPrepareNotEqual
+	errMultiStmtExecNotEqual
 	errBadProtocol
 	errUnknownStmtHandler
 	errInternal
@@ -63,6 +64,7 @@ var MySQLErrName = map[uint16]string{
 	errUnsupportedPrepare:                  "unsupported prepare for this sql",
 	errRepeatPrepare:                       "repeated prepare cmd",
 	errMultiPrepareNotEqual:                "multi prepare result not equal between node",
+	errMultiStmtExecNotEqual:               "multi execute result not equal between node",
 	errBadProtocol:                         "bad protocol packet",
 	errUnknownStmtHandler:                  "Unknown prepared statement handler (%.*s) given to %s",
 	errUnsupportedStmtExecCursor:           "unsupported stmt execute use cursor",

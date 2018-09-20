@@ -550,7 +550,7 @@ func (conn *MidConn) newEmptyResultset(stmt *sqlparser.Select) *mysql.Resultset 
 	return r
 }
 
-func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
+func (conn *MidConn) getShardList(stmt sqlparser.Statement, args map[int]interface{}) ([]int, error) {
 	ts := time.Now()
 	defer func() {
 		conn.stat.RouteT.add(int64(time.Since(ts)))
@@ -566,7 +566,7 @@ func (conn *MidConn) getShardList(stmt sqlparser.Statement) ([]int, error) {
 		log.Errorf("[%d] get router failed: %v", conn.ConnectionId, err)
 		return nil, err
 	} else {
-		return router.GeneralShardList(r, stmt)
+		return router.GeneralShardList(r, stmt, args)
 	}
 }
 
@@ -684,7 +684,7 @@ func (conn *MidConn) getNodeIdxs(stmt sqlparser.Statement, bindVars map[string]i
 		return err
 	}
 
-	conn.nodeIdx, err = conn.getShardList(stmt)
+	conn.nodeIdx, err = conn.getShardList(stmt, nil)
 
 	if err != nil {
 		log.Debugf("[%d] get node idxs failed: %v", conn.ConnectionId, err)
