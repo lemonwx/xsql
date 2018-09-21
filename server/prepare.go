@@ -167,9 +167,14 @@ func (conn *MidConn) myPrepare(stmt *Stmt, sql string, idx int) error {
 
 func (conn *MidConn) handleStmtClose(sql []byte) error {
 	stmtId := binary.LittleEndian.Uint32(sql[:4])
-	if err := conn.myStmts[stmtId].close(); err != nil {
+	stmt, ok := conn.myStmts[stmtId]
+	if !ok {
+		return nil
+	}
+	if err := stmt.close(); err != nil {
 		return err
 	}
+	delete(conn.myStmts, stmtId)
 	return nil
 }
 
@@ -222,9 +227,12 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 
 	//int<4> Iteration count (always 1)
 	pos += 4
-	stmt.execute(data[pos:])
+	rets, err := stmt.execute(data[pos:])
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return conn.HandleSelRets(rets)
 }
 
 /*

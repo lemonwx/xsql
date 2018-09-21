@@ -10,6 +10,8 @@ import (
 
 	"encoding/binary"
 
+	"sync"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/mysql"
 	"github.com/lemonwx/xsql/sqlparser"
@@ -17,7 +19,7 @@ import (
 
 type myStmt interface {
 	prepare(idx int) error
-	execute(data []byte) error
+	execute(data []byte) ([]*mysql.Result, error)
 	response() error
 	close() error
 }
@@ -97,6 +99,7 @@ func (bs *baseStmt) close() error {
 		if err != nil {
 			return err
 		}
+		delete(bs.svrStmtIds, idx)
 	}
 
 	return nil
@@ -159,8 +162,62 @@ func (bs *baseStmt) parseArgs(data []byte) error {
 	return nil
 }
 
-func (bs *baseStmt) execute(data []byte) error {
-	return nil
+func (bs *baseStmt) execute(data []byte) ([]*mysql.Result, error) {
+
+	if err := bs.parseArgs(data); err != nil {
+		return nil, err
+	}
+
+	shardList, err := bs.mid.getShardList(bs.s, bs.args)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(shardList) == 0 {
+		return nil, nil
+	}
+
+	if err := bs.stmtChk(shardList); err != nil {
+		return nil, err
+	}
+
+	mes := MultiExecSyncer{}
+	mes.Add(len(shardList))
+	for _, nodeIdx := range shardList {
+		stmtId, ok := bs.svrStmtIds[nodeIdx]
+		if !ok {
+			return nil, newDefaultMySQLError(errInternal, "svr stmt id not exists")
+		}
+		go func(node int, id uint32) {
+			back, err := bs.mid.getSingleBackConn(node)
+			if err != nil {
+				mes.appendErr(err)
+				return
+			}
+
+			svrData := make([]byte, 0, len(data)+4+1+4)
+			svrData = append(svrData, mysql.Uint32ToBytes(id)...) //int<4> statement id
+			svrData = append(svrData, 0)                          //int<1> flags:
+			svrData = append(svrData, 1, 0, 0, 0)                 //int<4> Iteration count (always 1)
+			svrData = append(svrData, data...)
+			if ret, err := back.Execute(mysql.COM_STMT_EXECUTE, svrData); err != nil {
+				mes.appendErr(err)
+			} else {
+				mes.appendRet(ret)
+			}
+			mes.Done()
+		}(nodeIdx, stmtId)
+	}
+	mes.Wait()
+
+	switch {
+	case len(mes.errs) == len(shardList):
+		return nil, mes.errs[0]
+	case len(mes.rets) == len(shardList):
+		return mes.rets, nil
+	default:
+		return nil, newMySQLErr(errMultiStmtExecNotEqual)
+	}
 }
 
 func (bs *baseStmt) response() error {
@@ -234,61 +291,40 @@ func (sel *selStmt) prepare(idx int) error {
 	return nil
 }
 
-func (sel *selStmt) execute(data []byte) error {
-	if err := sel.parseArgs(data); err != nil {
-		return err
+func (sel *selStmt) execute(data []byte) ([]*mysql.Result, error) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var vErr, eErr error
+	var vInuse map[uint64]bool
+	var rets []*mysql.Result
+	go func() {
+		vInuse, vErr = sel.mid.getCurVInUse(Select)
+		wg.Done()
+	}()
+	go func() {
+		rets, eErr = sel.baseStmt.execute(data)
+		wg.Done()
+	}()
+	wg.Wait()
+
+	if vErr != nil {
+		return nil, vErr
 	}
 
-	shardList, err := sel.mid.getShardList(sel.s, sel.args)
-	if err != nil {
-		return err
+	if eErr != nil {
+		return nil, eErr
 	}
 
-	if err := sel.stmtChk(shardList); err != nil {
-		return err
+	extraSize := len(sel.s.(*sqlparser.Select).ExtraCols)
+	if err := sel.mid.chkInUse(&rets, extraSize, vInuse, true); err != nil {
+		return nil, err
 	}
 
-	mes := MultiExecSyncer{}
-	mes.Add(len(shardList))
-	for _, nodeIdx := range shardList {
-		stmtId, ok := sel.svrStmtIds[nodeIdx]
-		if !ok {
-			return newDefaultMySQLError(errInternal, "svr stmt id not exists")
-		}
-		go func(node int, id uint32) {
-			back, err := sel.mid.getSingleBackConn(node)
-			if err != nil {
-				mes.appendErr(err)
-				return
-			}
-
-			svrData := make([]byte, 0, len(data)+4+1+4)
-			svrData = append(svrData, mysql.Uint32ToBytes(id)...) //int<4> statement id
-			svrData = append(svrData, 0)                          //int<1> flags:
-			svrData = append(svrData, 1, 0, 0, 0)                 //int<4> Iteration count (always 1)
-			svrData = append(svrData, data...)
-			if ret, err := back.Execute(mysql.COM_STMT_EXECUTE, svrData); err != nil {
-				mes.appendErr(err)
-			} else {
-				mes.appendRet(ret)
-			}
-			mes.Done()
-		}(nodeIdx, stmtId)
-	}
-	mes.Wait()
-
-	switch {
-	case len(mes.errs) == len(sel.svrStmtIds):
-	case len(mes.rets) == len(sel.svrStmtIds):
-	default:
-		return newMySQLErr(errMultiStmtExecNotEqual)
+	for _, ret := range rets {
+		log.Debug(ret.RowDatas)
 	}
 
-	log.Debug(sel.args)
-	log.Debug(sel.argTypes)
-	log.Debug(sel.argFlags)
-
-	return nil
+	return rets, nil
 }
 
 type istStmt struct {
