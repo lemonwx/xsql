@@ -384,7 +384,7 @@ func (conn *MidConn) ExecuteMultiNode(opt uint8, sql []byte, nodeIdxs []int) ([]
 
 		// 所有节点返回的 错误内容一致
 		if err, ok := errs[0].(*mysql.SqlError); ok {
-			if err.Code == rowsInUseByOtherSession {
+			if err.Code == errRowsInuseByOthers {
 				log.Debugf("[%d] all %d nodes return error: %v", conn.ConnectionId, nodeSize, err.Message)
 				return nil, errs[0]
 			}

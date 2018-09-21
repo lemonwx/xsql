@@ -14,6 +14,8 @@ import (
 
 	"time"
 
+	"encoding/binary"
+
 	"github.com/lemonwx/log"
 	"github.com/lemonwx/xsql/errors"
 	"github.com/lemonwx/xsql/meta"
@@ -105,7 +107,7 @@ func (conn *MidConn) executeSelect(sql string, flag uint8) ([]*mysql.Result, map
 	return rets, vInUse, nil
 }
 
-func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]bool) error {
+func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uint64]bool, isBin bool) error {
 	ts := time.Now()
 	defer func() {
 		conn.stat.ChkInuseT.add(int64(time.Since(ts)))
@@ -114,7 +116,7 @@ func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uin
 	for idx, ret := range *rets {
 		ret.Fields = ret.Fields[extraSz:]
 		for rowIdx, _ := range ret.RowDatas {
-			if err := conn.hideExtraCols(&ret.RowDatas[rowIdx], extraSz, vInUse); err != nil {
+			if err := conn.hideExtraCols(&ret.RowDatas[rowIdx], extraSz, vInUse, len(ret.Fields), isBin); err != nil {
 				return err
 			}
 		}
@@ -123,31 +125,86 @@ func (conn *MidConn) chkInUse(rets *[]*mysql.Result, extraSz int, vInUse map[uin
 	return nil
 }
 
-func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]bool) error {
-	idx := uint8(0)
-	for count := 0; count < size; count += 1 {
-		s := idx + 1
-		e := s + (*data)[idx]
-		idx = (*data)[idx] + idx + 1
+func (conn *MidConn) node2cliNullMask(data []byte, extraSize, fieldCount int) ([]byte, error) {
 
-		vStr := string((*data)[s:e])
-		res, err := strconv.ParseUint(vStr, 10, 64)
-		if err != nil {
-			log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
-			return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
+	cliSize := (fieldCount + 7 + 2) >> 3
+	nodePos := 1 + ((fieldCount + extraSize + 7 + 2) >> 3)
+
+	if nodePos >= len(data) {
+		err := fmt.Errorf("[%d] unexpected node err: node pos: %d >= len(*data): %d", conn.ConnectionId, nodePos, len(data))
+		log.Error(err)
+		return nil, newDefaultMySQLError(errInternal, err)
+	}
+
+	nodeNullMask := (data)[1:nodePos]
+	cliNullMask := make([]byte, cliSize)
+
+	for idx := 0; idx < fieldCount; idx += 1 {
+		nodeidx := idx + extraSize
+		if (nodeidx+2)>>3 >= len(nodeNullMask) {
+			err := fmt.Errorf("[%d] unexpected node err: idx: %d >= len(node null mask): %d", conn.ConnectionId,
+				(nodeidx+2)>>3, len(nodeNullMask))
+			log.Error(err)
+			return nil, newDefaultMySQLError(errInternal, err)
 		}
-
-		if res == conn.NextVersion {
-			continue
-		}
-
-		if _, ok := vs[res]; ok {
-			err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
-			log.Errorf("[%d] hide extra col failed: %v", conn.ConnectionId, err)
-			return err
+		if ((nodeNullMask[(nodeidx+2)>>3] >> uint((nodeidx+2)&7)) & 1) == 1 {
+			cliNullMask[(idx+2)>>3] += 1 << uint((idx+2)%8)
 		}
 	}
-	(*data) = (*data)[idx:]
+
+	log.Debugf("[%d] 2 cli null mask : %v, len: %d, %d, %d", conn.ConnectionId, cliNullMask, cliSize, nodePos, fieldCount)
+	return cliNullMask, nil
+}
+
+func (conn *MidConn) hideExtraCols(data *mysql.RowData, size int, vs map[uint64]bool, fieldSize int, isBin bool) error {
+	if isBin {
+		pos := 1 + ((fieldSize + size + 7 + 2) >> 3)
+		nullMask := (*data)[1:pos]
+
+		for idx := 0; idx < size; idx += 1 {
+			if ((nullMask[(idx+2)>>3] >> uint((idx+2)&7)) & 1) == 1 {
+				log.Errorf("[%d] unexpected node err: version parsed from ret is nil", conn.ConnectionId)
+				return newDefaultMySQLError(errInternal, "decoded extra col is nil")
+			}
+			extra := uint64(binary.LittleEndian.Uint64((*data)[pos : pos+8]))
+			log.Debugf("[%d] extra col val: %v", conn.ConnectionId, extra)
+			if _, ok := vs[extra]; ok {
+				return newMySQLErr(errRowsInuseByOthers)
+			}
+			pos += 8
+		}
+		mask, err := conn.node2cliNullMask(*data, size, fieldSize)
+		if err != nil {
+			return err
+		}
+		mask = append((*data)[:1], mask...)
+		*data = append(mask, (*data)[pos:]...)
+	} else {
+		idx := uint8(0)
+		for count := 0; count < size; count += 1 {
+			s := idx + 1
+			e := s + (*data)[idx]
+			idx = (*data)[idx] + idx + 1
+
+			vStr := string((*data)[s:e])
+			res, err := strconv.ParseUint(vStr, 10, 64)
+			if err != nil {
+				log.Errorf("[%d] ParseUint from %v failed: %v", vStr, err)
+				return mysql.NewDefaultError(mysql.MID_ER_HIDE_EXTRA_FAILED)
+			}
+
+			if res == conn.NextVersion {
+				continue
+			}
+
+			if _, ok := vs[res]; ok {
+				err = mysql.NewDefaultError(mysql.MID_ER_ROWS_IN_USE_BY_OTHER_SESSION)
+				log.Errorf("[%d] hide extra col failed: %v", conn.ConnectionId, err)
+				return err
+			}
+		}
+		(*data) = (*data)[idx:]
+	}
 	return nil
 }
 
@@ -175,7 +232,7 @@ func (conn *MidConn) handleSelect(stmt *sqlparser.Select) ([]*mysql.Result, erro
 		return nil, err
 	}
 
-	if err := conn.chkInUse(&rets, len(stmt.ExtraCols), vInUse); err != nil {
+	if err := conn.chkInUse(&rets, len(stmt.ExtraCols), vInUse, false); err != nil {
 		return nil, err
 	}
 

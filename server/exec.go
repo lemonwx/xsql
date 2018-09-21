@@ -58,7 +58,7 @@ func (conn *MidConn) execSingle(stmt *sqlparser.Update, idx int, delSql string) 
 		return nil, nil
 	}
 
-	if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse); err != nil {
+	if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse, false); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func (conn *MidConn) execMulti(stmt *sqlparser.Update, delsql string) ([]*mysql.
 			}
 
 			// if chk in use failed, response to client
-			if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse); err != nil {
+			if err := conn.chkInUse(&[]*mysql.Result{chkRet}, 1, vInUse, false); err != nil {
 				ms.appendErr(err)
 				return
 			}

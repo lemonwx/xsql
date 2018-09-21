@@ -50,12 +50,13 @@ const (
 	errUnsupportedStmtExecWithoutFieldType
 
 	errShardPanic
-	rowsInUseByOtherSession
+	errRowsInuseByOthers
 	sqlOnlySuccessInPartlyOfNode
 	unexpectedMiddleErr
 )
 
 var MySQLErrName = map[uint16]string{
+	errRowsInuseByOthers:                   "rows you request in use by another session",
 	errUnsupportedShard:                    "unsupported shard for this sql",
 	errUnsupportedMultiSet:                 "unsupported multi set",
 	errInternal:                            "internal error: %v",

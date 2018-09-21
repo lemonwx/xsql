@@ -129,8 +129,9 @@ func (conn *MidConn) clearExecNodes(sql []byte) error {
 		conn.stat.ClearT.add(int64(time.Since(ts)))
 	}()
 
-	for _, stmt := range conn.myStmts {
+	for idx, stmt := range conn.myStmts {
 		stmt.close()
+		delete(conn.myStmts, idx)
 	}
 
 	if len(conn.execNodes) == 1 {
