@@ -201,7 +201,7 @@ func (p *Plan) ShardForFrom(r *Router, preWhere *sqlparser.Where, froms ...sqlpa
 				case *sqlparser.SimpleSelect:
 					panic(UNSUPPORTED_SHARD_ERR)
 				case *sqlparser.Select:
-					plan, err := GeneralPlanForSelect(r, sel, nil)
+					plan, err := GeneralPlanForSelect(r, sel, p.stmtArgs)
 					if err != nil {
 						panic(err)
 					}
@@ -326,7 +326,7 @@ func (p *Plan) ShardForFrom(r *Router, preWhere *sqlparser.Where, froms ...sqlpa
 					case *sqlparser.SimpleSelect:
 						panic(UNSUPPORTED_SHARD_ERR)
 					case *sqlparser.Select:
-						plan, err := GeneralPlanForSelect(r, sel, nil)
+						plan, err := GeneralPlanForSelect(r, sel, p.stmtArgs)
 						if err != nil {
 							panic(err)
 						}
