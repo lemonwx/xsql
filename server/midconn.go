@@ -707,5 +707,5 @@ func newMySQLErr(errCode uint16) *mysql.SqlError {
 }
 
 func newDefaultMySQLError(errCode uint16, args ...interface{}) *mysql.SqlError {
-	return mysql.NewDefaultError(errCode, args)
+	return mysql.NewError(errCode, fmt.Sprintf(MySQLErrName[errCode], args))
 }
