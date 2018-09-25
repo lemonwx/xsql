@@ -45,136 +45,10 @@ type baseStmt struct {
 	argFlags []byte
 }
 
-func (bs *baseStmt) baseExec(data []byte, fun func(map[int]interface{}, uint32) ([]byte, error)) ([]*mysql.Result, error) {
-	var shardList []int
-	var err error
-	if err = bs.parseArgs(data); err != nil {
-		return nil, err
-	}
-
-	if shardList, err = bs.mid.getShardList(bs.s, bs.args); err != nil {
-		return nil, err
-	}
-
-	if len(shardList) == 0 {
-		// todo: return based on sql type
-		return nil, nil
-	}
-
-	if err = bs.stmtChk(shardList); err != nil {
-		return nil, err
-	}
-
-	mes := MultiExecSyncer{}
-	mes.Add(len(shardList))
-	for _, nodeIdx := range shardList {
-		stmtId, ok := bs.svrStmtIds[nodeIdx]
-		if !ok {
-			return nil, newDefaultMySQLError(errInternal, "svr stmt id not exists")
-		}
-
-		go func(nodeIdx int, stmtId uint32) {
-			var back *node.Node
-			var svrData []byte
-			var err error
-			if back, err = bs.mid.getSingleBackConn(nodeIdx); err != nil {
-				mes.appendErr(err)
-				return
-			}
-
-			if svrData, err = fun(bs.args, stmtId); err != nil {
-				mes.appendErr(err)
-				return
-			}
-
-			if ret, err := bs.mid.execute(back, mysql.COM_STMT_EXECUTE, svrData); err != nil {
-				mes.appendErr(err)
-			} else {
-				mes.appendRet(ret)
-			}
-
-			mes.Done()
-		}(nodeIdx, stmtId)
-	}
-	mes.Wait()
-	switch {
-	case len(mes.errs) == len(shardList):
-		return nil, mes.errs[0]
-	case len(mes.rets) == len(shardList):
-		return mes.rets, nil
-	default:
-		return nil, newMySQLErr(errMultiStmtExecNotEqual)
-	}
-}
-
-func (bs *baseStmt) mkPkt(stmtId uint32, data []byte) []byte {
-	sendSvrData := make([]byte, 0, len(data)+4+1+4)
-	sendSvrData = append(sendSvrData, mysql.Uint32ToBytes(stmtId)...) //int<4> statement id
-	sendSvrData = append(sendSvrData, 0)                              //int<1> flags:
-	sendSvrData = append(sendSvrData, 1, 0, 0, 0)                     //int<4> Iteration count (always 1)
-	sendSvrData = append(sendSvrData, data...)                        // args encoded
-	return sendSvrData
-}
-
 func (bs *baseStmt) reset() {
 	bs.args = map[int]interface{}{}
 	bs.argTypes = bs.argTypes[:0]
 	bs.argFlags = bs.argFlags[:0]
-}
-
-func (bs *baseStmt) prepare(idx int) error {
-	// get back conn of node[idx]
-	back, err := bs.mid.getSingleBackConn(idx)
-	if err != nil {
-		return err
-	}
-
-	// send prepare cmd to node[idx]'s svr
-	var id uint32
-	var fieldCount uint16
-	var argCount int
-	err = back.ExecutePrepare([]byte(bs.sql), &id, &fieldCount, &argCount)
-	if err != nil {
-		return err
-	}
-
-	// chk and assign
-	if _, ok := bs.svrStmtIds[idx]; ok {
-		log.Errorf("[%d] had send prepare cmd for this node and sql, but receive again", bs.mid.ConnectionId)
-		return newMySQLErr(errRepeatPrepare)
-	} else {
-		bs.svrStmtIds[idx] = id
-	}
-
-	if bs.svrFieldCount == 0 {
-		bs.svrFieldCount = fieldCount
-	} else if bs.svrFieldCount != fieldCount {
-		return newMySQLErr(errMultiPrepareNotEqual)
-	}
-
-	if bs.svrArgCount == 0 {
-		bs.svrArgCount = argCount
-	} else if bs.svrArgCount != argCount {
-		return newMySQLErr(errMultiPrepareNotEqual)
-	}
-
-	return nil
-}
-
-func (bs *baseStmt) close() error {
-	for idx, stmtId := range bs.svrStmtIds {
-		back, err := bs.mid.getSingleBackConn(idx)
-		if err != nil {
-			return err
-		}
-		err = back.WriteCmd(mysql.COM_STMT_CLOSE, mysql.Uint32ToBytes(stmtId))
-		if err != nil {
-			return err
-		}
-		delete(bs.svrStmtIds, idx)
-	}
-
-	return nil
 }
 
 func (bs *baseStmt) stmtChk(shardList []int) error {
@@ -234,22 +108,70 @@ func (bs *baseStmt) parseArgs(data []byte) error {
 	return nil
 }
 
-func (bs *baseStmt) execute(data []byte) ([]*mysql.Result, error) {
+func (bs *baseStmt) prepare(idx int) error {
+	// get back conn of node[idx]
+	back, err := bs.mid.getSingleBackConn(idx)
+	if err != nil {
+		return err
+	}
 
-	if err := bs.parseArgs(data); err != nil {
+	// send prepare cmd to node[idx]'s svr
+	var id uint32
+	var fieldCount uint16
+	var argCount int
+	err = back.ExecutePrepare([]byte(bs.sql), &id, &fieldCount, &argCount)
+	if err != nil {
+		return err
+	}
+
+	// chk and assign
+	if _, ok := bs.svrStmtIds[idx]; ok {
+		log.Errorf("[%d] had send prepare cmd for this node and sql, but receive again", bs.mid.ConnectionId)
+		return newMySQLErr(errRepeatPrepare)
+	} else {
+		bs.svrStmtIds[idx] = id
+	}
+
+	if bs.svrFieldCount == 0 {
+		bs.svrFieldCount = fieldCount
+	} else if bs.svrFieldCount != fieldCount {
+		return newMySQLErr(errMultiPrepareNotEqual)
+	}
+
+	if bs.svrArgCount == 0 {
+		bs.svrArgCount = argCount
+	} else if bs.svrArgCount != argCount {
+		return newMySQLErr(errMultiPrepareNotEqual)
+	}
+
+	return nil
+}
+
+func (bs *baseStmt) execute(data []byte, fun func(map[int]interface{}, uint32) ([]byte, error)) (
+	[]*mysql.Result, error) {
+	var shardList []int
+	var err error
+	if err = bs.parseArgs(data); err != nil {
 		return nil, err
 	}
 
-	shardList, err := bs.mid.getShardList(bs.s, bs.args)
-	if err != nil {
+	if shardList, err = bs.mid.getShardList(bs.s, bs.args); err != nil {
 		return nil, err
 	}
 
 	if len(shardList) == 0 {
-		return nil, nil
+		// todo: return based on sql type
+		switch v := bs.s.(type) {
+		case *sqlparser.Select:
+			rs := bs.mid.newEmptyResultset(v)
+			ret := &mysql.Result{Resultset: rs}
+			return []*mysql.Result{ret}, nil
+		default:
+			return nil, nil
+		}
 	}
 
-	if err := bs.stmtChk(shardList); err != nil {
+	if err = bs.stmtChk(shardList); err != nil {
 		return nil, err
 	}
 
@@ -260,28 +182,31 @@ func (bs *baseStmt) execute(data []byte) ([]*mysql.Result, error) {
 		if !ok {
 			return nil, newDefaultMySQLError(errInternal, "svr stmt id not exists")
 		}
-		go func(node int, id uint32) {
-			back, err := bs.mid.getSingleBackConn(node)
-			if err != nil {
+
+		go func(nodeIdx int, stmtId uint32) {
+			var back *node.Node
+			var svrData []byte
+			var err error
+			if back, err = bs.mid.getSingleBackConn(nodeIdx); err != nil {
 				mes.appendErr(err)
 				return
 			}
 
-			svrData := make([]byte, 0, len(data)+4+1+4)
-			svrData = append(svrData, mysql.Uint32ToBytes(id)...) //int<4> statement id
-			svrData = append(svrData, 0)                          //int<1> flags:
-			svrData = append(svrData, 1, 0, 0, 0)                 //int<4> Iteration count (always 1)
-			svrData = append(svrData, data...)
-			if ret, err := back.Execute(mysql.COM_STMT_EXECUTE, bs.mkPkt(id, data)); err != nil {
+			if svrData, err = fun(bs.args, stmtId); err != nil {
+				mes.appendErr(err)
+				return
+			}
+
+			if ret, err := bs.mid.execute(back, mysql.COM_STMT_EXECUTE, svrData); err != nil {
 				mes.appendErr(err)
 			} else {
 				mes.appendRet(ret)
 			}
+
 			mes.Done()
 		}(nodeIdx, stmtId)
 	}
 	mes.Wait()
-
 	switch {
 	case len(mes.errs) == len(shardList):
 		return nil, mes.errs[0]
@@ -345,6 +270,22 @@ func (bs *baseStmt) response() error {
 	return nil
 }
 
+func (bs *baseStmt) close() error {
+	for idx, stmtId := range bs.svrStmtIds {
+		back, err := bs.mid.getSingleBackConn(idx)
+		if err != nil {
+			return err
+		}
+		err = back.WriteCmd(mysql.COM_STMT_CLOSE, mysql.Uint32ToBytes(stmtId))
+		if err != nil {
+			return err
+		}
+		delete(bs.svrStmtIds, idx)
+	}
+
+	return nil
+}
+
 type selStmt struct {
 	*baseStmt
 }
@@ -374,7 +315,16 @@ func (sel *selStmt) execute(data []byte) ([]*mysql.Result, error) {
 		wg.Done()
 	}()
 	go func() {
-		rets, eErr = sel.baseStmt.execute(data)
+		f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+			svrData := make([]byte, 0, len(data)+4+1+4)
+			svrData = append(svrData, mysql.Uint32ToBytes(stmtId)...) //int<4> statement id
+			svrData = append(svrData, 0)                              //int<1> flags:
+			svrData = append(svrData, 1, 0, 0, 0)                     //int<4> Iteration count (always 1)
+			svrData = append(svrData, data...)
+			return svrData, nil
+		}
+
+		rets, eErr = sel.baseStmt.execute(data, f)
 		wg.Done()
 	}()
 	wg.Wait()
@@ -427,7 +377,7 @@ func (ist *istStmt) execute(data []byte) ([]*mysql.Result, error) {
 		return ret, nil
 	}
 
-	return ist.baseStmt.baseExec(data, f)
+	return ist.baseStmt.execute(data, f)
 }
 
 type updStmt struct {
@@ -435,9 +385,17 @@ type updStmt struct {
 	lockStmt *selStmt
 }
 
+func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
+	return nil, nil
+}
+
 type delStmt struct {
 	*baseStmt
 	upd *updStmt
+}
+
+func (del *delStmt) execute(data []byte) ([]*mysql.Result, error) {
+	return nil, nil
 }
 
 func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
