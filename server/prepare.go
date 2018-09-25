@@ -214,6 +214,8 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	id := binary.LittleEndian.Uint32(data[pos : pos+4])
 	pos += 4
 
+	log.Debug(conn.myStmts, id)
+
 	stmt, ok := conn.myStmts[id]
 	if !ok {
 		return newDefaultMySQLError(errUnknownStmtHandler, id, "stmt execute")
@@ -232,7 +234,14 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 		return err
 	}
 
-	return conn.HandleSelRets(rets)
+	switch stmt.(type) {
+	case *istStmt, *updStmt, *delStmt:
+		return conn.HandleExecRets(rets)
+	case *selStmt:
+		return conn.HandleSelRets(rets)
+	default:
+		return newMySQLErr(errUnsupportedPrepare)
+	}
 }
 
 /*
