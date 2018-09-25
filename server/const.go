@@ -48,6 +48,8 @@ const (
 	errUnsupportedStmtExecCursor
 	errUnsupportedStmtFieldType
 	errUnsupportedStmtExecWithoutFieldType
+	errOrderByIdxOutOfRange
+	errOrderByColMustInSelectList
 
 	errShardPanic
 	errRowsInuseByOthers
@@ -71,4 +73,6 @@ var MySQLErrName = map[uint16]string{
 	errUnsupportedStmtExecCursor:           "unsupported stmt execute use cursor",
 	errUnsupportedStmtExecWithoutFieldType: "stmt execute must with field type and flag",
 	errUnsupportedStmtFieldType:            "unsupported this type of field %v",
+	errOrderByIdxOutOfRange:                "order by index out of range",
+	errOrderByColMustInSelectList:          "order by column must in select list",
 }

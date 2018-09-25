@@ -68,13 +68,18 @@ func NewOrderedResult(rets []*mysql.Result, orderBy sqlparser.OrderBy, extraSize
 			if err != nil {
 				return ret, err
 			}
+
+			if keyIdx > uint64(len(ret.Fields)) {
+				return ret, newMySQLErr(errOrderByIdxOutOfRange)
+			}
+
 			ret.orderKeys = append(ret.orderKeys, &order{keyIdx - uint64(extraSize), orderby.Direction})
 		case *sqlparser.ColName:
 			log.Debugf("cols: %v, want: %s", ret.FieldNames, node.Name)
 			if colIdx, ok := ret.FieldNames[string(node.Name)]; ok {
 				ret.orderKeys = append(ret.orderKeys, &order{uint64(colIdx - extraSize), orderby.Direction})
 			} else {
-				return ret, errors.New2("unknown colname")
+				return ret, newMySQLErr(errOrderByColMustInSelectList)
 			}
 		default:
 			return ret, errors.New2("unsupported order key type")
