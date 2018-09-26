@@ -747,9 +747,9 @@ func GeneralPlanForInsert(r *Router, ist *sqlparser.Insert, args map[int]interfa
 	return
 }
 
-func GeneralPlanForWhere(r *Router, table string, where *sqlparser.Where) (plan *Plan, err error) {
+func GeneralPlanForWhere(r *Router, table string, where *sqlparser.Where, args map[int]interface{}) (plan *Plan, err error) {
 	defer handleError(&err)
-	plan = &Plan{}
+	plan = &Plan{stmtArgs: args}
 
 	var ok bool
 	if plan.rule, ok = r.Rules[table]; !ok {
@@ -770,9 +770,9 @@ func GeneralShardList(r *Router, stmt sqlparser.Statement, args map[int]interfac
 	case *sqlparser.Insert:
 		plan, err = GeneralPlanForInsert(r, s, args)
 	case *sqlparser.Update:
-		plan, err = GeneralPlanForWhere(r, string(s.Table.Name), s.Where)
+		plan, err = GeneralPlanForWhere(r, string(s.Table.Name), s.Where, args)
 	case *sqlparser.Delete:
-		plan, err = GeneralPlanForWhere(r, string(s.Table.Name), s.Where)
+		plan, err = GeneralPlanForWhere(r, string(s.Table.Name), s.Where, args)
 	default:
 		return nil, errors.New2("can't shard for this type of sql")
 	}

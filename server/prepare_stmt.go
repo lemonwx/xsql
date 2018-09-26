@@ -63,6 +63,7 @@ func (bs *baseStmt) stmtChk(shardList []int) error {
 }
 
 func (bs *baseStmt) parseArgs(data []byte) error {
+	log.Debug(bs.cliArgCount)
 	if bs.cliArgCount == 0 {
 		return nil
 	}
@@ -155,6 +156,7 @@ func (bs *baseStmt) execute(data []byte, fun func(map[int]interface{}, uint32) (
 		return nil, err
 	}
 
+	log.Debug(bs.args, data)
 	if shardList, err = bs.mid.getShardList(bs.s, bs.args); err != nil {
 		return nil, err
 	}
@@ -385,8 +387,92 @@ type updStmt struct {
 	lockStmt *selStmt
 }
 
+func (upd *updStmt) prepare(idx int) error {
+	if err := upd.baseStmt.prepare(idx); err != nil {
+		return err
+	}
+	upd.cliArgCount = upd.svrArgCount - 1
+	upd.cliFieldCount = upd.svrFieldCount
+	upd.mid.myStmts[upd.stmtId] = upd
+	upd.args = map[int]interface{}{}
+	upd.argTypes = make([]byte, 0, upd.cliArgCount)
+	upd.argFlags = make([]byte, 0, upd.cliArgCount)
+
+	u := upd.s.(*sqlparser.Update)
+	from := sqlparser.String(u.Table)
+	whereSql := sqlparser.String(u.Where)
+	lockSql := fmt.Sprintf("select 1 from %s %s for update ", from, whereSql)
+	lockS, err := sqlparser.Parse(lockSql)
+
+	if err != nil {
+		log.Errorf("[%d] parse sql %s failed: %v", upd.mid.ConnectionId, lockSql, err)
+		return err
+	}
+
+	if s, err := newMyStmt(lockS, upd.mid); err != nil {
+		return err
+	} else {
+		upd.lockStmt = s.(*selStmt)
+		if err := upd.lockStmt.prepare(idx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
-	return nil, nil
+
+	vInuse, err := upd.mid.getCurVInUse(updateOrDelete)
+	if err != nil {
+		return nil, err
+	}
+
+	whereArgsFrom := 0
+	if s, ok := upd.s.(*sqlparser.Update); ok {
+		// update stmt will add extra cols, first expr must be ValArg
+		for _, expr := range s.Exprs[1:] {
+			if _, ok := expr.Expr.(sqlparser.ValArg); ok {
+				whereArgsFrom += 1
+			}
+		}
+	}
+
+	f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+		log.Debug(args, whereArgsFrom)
+		svrArgs := make([]interface{}, 0, len(args)-whereArgsFrom)
+		for idx := whereArgsFrom; idx < len(args); idx += 1 {
+			svrArgs = append(svrArgs, args[idx])
+		}
+
+		log.Debug(whereArgsFrom, args, svrArgs)
+		ret := upd.mid.makePkt(svrArgs, stmtId)
+		return ret, nil
+	}
+
+	ret, err := upd.lockStmt.baseStmt.execute(data, f)
+	if err != nil {
+		log.Debug(ret, err)
+		return nil, err
+	}
+
+	extraColSize := len(upd.lockStmt.s.(*sqlparser.Select).ExtraCols)
+	if err := upd.mid.chkInUse(&ret, extraColSize, vInuse, true); err != nil {
+		return nil, err
+	}
+
+	f1 := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+		svrAgrs := make([]interface{}, 1, len(args)+1)
+		svrAgrs[0] = int64(upd.mid.NextVersion)
+		for idx := 0; idx < len(args); idx += 1 {
+			svrAgrs = append(svrAgrs, args[idx])
+		}
+
+		log.Debug(svrAgrs)
+		ret := upd.mid.makePkt(svrAgrs, stmtId)
+		return ret, nil
+	}
+	return upd.baseStmt.execute(data, f1)
 }
 
 type delStmt struct {
@@ -408,7 +494,7 @@ func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
 		stmtId:     co.baseStmtId,
 	}
 
-	switch s.(type) {
+	switch v := s.(type) {
 	case *sqlparser.Select:
 		return &selStmt{baseStmt: stmt}, nil
 	case *sqlparser.Insert:
@@ -416,6 +502,8 @@ func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
 	case *sqlparser.Delete:
 		return &delStmt{baseStmt: stmt}, nil
 	case *sqlparser.Update:
+		v.Exprs[0].Expr = sqlparser.ValArg("?")
+		stmt.sql = sqlparser.String(v)
 		return &updStmt{baseStmt: stmt}, nil
 	default:
 		log.Errorf("[%d] unsupported prepare for this sql", co.ConnectionId)
