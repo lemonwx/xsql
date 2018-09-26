@@ -398,15 +398,23 @@ func (upd *updStmt) prepare(idx int) error {
 	upd.argTypes = make([]byte, 0, upd.cliArgCount)
 	upd.argFlags = make([]byte, 0, upd.cliArgCount)
 
-	u := upd.s.(*sqlparser.Update)
-	from := sqlparser.String(u.Table)
-	whereSql := sqlparser.String(u.Where)
-	lockSql := fmt.Sprintf("select 1 from %s %s for update ", from, whereSql)
-	lockS, err := sqlparser.Parse(lockSql)
-
-	if err != nil {
-		log.Errorf("[%d] parse sql %s failed: %v", upd.mid.ConnectionId, lockSql, err)
-		return err
+	u, ok := upd.s.(*sqlparser.Update)
+	if !ok {
+		return newDefaultMySQLError(errInternal, "mid update stmt, but back stmt not update")
+	}
+	selList := []sqlparser.SelectExpr{&sqlparser.NonStarExpr{Expr: &sqlparser.ColName{Name: []byte("version")}}}
+	lockS := &sqlparser.Select{
+		Comments:    nil,
+		Distinct:    "",
+		SelectExprs: selList,
+		From:        []sqlparser.TableExpr{&sqlparser.AliasedTableExpr{Expr: u.Table}},
+		Where:       u.Where,
+		GroupBy:     nil,
+		Having:      nil,
+		OrderBy:     u.OrderBy,
+		Limit:       u.Limit,
+		Lock:        " for update",
+		ExtraCols:   selList,
 	}
 
 	if s, err := newMyStmt(lockS, upd.mid); err != nil {
