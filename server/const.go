@@ -51,6 +51,8 @@ const (
 	errOrderByIdxOutOfRange
 	errOrderByColMustInSelectList
 
+	errGetVersionFailed
+
 	errShardPanic
 	errRowsInuseByOthers
 	sqlOnlySuccessInPartlyOfNode
@@ -75,4 +77,5 @@ var MySQLErrName = map[uint16]string{
 	errUnsupportedStmtFieldType:            "unsupported this type of field %v",
 	errOrderByIdxOutOfRange:                "order by index out of range",
 	errOrderByColMustInSelectList:          "order by column must in select list",
+	errGetVersionFailed:                    "get version failed %v",
 }

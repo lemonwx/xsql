@@ -427,18 +427,16 @@ func (upd *updStmt) prepare(idx int) error {
 	}
 
 	return nil
-}git 
+}
 
 func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
-	var vInUse map[uint64]bool
-	var ret []*mysql.Result
-	var vErr, eErr error
 	ch := make(chan map[uint64]bool)
-	var wg sync.WaitGroup
-	wg.Add(2)
+	var vErr error
 
 	// get v inUse and next v
 	go func() {
+		defer close(ch)
+		var vInUse map[uint64]bool
 		vInUse, vErr = upd.mid.getCurVInUse(updateOrDelete)
 		if vErr != nil {
 			return
@@ -447,66 +445,56 @@ func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
 	}()
 
 	// exec
-	go func() {
-		whereArgsFrom := 0
-		if s, ok := upd.s.(*sqlparser.Update); ok {
-			// update stmt will add extra cols, first expr must be ValArg
-			for _, expr := range s.Exprs[1:] {
-				if _, ok := expr.Expr.(sqlparser.ValArg); ok {
-					whereArgsFrom += 1
-				}
+	// calc update exprs size
+	whereArgsFrom := 0
+	if s, ok := upd.s.(*sqlparser.Update); ok {
+		// update stmt will add extra cols, first expr must be ValArg
+		for _, expr := range s.Exprs[1:] {
+			if _, ok := expr.Expr.(sqlparser.ValArg); ok {
+				whereArgsFrom += 1
 			}
 		}
-
-		f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
-			log.Debug(args, whereArgsFrom)
-			svrArgs := make([]interface{}, 0, len(args)-whereArgsFrom)
-			for idx := whereArgsFrom; idx < len(args); idx += 1 {
-				svrArgs = append(svrArgs, args[idx])
-			}
-
-			log.Debug(whereArgsFrom, args, svrArgs)
-			ret := upd.mid.makePkt(svrArgs, stmtId)
-			return ret, nil
-		}
-
-		ret, eErr = upd.lockStmt.baseStmt.execute(data, f)
-		if eErr != nil {
-			return
-		}
-
-		vInUse := <-ch
-		extraColSize := len(upd.lockStmt.s.(*sqlparser.Select).ExtraCols)
-		if eErr = upd.mid.chkInUse(&ret, extraColSize, vInUse, true); eErr != nil {
-			return
-		}
-
-		f1 := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
-			svrArgs := make([]interface{}, 1, len(args)+1)
-			svrArgs[0] = int64(upd.mid.NextVersion)
-			for idx := 0; idx < len(args); idx += 1 {
-				svrArgs = append(svrArgs, args[idx])
-			}
-
-			log.Debug(svrArgs)
-			ret := upd.mid.makePkt(svrArgs, stmtId)
-			return ret, nil
-		}
-
-		ret, eErr = upd.baseStmt.execute(data, f1)
-	}()
-
-	wg.Wait()
-
-	if vErr != nil {
-		return nil, vErr
 	}
 
-	if eErr != nil {
-		return nil, eErr
+	f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+		log.Debug(args, whereArgsFrom)
+		svrArgs := make([]interface{}, 0, len(args)-whereArgsFrom)
+		for idx := whereArgsFrom; idx < len(args); idx += 1 {
+			svrArgs = append(svrArgs, args[idx])
+		}
+
+		log.Debug(whereArgsFrom, args, svrArgs)
+		ret := upd.mid.makePkt(svrArgs, stmtId)
+		return ret, nil
 	}
 
-	return ret, nil
+	ret, err := upd.lockStmt.baseStmt.execute(data, f)
+	if err != nil {
+		return nil, err
+	}
+
+	vInUse, ok := <-ch
+	if !ok {
+		return nil, newDefaultMySQLError(errGetVersionFailed, vErr)
+	}
+	extraColSize := len(upd.lockStmt.s.(*sqlparser.Select).ExtraCols)
+	if err := upd.mid.chkInUse(&ret, extraColSize, vInUse, true); err != nil {
+		return nil, err
+	}
+
+	f1 := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+		svrArgs := make([]interface{}, 1, len(args)+1)
+		svrArgs[0] = int64(upd.mid.NextVersion)
+		for idx := 0; idx < len(args); idx += 1 {
+			svrArgs = append(svrArgs, args[idx])
+		}
+
+		log.Debug(svrArgs)
+		ret := upd.mid.makePkt(svrArgs, stmtId)
+		return ret, nil
+	}
+
+	return upd.baseStmt.execute(data, f1)
 }
 
 type delStmt struct {
