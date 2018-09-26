@@ -23,6 +23,7 @@ type myStmt interface {
 	execute(data []byte) ([]*mysql.Result, error)
 	response() error
 	close() error
+	reset()
 }
 
 type baseStmt struct {
@@ -43,6 +44,8 @@ type baseStmt struct {
 	args     map[int]interface{}
 	argTypes []byte
 	argFlags []byte
+
+	lockStartIdx int
 }
 
 func (bs *baseStmt) reset() {
@@ -63,6 +66,9 @@ func (bs *baseStmt) stmtChk(shardList []int) error {
 }
 
 func (bs *baseStmt) parseArgs(data []byte) error {
+	if len(bs.args) != 0 {
+		return nil
+	}
 	log.Debug(bs.cliArgCount)
 	if bs.cliArgCount == 0 {
 		return nil
@@ -105,7 +111,6 @@ func (bs *baseStmt) parseArgs(data []byte) error {
 			return newDefaultMySQLError(errUnsupportedStmtFieldType, tp)
 		}
 	}
-
 	return nil
 }
 
@@ -156,7 +161,7 @@ func (bs *baseStmt) execute(data []byte, fun func(map[int]interface{}, uint32) (
 		return nil, err
 	}
 
-	log.Debug(bs.args, data)
+	log.Debug(bs.args, data, sqlparser.String(bs.s))
 	if shardList, err = bs.mid.getShardList(bs.s, bs.args); err != nil {
 		return nil, err
 	}
@@ -387,6 +392,11 @@ type updStmt struct {
 	lockStmt *selStmt
 }
 
+func (upd *updStmt) reset() {
+	upd.baseStmt.reset()
+	upd.lockStmt.reset()
+}
+
 func (upd *updStmt) prepare(idx int) error {
 	if err := upd.baseStmt.prepare(idx); err != nil {
 		return err
@@ -444,26 +454,34 @@ func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
 		ch <- vInUse
 	}()
 
-	// exec
+	if err := upd.parseArgs(data); err != nil {
+		return nil, err
+	}
+
 	// calc update exprs size
-	whereArgsFrom := 0
+	upd.lockStartIdx = 0
 	if s, ok := upd.s.(*sqlparser.Update); ok {
 		// update stmt will add extra cols, first expr must be ValArg
 		for _, expr := range s.Exprs[1:] {
 			if _, ok := expr.Expr.(sqlparser.ValArg); ok {
-				whereArgsFrom += 1
+				upd.lockStartIdx += 1
 			}
 		}
 	}
 
+	for idx := upd.lockStartIdx; idx < len(upd.args); idx += 1 {
+		upd.lockStmt.args[idx] = upd.args[idx]
+	}
+
+	log.Debug(upd.args, upd.lockStmt.args)
+
 	f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
-		log.Debug(args, whereArgsFrom)
-		svrArgs := make([]interface{}, 0, len(args)-whereArgsFrom)
-		for idx := whereArgsFrom; idx < len(args); idx += 1 {
-			svrArgs = append(svrArgs, args[idx])
+		svrArgs := make([]interface{}, 0, len(args)-upd.lockStartIdx)
+		for idx := 0; idx < len(args); idx += 1 {
+			svrArgs = append(svrArgs, args[idx+upd.lockStartIdx])
 		}
 
-		log.Debug(whereArgsFrom, args, svrArgs)
+		log.Debug(upd.lockStartIdx, args, svrArgs)
 		ret := upd.mid.makePkt(svrArgs, stmtId)
 		return ret, nil
 	}

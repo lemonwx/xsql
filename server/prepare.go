@@ -220,6 +220,7 @@ func (conn *MidConn) handleStmtExecute(data []byte) error {
 	if !ok {
 		return newDefaultMySQLError(errUnknownStmtHandler, id, "stmt execute")
 	}
+	stmt.reset()
 
 	flag := data[pos]
 	pos += 1
