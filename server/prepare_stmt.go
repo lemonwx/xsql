@@ -44,8 +44,6 @@ type baseStmt struct {
 	args     map[int]interface{}
 	argTypes []byte
 	argFlags []byte
-
-	lockStartIdx int
 }
 
 func (bs *baseStmt) reset() {
@@ -69,7 +67,7 @@ func (bs *baseStmt) parseArgs(data []byte) error {
 	if len(bs.args) != 0 {
 		return nil
 	}
-	log.Debug(bs.cliArgCount)
+
 	if bs.cliArgCount == 0 {
 		return nil
 	}
@@ -390,6 +388,8 @@ func (ist *istStmt) execute(data []byte) ([]*mysql.Result, error) {
 type updStmt struct {
 	*baseStmt
 	lockStmt *selStmt
+
+	lockStartIdx int
 }
 
 func (upd *updStmt) reset() {
@@ -431,12 +431,61 @@ func (upd *updStmt) prepare(idx int) error {
 		return err
 	} else {
 		upd.lockStmt = s.(*selStmt)
-		if err := upd.lockStmt.prepare(idx); err != nil {
-			return err
+		/*
+			if err := upd.lockStmt.prepare(idx); err != nil {
+				return err
+			}
+		*/
+	}
+
+	return nil
+}
+
+func (upd *updStmt) parseLockStartIdx() error {
+	// update's lock stmt only have ValArg in where stmt, so should calc update filed ArgVals count
+	if upd.lockStartIdx != -1 {
+		return nil
+	}
+
+	s, ok := upd.s.(*sqlparser.Update)
+	if !ok {
+		return newDefaultMySQLError(errInternal, "update mid stmt's s not update error")
+	}
+
+	// update stmt will add extra cols, first expr must be ValArg
+	upd.lockStartIdx = 0
+	for _, expr := range s.Exprs[1:] {
+		if _, ok := expr.Expr.(sqlparser.ValArg); ok {
+			upd.lockStartIdx += 1
 		}
 	}
 
 	return nil
+}
+
+func (upd *updStmt) encodeSvrLockArgs(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+	if err := upd.parseLockStartIdx(); err != nil {
+		return nil, err
+	}
+	svrArgs := make([]interface{}, 0, len(args)-upd.lockStartIdx)
+	for idx := upd.lockStartIdx; idx < len(args); idx += 1 {
+		svrArgs = append(svrArgs, args[idx])
+
+	}
+	ret := upd.mid.makePkt(svrArgs, stmtId)
+	return ret, nil
+}
+
+func (upd *updStmt) encodeSvrExecArgs(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+	svrArgs := make([]interface{}, 1, len(args)+1)
+	svrArgs[0] = int64(upd.mid.NextVersion)
+	for idx := 0; idx < len(args); idx += 1 {
+		svrArgs = append(svrArgs, args[idx])
+	}
+
+	log.Debug(svrArgs)
+	ret := upd.mid.makePkt(svrArgs, stmtId)
+	return ret, nil
 }
 
 func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
@@ -457,36 +506,9 @@ func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
 	if err := upd.parseArgs(data); err != nil {
 		return nil, err
 	}
+	upd.lockStmt.args = upd.args
 
-	// calc update exprs size
-	upd.lockStartIdx = 0
-	if s, ok := upd.s.(*sqlparser.Update); ok {
-		// update stmt will add extra cols, first expr must be ValArg
-		for _, expr := range s.Exprs[1:] {
-			if _, ok := expr.Expr.(sqlparser.ValArg); ok {
-				upd.lockStartIdx += 1
-			}
-		}
-	}
-
-	for idx := upd.lockStartIdx; idx < len(upd.args); idx += 1 {
-		upd.lockStmt.args[idx] = upd.args[idx]
-	}
-
-	log.Debug(upd.args, upd.lockStmt.args)
-
-	f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
-		svrArgs := make([]interface{}, 0, len(args)-upd.lockStartIdx)
-		for idx := 0; idx < len(args); idx += 1 {
-			svrArgs = append(svrArgs, args[idx+upd.lockStartIdx])
-		}
-
-		log.Debug(upd.lockStartIdx, args, svrArgs)
-		ret := upd.mid.makePkt(svrArgs, stmtId)
-		return ret, nil
-	}
-
-	ret, err := upd.lockStmt.baseStmt.execute(data, f)
+	ret, err := upd.lockStmt.baseStmt.execute(data, upd.encodeSvrLockArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -500,19 +522,16 @@ func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
 		return nil, err
 	}
 
-	f1 := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
-		svrArgs := make([]interface{}, 1, len(args)+1)
-		svrArgs[0] = int64(upd.mid.NextVersion)
-		for idx := 0; idx < len(args); idx += 1 {
-			svrArgs = append(svrArgs, args[idx])
-		}
-
-		log.Debug(svrArgs)
-		ret := upd.mid.makePkt(svrArgs, stmtId)
-		return ret, nil
+	rowCount := 0
+	for _, ret := range ret {
+		rowCount += len(ret.RowDatas)
+	}
+	if rowCount == 0 {
+		log.Debugf("[%d] select lock 0 rows, direct response nil", upd.mid.ConnectionId)
+		return nil, nil
 	}
 
-	return upd.baseStmt.execute(data, f1)
+	return upd.baseStmt.execute(data, upd.encodeSvrExecArgs)
 }
 
 type delStmt struct {
@@ -544,7 +563,7 @@ func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
 	case *sqlparser.Update:
 		v.Exprs[0].Expr = sqlparser.ValArg("?")
 		stmt.sql = sqlparser.String(v)
-		return &updStmt{baseStmt: stmt}, nil
+		return &updStmt{baseStmt: stmt, lockStartIdx: -1}, nil
 	default:
 		log.Errorf("[%d] unsupported prepare for this sql", co.ConnectionId)
 		return nil, newMySQLErr(errUnsupportedSql)
