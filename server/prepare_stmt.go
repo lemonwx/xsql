@@ -24,6 +24,7 @@ type myStmt interface {
 	response() error
 	close() error
 	reset()
+	getStmtId() uint32
 }
 
 type baseStmt struct {
@@ -44,6 +45,10 @@ type baseStmt struct {
 	args     map[int]interface{}
 	argTypes []byte
 	argFlags []byte
+}
+
+func (bs *baseStmt) getStmtId() uint32 {
+	return bs.stmtId
 }
 
 func (bs *baseStmt) reset() {
@@ -302,10 +307,6 @@ func (sel *selStmt) prepare(idx int) error {
 
 	sel.cliArgCount = sel.svrArgCount
 	sel.cliFieldCount = sel.svrFieldCount - 1
-	sel.mid.myStmts[sel.stmtId] = sel
-	sel.args = map[int]interface{}{}
-	sel.argTypes = make([]byte, 0, sel.cliArgCount)
-	sel.argFlags = make([]byte, 0, sel.cliArgCount)
 	return nil
 }
 
@@ -360,10 +361,6 @@ func (ist *istStmt) prepare(idx int) error {
 	}
 	ist.cliArgCount = ist.svrArgCount - 1
 	ist.cliFieldCount = ist.svrFieldCount
-	ist.mid.myStmts[ist.stmtId] = ist
-	ist.args = map[int]interface{}{}
-	ist.argTypes = make([]byte, 0, ist.cliArgCount)
-	ist.argFlags = make([]byte, 0, ist.cliArgCount)
 	return nil
 }
 
@@ -403,10 +400,6 @@ func (upd *updStmt) prepare(idx int) error {
 	}
 	upd.cliArgCount = upd.svrArgCount - 1
 	upd.cliFieldCount = upd.svrFieldCount
-	upd.mid.myStmts[upd.stmtId] = upd
-	upd.args = map[int]interface{}{}
-	upd.argTypes = make([]byte, 0, upd.cliArgCount)
-	upd.argFlags = make([]byte, 0, upd.cliArgCount)
 	return nil
 }
 
@@ -516,10 +509,6 @@ func (del *delStmt) prepare(idx int) error {
 	}
 	del.cliFieldCount = del.svrFieldCount
 	del.cliArgCount = del.svrArgCount
-	del.mid.myStmts[del.stmtId] = del
-	del.args = map[int]interface{}{}
-	del.argTypes = make([]byte, 0, del.cliArgCount)
-	del.argFlags = make([]byte, 0, del.cliArgCount)
 	return nil
 }
 

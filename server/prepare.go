@@ -203,6 +203,11 @@ func (conn *MidConn) handlePrepare(sql string) error {
 	if err = stmt.response(); err != nil {
 		return err
 	}
+
+	stmtId := stmt.getStmtId()
+	conn.myStmts[stmtId] = stmt
+	stmt.reset()
+
 	return nil
 }
 
