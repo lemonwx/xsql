@@ -407,37 +407,6 @@ func (upd *updStmt) prepare(idx int) error {
 	upd.args = map[int]interface{}{}
 	upd.argTypes = make([]byte, 0, upd.cliArgCount)
 	upd.argFlags = make([]byte, 0, upd.cliArgCount)
-
-	u, ok := upd.s.(*sqlparser.Update)
-	if !ok {
-		return newDefaultMySQLError(errInternal, "mid update stmt, but back stmt not update")
-	}
-	selList := []sqlparser.SelectExpr{&sqlparser.NonStarExpr{Expr: &sqlparser.ColName{Name: []byte("version")}}}
-	lockS := &sqlparser.Select{
-		Comments:    nil,
-		Distinct:    "",
-		SelectExprs: selList,
-		From:        []sqlparser.TableExpr{&sqlparser.AliasedTableExpr{Expr: u.Table}},
-		Where:       u.Where,
-		GroupBy:     nil,
-		Having:      nil,
-		OrderBy:     u.OrderBy,
-		Limit:       u.Limit,
-		Lock:        " for update",
-		ExtraCols:   selList,
-	}
-
-	if s, err := newMyStmt(lockS, upd.mid); err != nil {
-		return err
-	} else {
-		upd.lockStmt = s.(*selStmt)
-		/*
-			if err := upd.lockStmt.prepare(idx); err != nil {
-				return err
-			}
-		*/
-	}
-
 	return nil
 }
 
@@ -506,6 +475,8 @@ func (upd *updStmt) execute(data []byte) ([]*mysql.Result, error) {
 	if err := upd.parseArgs(data); err != nil {
 		return nil, err
 	}
+
+	log.Debug(upd.lockStmt, upd.args)
 	upd.lockStmt.args = upd.args
 
 	ret, err := upd.lockStmt.baseStmt.execute(data, upd.encodeSvrLockArgs)
@@ -539,7 +510,33 @@ type delStmt struct {
 	upd *updStmt
 }
 
+func (del *delStmt) prepare(idx int) error {
+	if err := del.baseStmt.prepare(idx); err != nil {
+		return err
+	}
+	del.cliFieldCount = del.svrFieldCount
+	del.cliArgCount = del.svrArgCount
+	del.mid.myStmts[del.stmtId] = del
+	del.args = map[int]interface{}{}
+	del.argTypes = make([]byte, 0, del.cliArgCount)
+	del.argFlags = make([]byte, 0, del.cliArgCount)
+	return nil
+}
+
 func (del *delStmt) execute(data []byte) ([]*mysql.Result, error) {
+	if err := del.parseArgs(data); err != nil {
+		return nil, err
+	}
+
+	log.Debug(del.args)
+	del.upd.args = del.args
+
+	ret, err := del.upd.execute(data)
+	if err != nil {
+		log.Debugf("[%d] update failed: %v", del.mid.ConnectionId, err)
+		return nil, err
+	}
+	log.Debug(ret)
 	return nil, nil
 }
 
@@ -559,11 +556,41 @@ func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
 	case *sqlparser.Insert:
 		return &istStmt{baseStmt: stmt}, nil
 	case *sqlparser.Delete:
-		return &delStmt{baseStmt: stmt}, nil
+		updS := &sqlparser.Update{
+			Table:   v.Table,
+			Where:   v.Where,
+			Exprs:   []*sqlparser.UpdateExpr{{Name: &sqlparser.ColName{Name: []byte("version")}, Expr: sqlparser.ValArg("?")}},
+			OrderBy: v.OrderBy,
+			Limit:   v.Limit,
+		}
+		s, err := newMyStmt(updS, co)
+		if err != nil {
+			return nil, err
+		}
+		return &delStmt{baseStmt: stmt, upd: s.(*updStmt)}, nil
 	case *sqlparser.Update:
 		v.Exprs[0].Expr = sqlparser.ValArg("?")
 		stmt.sql = sqlparser.String(v)
-		return &updStmt{baseStmt: stmt, lockStartIdx: -1}, nil
+		selList := []sqlparser.SelectExpr{&sqlparser.NonStarExpr{Expr: &sqlparser.ColName{Name: []byte("version")}}}
+		lockS := &sqlparser.Select{
+			Comments:    nil,
+			Distinct:    "",
+			SelectExprs: selList,
+			From:        []sqlparser.TableExpr{&sqlparser.AliasedTableExpr{Expr: v.Table}},
+			Where:       v.Where,
+			GroupBy:     nil,
+			Having:      nil,
+			OrderBy:     v.OrderBy,
+			Limit:       v.Limit,
+			Lock:        " for update",
+			ExtraCols:   selList,
+		}
+
+		s, err := newMyStmt(lockS, co)
+		if err != nil {
+			return nil, err
+		}
+		return &updStmt{baseStmt: stmt, lockStartIdx: -1, lockStmt: s.(*selStmt)}, nil
 	default:
 		log.Errorf("[%d] unsupported prepare for this sql", co.ConnectionId)
 		return nil, newMySQLErr(errUnsupportedSql)
