@@ -47,6 +47,15 @@ type baseStmt struct {
 	argFlags []byte
 }
 
+func (bs *baseStmt) mkBasicPkt(data []byte, stmtId uint32) []byte {
+	svrData := make([]byte, 0, len(data)+4+1+4)
+	svrData = append(svrData, mysql.Uint32ToBytes(stmtId)...) //int<4> statement id
+	svrData = append(svrData, 0)                              //int<1> flags:
+	svrData = append(svrData, 1, 0, 0, 0)                     //int<4> Iteration count (always 1)
+	svrData = append(svrData, data...)
+	return svrData
+}
+
 func (bs *baseStmt) getStmtId() uint32 {
 	return bs.stmtId
 }
@@ -322,12 +331,7 @@ func (sel *selStmt) execute(data []byte) ([]*mysql.Result, error) {
 	}()
 	go func() {
 		f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
-			svrData := make([]byte, 0, len(data)+4+1+4)
-			svrData = append(svrData, mysql.Uint32ToBytes(stmtId)...) //int<4> statement id
-			svrData = append(svrData, 0)                              //int<1> flags:
-			svrData = append(svrData, 1, 0, 0, 0)                     //int<4> Iteration count (always 1)
-			svrData = append(svrData, data...)
-			return svrData, nil
+			return sel.mkBasicPkt(data, stmtId), nil
 		}
 
 		rets, eErr = sel.baseStmt.execute(data, f)
@@ -525,8 +529,18 @@ func (del *delStmt) execute(data []byte) ([]*mysql.Result, error) {
 		log.Debugf("[%d] update failed: %v", del.mid.ConnectionId, err)
 		return nil, err
 	}
-	log.Debug(ret)
-	return nil, nil
+
+	// if update affect 0 rows, that means your where in sql don't match any rows, direct response nil
+	if ret == nil {
+		return nil, nil
+	}
+
+	f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
+		return del.mkBasicPkt(data, stmtId), nil
+	}
+
+	log.Debug(del.stmtId)
+	return del.baseStmt.execute(data, f)
 }
 
 func newMyStmt(s sqlparser.Statement, co *MidConn) (myStmt, error) {
