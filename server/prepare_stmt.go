@@ -119,6 +119,20 @@ func (bs *baseStmt) parseArgs(data []byte) error {
 				bs.args[idx] = int64(binary.LittleEndian.Uint64(data[pos : pos+8]))
 			}
 			pos += 8
+		case mysql.MYSQL_TYPE_STRING:
+			v, isNull, n, err := LengthEnodedString(data[pos:])
+			pos += n
+			if err != nil {
+				return err
+			}
+
+			if !isNull {
+				bs.args[idx] = v
+				continue
+			} else {
+				bs.args[idx] = nil
+				continue
+			}
 		default:
 			return newDefaultMySQLError(errUnsupportedStmtFieldType, tp)
 		}
