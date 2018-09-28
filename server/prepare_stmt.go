@@ -376,8 +376,8 @@ func (ist *istStmt) execute(data []byte) ([]*mysql.Result, error) {
 	f := func(args map[int]interface{}, stmtId uint32) ([]byte, error) {
 		svrArgs := make([]interface{}, 1, len(args)+1)
 		svrArgs[0] = int64(ist.mid.NextVersion)
-		for _, v := range args {
-			svrArgs = append(svrArgs, v)
+		for idx := 0; idx < len(args); idx += 1 {
+			svrArgs = append(svrArgs, args[idx])
 		}
 		ret := ist.mid.makePkt(svrArgs, stmtId)
 		return ret, nil
